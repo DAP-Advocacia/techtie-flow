@@ -1,0 +1,692 @@
+/* Tela Negócios (#/pipeline). Tudo prefixado com .pipeline- para não colidir. */
+.pipeline {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pipeline-header {
+  padding: 22px 28px 14px;
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.pipeline-header .grow {
+  flex: 1;
+  min-width: 260px;
+}
+.pipeline-header .btn--primary {
+  padding: 10px 20px;
+}
+.pipeline-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* ---------- quadro ---------- */
+.pipeline-board {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 4px 28px 24px;
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+}
+.pipeline-col {
+  width: 268px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pipeline-col__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 8px;
+}
+.pipeline-col__name {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pipeline-col__count {
+  color: var(--mute);
+  font-weight: 500;
+}
+.pipeline-col__total {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.pipeline-col__list {
+  flex: 1;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 12px;
+  border: 1px dashed transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+.pipeline-col__empty {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 26px 12px;
+  text-align: center;
+  color: var(--mute);
+  font-size: 13px;
+}
+/* durante o arraste, todas as colunas indicam que aceitam soltar; a de destino acende */
+.pipeline-board.is-dragging .pipeline-col__list {
+  border-color: var(--line);
+}
+.pipeline-col.is-over .pipeline-col__list {
+  border-color: var(--acc);
+  background: var(--note-bg);
+}
+.pipeline-col.is-over .pipeline-col__empty {
+  border-color: var(--acc);
+  color: var(--acc);
+}
+
+/* ---------- cartão ---------- */
+.pipeline-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.12s;
+}
+.pipeline-card:hover {
+  border-color: var(--dim);
+}
+.pipeline-card.is-selected {
+  border-color: var(--acc);
+}
+.pipeline-card[draggable='true'] {
+  cursor: grab;
+}
+.pipeline-card.is-dragging-card {
+  opacity: 0.4;
+  border-style: dashed;
+}
+.pipeline-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pipeline-card__title {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pipeline-card__company {
+  color: var(--mute);
+  font-size: 13px;
+}
+.pipeline-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 24px;
+}
+.pipeline-card__value {
+  font-weight: 600;
+  font-size: 15px;
+}
+/* Valor | (mover) | idade. A idade é o último item da linha, então termina sempre na mesma borda do avatar,
+   com ou sem o botão "mover" visível (que reserva espaço só à esquerda dela). */
+.pipeline-card__value {
+  margin-right: auto;
+}
+.pipeline-card__age {
+  font-size: 11.5px;
+  color: var(--mute);
+  margin-left: 6px;
+}
+.pipeline-card__wa {
+  font-size: 12px;
+  color: var(--green);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.pipeline-card__wa-text {
+  color: var(--mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipeline-card__move {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--card2);
+  color: var(--mute);
+  border-radius: 50%;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s, border-color 0.12s;
+}
+.pipeline-card:hover .pipeline-card__move,
+.pipeline-card:focus-within .pipeline-card__move,
+.pipeline-card.is-selected .pipeline-card__move,
+.pipeline-card__move[aria-expanded='true'] {
+  opacity: 1;
+}
+.pipeline-card__move:hover {
+  color: var(--acc);
+  border-color: var(--dim);
+}
+
+/* ---------- menu "Mover para…" ---------- */
+.pipeline-menu {
+  position: fixed;
+  z-index: 900;
+  min-width: 210px;
+  background: var(--card2);
+  border: 1px solid var(--dim);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pipeline-menu__title {
+  padding: 6px 10px 4px;
+}
+.pipeline-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--text);
+}
+.pipeline-menu__item:hover:not(:disabled),
+.pipeline-menu__item:focus-visible {
+  background: var(--line);
+  color: var(--acc2);
+}
+.pipeline-menu__item:disabled {
+  color: var(--mute);
+  cursor: default;
+}
+.pipeline-menu__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.pipeline-menu__name {
+  flex: 1;
+}
+.pipeline-menu__here {
+  font-size: 11px;
+  color: var(--mute);
+}
+
+/* ---------- painel de proposta ---------- */
+.pipeline-panel {
+  width: 340px;
+  flex: none;
+  border-left: 1px solid var(--line);
+  background: var(--side);
+  overflow: auto;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pipeline-panel__title {
+  font-weight: 600;
+  font-size: 21px;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.pipeline-panel__empty {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+.pipeline-panel__sent {
+  font-size: 12px;
+  color: var(--green);
+  text-align: center;
+  margin-top: -6px;
+}
+.pipeline-items {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pipeline-items__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.pipeline-items__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.pipeline-items__note {
+  font-size: 12px;
+  color: var(--mute);
+}
+.pipeline-items__price {
+  white-space: nowrap;
+}
+.pipeline-items__remove {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  color: var(--mute);
+  padding: 0;
+  margin: 1px -4px 0 0;
+}
+.pipeline-items__remove:hover {
+  color: var(--red);
+  background: var(--card2);
+}
+.pipeline-items__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--card2);
+}
+.pipeline-items__total-label {
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  color: var(--mute);
+}
+.pipeline-items__total-value {
+  font-weight: 600;
+  font-size: 18px;
+}
+.pipeline-noitems {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--dim);
+  font-size: 13.5px;
+}
+.pipeline-noitems strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.pipeline-noitems__est {
+  margin-top: 4px;
+  color: var(--mute);
+  font-size: 12.5px;
+}
+.pipeline-noitems__est b {
+  color: var(--text);
+}
+/* Desabilitado sem envio em curso: superfície neutra dos tokens em vez de opacity sobre --fill
+   (que no tema claro virava um cinza chapado). "Enviando…" (aria-busy) mantém o preenchimento. */
+.pipeline-panel .btn--primary:disabled:not([aria-busy='true']) {
+  background: var(--card2);
+  color: var(--mute);
+  border-color: var(--line);
+  opacity: 1;
+}
+.pipeline-add {
+  background: none;
+  border: 1px dashed var(--dim);
+  color: var(--acc);
+  border-radius: 10px;
+  padding: 10px;
+}
+.pipeline-add:hover {
+  background: var(--card2);
+}
+
+/* ---------- modais ---------- */
+.pipeline-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(2px);
+}
+.pipeline-modal {
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 22px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pipeline-modal__title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.pipeline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pipeline-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.pipeline-form__sub {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px dashed var(--dim);
+  border-radius: 12px;
+}
+.pipeline-form__sub[hidden] {
+  display: none;
+}
+.pipeline-modal [aria-invalid='true'] {
+  border-color: var(--red);
+}
+.pipeline-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+.pipeline-addprod__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--card2);
+  border-radius: 10px;
+}
+.pipeline-addprod__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pipeline-addprod__sub {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+/* telas baixas (1280x800): compacta o formulário para o botão não ficar fora da vista */
+@media (max-height: 860px) {
+  .pipeline-modal {
+    padding: 18px 22px 20px;
+    gap: 12px;
+  }
+  .pipeline-form {
+    gap: 10px;
+  }
+  .pipeline-form__sub {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .pipeline-modal .input,
+  .pipeline-modal .select {
+    padding: 9px 12px;
+  }
+}
+
+/* ---------- permissões ---------- */
+/* botão "+ Novo negócio" com a dica de por que está desabilitado */
+.pipeline-header__new {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: 260px;
+}
+.pipeline-header__hint {
+  font-size: 12px;
+  color: var(--mute);
+  text-align: right;
+}
+.pipeline-header__hint[hidden] {
+  display: none;
+}
+.pipeline-header .btn--primary:disabled {
+  background: var(--card2);
+  color: var(--mute);
+  border-color: var(--line);
+  opacity: 1;
+}
+.pipeline-noaccess {
+  gap: 6px;
+  text-align: center;
+}
+
+/* cartão que o usuário não pode mover: não é "agarrável" */
+.pipeline-card.is-fixed[draggable='false'] {
+  cursor: pointer;
+}
+/* valor/total ocultos pelo perfil */
+.pipeline-card__value--hidden,
+.pipeline-col__total--hidden,
+.pipeline-items__price.is-hidden,
+.pipeline-items__total-value.is-hidden {
+  color: var(--mute);
+  letter-spacing: 0.12em;
+}
+
+/* coluna que NÃO aceita o drop (negada pelo motor): borda vermelha + motivo */
+.pipeline-col.is-blocked,
+.pipeline-col.is-blocked .pipeline-col__list {
+  cursor: not-allowed;
+}
+.pipeline-board.is-dragging .pipeline-col.is-blocked .pipeline-col__list {
+  position: relative;
+  border-color: var(--red);
+  background: color-mix(in srgb, var(--red) 7%, transparent);
+}
+.pipeline-col.is-blocked .pipeline-col__list[data-block]::before {
+  content: attr(data-block);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--red) 16%, var(--card));
+  color: var(--text);
+  border: 1px solid var(--red);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.pipeline-col.is-blocked .pipeline-col__empty {
+  border-color: var(--red);
+  color: var(--mute);
+}
+
+/* menu "Mover para…": destino negado com o motivo embaixo do nome */
+.pipeline-menu {
+  min-width: 250px;
+  max-width: 320px;
+}
+.pipeline-menu__item.is-blocked {
+  align-items: flex-start;
+}
+.pipeline-menu__item.is-blocked .pipeline-menu__dot {
+  margin-top: 6px;
+}
+.pipeline-menu__why {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--mute);
+  margin-top: 1px;
+}
+
+/* dicas de por que uma ação está desabilitada / precisa de aprovação */
+.pipeline-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--mute);
+  margin-top: -6px;
+}
+.pipeline-form .pipeline-hint,
+.field .pipeline-hint {
+  margin-top: 0;
+}
+.pipeline-hint.is-warn {
+  color: var(--text);
+  border: 1px solid var(--acc);
+  background: var(--note-bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 0;
+}
+.pipeline-form > .pipeline-hint.is-warn {
+  margin-bottom: 2px;
+}
+
+/* ações do negócio (ganho / perdido / excluir) */
+.pipeline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pipeline-actions__btn {
+  flex: 1 1 auto;
+}
+.pipeline-actions__btn.is-won:not(:disabled) {
+  color: var(--green);
+}
+.pipeline-actions__btn.is-lost:not(:disabled),
+.pipeline-actions__btn.is-danger:not(:disabled) {
+  color: var(--red);
+}
+.pipeline-actions__btn:disabled {
+  color: var(--mute);
+}
+
+/* compartilhamento por registro */
+.pipeline-share {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.pipeline-share__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pipeline-share__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.pipeline-share__row:last-child {
+  border-bottom: 0;
+}
+.pipeline-share__who {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pipeline-share__lvl {
+  font-size: 12px;
+  color: var(--mute);
+  white-space: nowrap;
+}
+.pipeline-share__row .pipeline-items__remove {
+  margin: 0;
+}
+.pipeline-share__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pipeline-share__formrow {
+  display: flex;
+  gap: 8px;
+}
+.pipeline-share__formrow .select {
+  flex: 1;
+  min-width: 0;
+}
+.pipeline-share .pipeline-hint {
+  margin-top: 0;
+}
+
+/* o painel rola; nada dentro dele deve encolher para caber (a lista de itens era cortada) */
+.pipeline-panel > * {
+  flex-shrink: 0;
+}
+.pipeline-share .select {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.pipeline-header .pills:empty {
+  display: none;
+}
+.pipeline-noaccess {
+  justify-content: center;
+  align-items: center;
+}
+.field .pipeline-hint,
+.pipeline-form .pipeline-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo 'protótipo estático: nenhuma dependência para instalar'",
+  "buildCommand": "node scripts/build-static.mjs",
+  "outputDirectory": "dist",
+  "cleanUrls": true
+}

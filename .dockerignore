@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+*.log
+auth_session
+auth_session_backup*
+data
+control-plane
+.claude
+HANDOFF.md
+handoff.json

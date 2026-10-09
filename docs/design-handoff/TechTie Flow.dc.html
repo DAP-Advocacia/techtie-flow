@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1b1d21;--side:#141619;--card:#24272c;--card2:#2c3036;--bub:#2f333a;--line:#3a3e46;--glow:#2d3036;--out:#3b4048;--outline:#5a5f69;--acc:#d6c093;--acc2:#ead9b0;--dim:#8b7a55;--bar:#6f6850;--mute:#a3a8b0;--text:#f3ede2;--fill:#e4d6b8;--fillh:#f0e4c8;--ink:#1b1d21;--green:#6fbf8b;--red:#e08a82;--ins:#8bb4dd;--sh:rgba(0,0,0,.28);--hi:rgba(255,255,255,.05)}
+body{margin:0;background:var(--bg);font-family:'Plus Jakarta Sans',sans-serif;color:var(--text)}
+a{color:var(--acc);text-decoration:none}a:hover{color:var(--acc2)}
+*{box-sizing:border-box}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+button,input,textarea{font-family:inherit}
+</style>
+</helmet>
+<div style="display:flex;height:100vh;min-height:760px;background:var(--bg);color:var(--text);font-size:14px">
+
+<sc-if value="{{ showShell }}" hint-placeholder-val="{{ true }}">
+<aside style="width:232px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px;gap:6px">
+  <div style="display:flex;align-items:center;gap:10px;padding:0 8px 22px">
+    <div style="width:34px;height:34px;border:1px solid var(--dim);border-radius:8px;display:grid;place-items:center;font-family:'Plus Jakarta Sans';font-weight:700;font-size:16px;color:var(--acc);background:var(--card)">T</div>
+    <div style="display:flex;flex-direction:column;line-height:1.05"><span style="font-family:'Plus Jakarta Sans';font-weight:600;letter-spacing:.22em;font-size:17px;color:var(--acc)">TECHTIE</span><span style="font-size:11px;letter-spacing:.3em;color:var(--mute)">FLOW</span></div>
+  </div>
+  <div style="font-size:10.5px;letter-spacing:.2em;color:var(--mute);padding:0 10px 6px">OPERAÇÃO</div>
+  <sc-for list="{{ nav }}" as="n" hint-placeholder-count="7">
+    <button onClick="{{ n.go }}" style="{{ n.style }}" style-hover="color:var(--acc)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.icon }}"></path></svg>
+      <span style="flex:1;text-align:left">{{ n.label }}</span>
+      <sc-if value="{{ n.badge }}"><span style="background:var(--fill);color:var(--ink);border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px">{{ n.badge }}</span></sc-if>
+    </button>
+  </sc-for>
+  <div style="flex:1"></div>
+  <button onClick="{{ toggleTheme }}" style="background:var(--card);border:1px solid var(--line);color:var(--acc);border-radius:10px;padding:9px 12px;cursor:pointer;font-size:12.5px;text-align:left">{{ themeLabel }}</button>
+  <button onClick="{{ goLogin }}" style="background:none;border:1px dashed var(--line);color:var(--mute);border-radius:10px;padding:9px 12px;cursor:pointer;font-size:12.5px;text-align:left" style-hover="color:var(--acc);border-color:var(--dim)">Ver login / onboarding</button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 8px 0;border-top:1px solid var(--line);margin-top:8px">
+    <div style="width:34px;height:34px;border-radius:50%;background:var(--dim);color:var(--ink);display:grid;place-items:center;font-weight:700">MA</div>
+    <div style="display:flex;flex-direction:column;line-height:1.25"><span style="font-weight:600">Marina Alves</span><span style="font-size:12px;color:var(--mute)">Admin · Acme Ltda</span></div>
+  </div>
+</aside>
+</sc-if>
+
+<main style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden">
+
+<!-- LOGIN -->
+<sc-if value="{{ isLogin }}">
+<div style="flex:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);background:radial-gradient(900px 600px at 25% 40%,var(--glow) 0%,var(--bg) 60%)">
+  <div style="padding:64px;display:flex;flex-direction:column;justify-content:center;gap:22px;border-right:1px solid var(--line)">
+    <div style="display:flex;align-items:center;gap:12px"><div style="width:42px;height:42px;border:1px solid var(--dim);border-radius:9px;display:grid;place-items:center;font-family:'Plus Jakarta Sans';font-weight:700;font-size:19px;color:var(--acc)">T</div><span style="font-family:'Plus Jakarta Sans';font-weight:600;letter-spacing:.28em;font-size:24px;color:var(--acc)">TECHTIE FLOW</span></div>
+    <div style="font-size:12px;letter-spacing:.24em;color:var(--acc);margin-top:40px">CRM + CONTACT CENTER</div>
+    <h1 style="margin:0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:48px;line-height:1.02;letter-spacing:.01em"><span style="color:var(--acc)">ATENDA, VENDA E AUTOMATIZE</span><br><span style="font-weight:300">TUDO NO MESMO LUGAR.</span></h1>
+    <p style="margin:0;max-width:460px;color:var(--mute);font-size:16px;line-height:1.6;text-wrap:pretty">WhatsApp, funil de vendas, agente de IA e BI em uma plataforma só — sem depender de outro CRM.</p>
+  </div>
+  <div style="display:grid;place-items:center;padding:40px">
+    <div style="width:100%;max-width:380px;display:flex;flex-direction:column;gap:16px">
+      <h2 style="margin:0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:26px;letter-spacing:.04em">ENTRAR</h2>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;letter-spacing:.12em;color:var(--mute)">E-MAIL<input value="marina@acme.com.br" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;outline:none" style-focus="border-color:var(--acc)"></label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;letter-spacing:.12em;color:var(--mute)">SENHA<input type="password" value="••••••••••" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;outline:none" style-focus="border-color:var(--acc)"></label>
+      <a href="#" style="font-size:13px;align-self:flex-end">Esqueci a senha</a>
+      <button onClick="{{ goOnboarding }}" style="background:var(--fill);color:var(--ink);border:0;border-radius:999px;padding:13px;font-weight:700;font-size:15px;cursor:pointer" style-hover="background:var(--fillh)">Entrar</button>
+      <button onClick="{{ goOnboarding }}" style="background:none;color:var(--acc);border:1px solid var(--dim);border-radius:999px;padding:12px;font-size:14px;cursor:pointer" style-hover="background:var(--card2)">Criar conta da empresa</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ONBOARDING -->
+<sc-if value="{{ isOnboarding }}">
+<div style="flex:1;overflow:auto;display:grid;place-items:center;padding:40px;background:radial-gradient(800px 500px at 50% 0,var(--glow) 0%,var(--bg) 65%)">
+  <div style="width:100%;max-width:880px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;gap:10px">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px"><div style="height:3px;border-radius:3px;background:{{ s.bar }}"></div><span style="font-size:11.5px;letter-spacing:.16em;color:{{ s.color }}">{{ s.n }} · {{ s.label }}</span></div>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:40px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:40px">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <h2 style="margin:0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:29px;letter-spacing:.03em;color:var(--acc)">CONECTE SEU WHATSAPP</h2>
+        <p style="margin:0;color:var(--mute);line-height:1.6">No celular: WhatsApp → Aparelhos conectados → Conectar aparelho. Aponte a câmera para o código ao lado.</p>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;letter-spacing:.12em;color:var(--mute)">NOME DA INSTÂNCIA<input value="Comercial · Acme" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;outline:none"></label>
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button onClick="{{ goInbox }}" style="background:var(--fill);color:var(--ink);border:0;border-radius:999px;padding:12px 26px;font-weight:700;cursor:pointer">Continuar</button>
+          <button onClick="{{ goInbox }}" style="background:none;color:var(--mute);border:0;padding:12px 16px;cursor:pointer">Pular por enquanto</button>
+        </div>
+      </div>
+      <div style="aspect-ratio:1;background:var(--text);border-radius:12px;padding:18px;display:grid;place-items:center;color:var(--ink);font-size:12px;letter-spacing:.14em;text-align:center">QR CODE<br>(gerado pela instância)</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- INBOX -->
+<sc-if value="{{ isInbox }}">
+<div style="flex:1;display:grid;grid-template-columns:300px minmax(420px,1fr) 300px;min-height:0;overflow-x:auto">
+  <section style="border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0">
+    <div style="padding:20px 18px 12px;display:flex;flex-direction:column;gap:12px">
+      <h1 style="margin:0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:22px;letter-spacing:.06em">INBOX</h1>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--mute)">Buscar conversa ou contato…</div>
+      <div style="display:flex;gap:6px">
+        <sc-for list="{{ inboxTabs }}" as="t" hint-placeholder-count="3"><span style="{{ t.style }}">{{ t.label }}</span></sc-for>
+      </div>
+    </div>
+    <div style="overflow:auto;flex:1">
+      <sc-for list="{{ convs }}" as="c" hint-placeholder-count="6">
+        <div onClick="{{ c.pick }}" style="{{ c.style }}">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--card2);border:1px solid var(--line);display:grid;place-items:center;font-weight:600;color:var(--acc);flex:none">{{ c.ini }}</div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.name }}</span><span style="font-size:11.5px;color:var(--mute);flex:none">{{ c.time }}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--mute);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.last }}</span><sc-if value="{{ c.unread }}"><span style="background:var(--green);color:#0d1a11;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px;flex:none">{{ c.unread }}</span></sc-if></div>
+            <span style="font-size:11px;letter-spacing:.08em;color:var(--dim)">{{ c.stage }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;min-height:0;background:var(--bg)">
+    <header style="padding:14px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap">
+      <div style="width:40px;height:40px;border-radius:50%;background:var(--card2);border:1px solid var(--line);display:grid;place-items:center;font-weight:600;color:var(--acc)">{{ cur.ini }}</div>
+      <div style="flex:1;min-width:150px;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:600;font-size:16px">{{ cur.name }}</span><span style="font-size:12.5px;color:var(--green)">● online · {{ cur.phone }}</span></div>
+      <span style="border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--mute)">Instância: Comercial</span>
+      <button style="background:none;border:1px solid var(--dim);color:var(--acc);border-radius:999px;padding:7px 16px;cursor:pointer" style-hover="background:var(--card2)">Transferir</button>
+      <button style="background:var(--fill);color:var(--ink);border:0;border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer">Resolver</button>
+    </header>
+    <div style="flex:1;overflow:auto;padding:24px 28px;display:flex;flex-direction:column;gap:12px">
+      <sc-for list="{{ msgs }}" as="m" hint-placeholder-count="5">
+        <sc-if value="{{ m.isIn }}"><div style="align-self:flex-start;max-width:62%;background:var(--bub);border-radius:14px 14px 14px 4px;padding:10px 14px;line-height:1.45">{{ m.text }}<div style="font-size:11px;color:var(--mute);margin-top:4px">{{ m.time }}</div></div></sc-if>
+        <sc-if value="{{ m.isOut }}"><div style="align-self:flex-end;max-width:62%;background:var(--out);border:1px solid var(--outline);color:var(--text);border-radius:14px 14px 4px 14px;padding:10px 14px;line-height:1.45">{{ m.text }}<div style="font-size:11px;opacity:.75;margin-top:4px;text-align:right">{{ m.time }} ✓✓</div></div></sc-if>
+        <sc-if value="{{ m.isNote }}"><div style="align-self:center;width:70%;background:rgba(214,192,147,.08);border:1px dashed var(--dim);border-radius:10px;padding:10px 14px;line-height:1.45"><div style="font-size:11px;letter-spacing:.14em;color:var(--acc);margin-bottom:4px">NOTA INTERNA · só a equipe vê</div>{{ m.text }}</div></sc-if>
+        <sc-if value="{{ m.isInsight }}"><div style="align-self:center;width:70%;background:rgba(139,180,221,.08);border:1px solid rgba(139,180,221,.25);border-left:3px solid rgba(139,180,221,.6);border-radius:10px;padding:10px 14px;line-height:1.45"><div style="font-size:11px;letter-spacing:.14em;color:var(--ins);margin-bottom:4px">SUGESTÃO DA IA · {{ m.topic }}</div>{{ m.text }}<div style="display:flex;gap:8px;margin-top:10px"><button style="background:none;border:1px solid rgba(139,180,221,.5);color:var(--ins);border-radius:999px;padding:4px 12px;cursor:pointer">Usar resposta</button><button style="background:none;border:1px solid var(--line);color:var(--mute);border-radius:999px;padding:4px 12px;cursor:pointer">Virar follow-up</button></div></div></sc-if>
+      </sc-for>
+    </div>
+    <footer style="padding:14px 22px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;font-size:12.5px"><span style="color:var(--acc);border-bottom:2px solid var(--acc);padding-bottom:3px">Responder</span><span style="color:var(--mute);padding-bottom:3px">Nota interna</span><span style="color:var(--mute);padding-bottom:3px">Modelos</span></div>
+      <div style="display:flex;gap:10px;align-items:center"><div style="flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--mute)">Digite uma mensagem…</div><button style="background:var(--fill);color:var(--ink);border:0;border-radius:12px;padding:12px 22px;font-weight:700;cursor:pointer">Enviar</button></div>
+    </footer>
+  </section>
+
+  <aside style="border-left:1px solid var(--line);overflow:auto;padding:22px 20px;display:flex;flex-direction:column;gap:20px;background:var(--side)">
+    <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">CONTATO</span><span style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:19px">{{ cur.name }}</span><span style="color:var(--mute)">{{ cur.company }}</span></div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:13px"><span style="color:var(--mute)">Telefone</span><span>{{ cur.phone }}</span><span style="color:var(--mute)">E-mail</span><span>{{ cur.email }}</span><span style="color:var(--mute)">Responsável</span><span>{{ cur.owner }}</span><span style="color:var(--mute)">Origem</span><span>{{ cur.source }}</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ cur.tags }}" as="t"><span style="border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--acc)">{{ t }}</span></sc-for></div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">NEGÓCIO</span>
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:600">{{ cur.deal }}</span><span style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:18px;color:var(--text)">{{ cur.value }}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--mute)"><span>Pipeline: {{ cur.pipe }}</span><span style="color:var(--text)">{{ cur.stage }}</span></div>
+      <button onClick="{{ goPipeline }}" style="background:none;border:1px solid var(--dim);color:var(--acc);border-radius:999px;padding:8px;cursor:pointer" style-hover="background:var(--card2)">Abrir no pipeline</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">LINHA DO TEMPO</span>
+      <sc-for list="{{ cur.timeline }}" as="e"><div style="display:flex;gap:10px;font-size:13px"><span style="width:8px;height:8px;border-radius:50%;background:var(--dim);margin-top:5px;flex:none"></span><div style="display:flex;flex-direction:column"><span>{{ e.t }}</span><span style="font-size:11.5px;color:var(--mute)">{{ e.w }}</span></div></div></sc-for>
+    </div>
+  </aside>
+</div>
+</sc-if>
+
+<!-- PIPELINE -->
+<sc-if value="{{ isPipeline }}">
+<div style="flex:1;display:flex;flex-direction:column;min-height:0">
+  <header style="padding:22px 28px 14px;display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap">
+    <div style="flex:1;min-width:260px"><div style="font-size:11px;letter-spacing:.22em;color:var(--mute)">NEGÓCIOS</div><h1 style="margin:2px 0 0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:27px;letter-spacing:.04em">PIPELINES</h1></div>
+    <div style="display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px">
+      <sc-for list="{{ pipes }}" as="p" hint-placeholder-count="3"><button onClick="{{ p.pick }}" style="{{ p.style }}">{{ p.label }}</button></sc-for>
+    </div>
+    <button style="background:var(--fill);color:var(--ink);border:0;border-radius:999px;padding:10px 20px;font-weight:700;cursor:pointer">+ Novo negócio</button>
+  </header>
+  <div style="flex:1;display:flex;min-height:0">
+    <div style="flex:1;min-width:0;overflow:auto;padding:4px 28px 24px;display:flex;gap:14px;align-items:flex-start">
+      <sc-for list="{{ cols }}" as="col" hint-placeholder-count="4">
+        <div style="width:268px;flex:none;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid {{ col.accent }};padding-bottom:8px"><span style="font-size:12px;letter-spacing:.16em;font-weight:600">{{ col.name }} <span style="color:var(--mute)">{{ col.count }}</span></span><span style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:14px;color:var(--text)">{{ col.total }}</span></div>
+          <sc-for list="{{ col.cards }}" as="d">
+            <div onClick="{{ d.pick }}" style="{{ d.style }}">
+              <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-weight:600">{{ d.title }}</span><span style="width:24px;height:24px;border-radius:50%;background:var(--dim);color:var(--ink);display:grid;place-items:center;font-size:10.5px;font-weight:700;flex:none">{{ d.owner }}</span></div>
+              <span style="color:var(--mute);font-size:13px">{{ d.company }}</span>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:15px;color:var(--text)">{{ d.value }}</span><span style="font-size:11.5px;color:var(--mute)">{{ d.age }}</span></div>
+              <sc-if value="{{ d.wa }}"><div style="font-size:12px;color:var(--green);display:flex;gap:6px;align-items:center"><span>●</span><span style="color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.wa }}</span></div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+    <aside style="width:340px;flex:none;border-left:1px solid var(--line);background:var(--side);overflow:auto;padding:22px 20px;display:flex;flex-direction:column;gap:16px">
+      <div><div style="font-size:11px;letter-spacing:.2em;color:var(--mute)">PROPOSTA</div><div style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:21px;margin-top:2px">{{ sel.title }}</div><div style="color:var(--mute)">{{ sel.company }} · {{ sel.stage }}</div></div>
+      <div style="display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+        <sc-for list="{{ sel.items }}" as="i"><div style="display:flex;justify-content:space-between;gap:10px;padding:11px 14px;background:var(--card);border-bottom:1px solid var(--line)"><div style="display:flex;flex-direction:column"><span>{{ i.name }}</span><span style="font-size:12px;color:var(--mute)">{{ i.qty }}</span></div><span style="font-variant-numeric:tabular-nums">{{ i.price }}</span></div></sc-for>
+        <div style="display:flex;justify-content:space-between;padding:12px 14px;background:var(--card2)"><span style="letter-spacing:.14em;font-size:12px;color:var(--mute)">TOTAL</span><span style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:18px;color:var(--text)">{{ sel.value }}</span></div>
+      </div>
+      <button style="background:none;border:1px dashed var(--dim);color:var(--acc);border-radius:10px;padding:10px;cursor:pointer">+ Adicionar produto</button>
+      <div style="display:flex;gap:8px"><button style="flex:1;background:var(--fill);color:var(--ink);border:0;border-radius:999px;padding:11px;font-weight:700;cursor:pointer">Enviar proposta (WhatsApp)</button></div>
+      <button onClick="{{ goInbox }}" style="background:none;border:1px solid var(--line);color:var(--mute);border-radius:999px;padding:10px;cursor:pointer" style-hover="color:var(--acc);border-color:var(--dim)">Abrir conversa</button>
+    </aside>
+  </div>
+</div>
+</sc-if>
+
+<!-- AGENTE IA -->
+<sc-if value="{{ isAgent }}">
+<div style="flex:1;overflow:auto;padding:26px 32px;display:flex;flex-direction:column;gap:22px">
+  <header style="display:flex;align-items:flex-end;gap:20px"><div style="flex:1"><div style="font-size:11px;letter-spacing:.22em;color:var(--mute)">AUTOMAÇÃO</div><h1 style="margin:2px 0 0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:27px;letter-spacing:.04em">AGENTE DE IA</h1></div>
+    <div style="display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 8px 8px 18px"><span style="color:var(--green)">● Ativo na instância Comercial</span><div style="width:44px;height:26px;background:var(--acc);border-radius:999px;position:relative"><div style="position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--bg)"></div></div></div></header>
+  <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">PERSONALIDADE E REGRAS</span><div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;line-height:1.6;min-height:120px;color:var(--text)">Você é a assistente virtual da Acme. Responda de forma cordial e objetiva, em português. Qualifique o lead (necessidade, prazo, orçamento) antes de oferecer proposta. Nunca invente preços: consulte a base de conhecimento.</div></div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">BASE DE CONHECIMENTO</span><a href="#">+ Enviar documento</a></div>
+        <sc-for list="{{ docs }}" as="d"><div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:10px"><span style="flex:1">{{ d.name }}</span><span style="font-size:12px;color:var(--mute)">{{ d.meta }}</span><span style="font-size:11.5px;color:{{ d.color }}">● {{ d.status }}</span></div></sc-for></div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">TRANSBORDO PARA HUMANO</span>
+        <sc-for list="{{ handoff }}" as="h"><div style="display:flex;gap:10px;align-items:center"><span style="color:var(--acc)">✓</span><span>{{ h }}</span></div></sc-for></div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:520px">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.2em;color:var(--ins)">TESTAR AGENTE</div>
+      <div style="flex:1;padding:18px;display:flex;flex-direction:column;gap:10px">
+        <div style="align-self:flex-start;max-width:80%;background:var(--bub);border-radius:14px 14px 14px 4px;padding:10px 14px">Vocês fazem integração com ERP?</div>
+        <div style="align-self:flex-end;max-width:80%;background:rgba(139,180,221,.12);border:1px solid rgba(139,180,221,.3);border-radius:14px 14px 4px 14px;padding:10px 14px;line-height:1.45">Fazemos sim! Integramos via API com os principais ERPs. Qual sistema vocês usam hoje?<div style="font-size:11px;color:var(--ins);margin-top:6px">Fonte: Catálogo de Integrações.pdf</div></div>
+      </div>
+      <div style="padding:14px 18px;border-top:1px solid var(--line);color:var(--mute)">Escreva como um lead…</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- DASHBOARD -->
+<sc-if value="{{ isDash }}">
+<div style="flex:1;overflow:auto;padding:26px 32px;display:flex;flex-direction:column;gap:22px">
+  <header style="display:flex;align-items:flex-end;gap:20px"><div style="flex:1"><div style="font-size:11px;letter-spacing:.22em;color:var(--mute)">VISÃO GERAL</div><h1 style="margin:2px 0 0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:27px;letter-spacing:.04em">DASHBOARD</h1></div>
+    <div style="display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px"><span style="padding:6px 16px;border-radius:999px;color:var(--mute)">Hoje</span><span style="padding:6px 16px;border-radius:999px;color:var(--mute)">7 dias</span><span style="padding:6px 16px;border-radius:999px;background:var(--line);color:var(--acc2);font-weight:600">30 dias</span></div></header>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+      <div style="background:var(--line);padding:1px;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px))"><div style="background:linear-gradient(160deg,var(--glow),var(--card));padding:18px 20px;display:flex;flex-direction:column;gap:6px;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px))"><span style="font-size:11px;letter-spacing:.18em;color:var(--acc)">{{ k.label }}</span><span style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:32px;line-height:1">{{ k.value }}</span><span style="font-size:12.5px;color:{{ k.color }}">{{ k.delta }}</span></div></div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px">
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:16px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">CONVERSAS POR DIA</span>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:190px"><sc-for list="{{ bars }}" as="b"><div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%"><div style="width:100%;height:{{ b.h }};background:linear-gradient(var(--acc),var(--bar));border-radius:4px 4px 0 0"></div><span style="font-size:10.5px;color:var(--mute)">{{ b.d }}</span></div></sc-for></div></div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:12px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">FUNIL</span>
+      <sc-for list="{{ funnel }}" as="f"><div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>{{ f.name }}</span><span style="color:var(--mute)">{{ f.n }}</span></div><div style="height:10px;background:var(--bg);border-radius:6px"><div style="height:100%;width:{{ f.w }};background:var(--acc);border-radius:6px;opacity:{{ f.o }}"></div></div></div></sc-for></div>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:6px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute);margin-bottom:8px">DESEMPENHO DA EQUIPE</span>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:10px;font-size:11px;letter-spacing:.14em;color:var(--mute);padding:0 4px 8px;border-bottom:1px solid var(--line)"><span>ATENDENTE</span><span>CONVERSAS</span><span>1ª RESPOSTA</span><span>GANHOS</span><span>RECEITA</span></div>
+    <sc-for list="{{ team }}" as="t"><div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:10px;padding:10px 4px;border-bottom:1px solid var(--card2)"><span style="font-weight:600">{{ t.name }}</span><span>{{ t.c }}</span><span>{{ t.r }}</span><span>{{ t.w }}</span><span style="color:var(--acc);font-weight:600">{{ t.v }}</span></div></sc-for></div>
+</div>
+</sc-if>
+
+<!-- INSTÂNCIAS -->
+<sc-if value="{{ isInst }}">
+<div style="flex:1;overflow:auto;padding:26px 32px;display:flex;flex-direction:column;gap:22px">
+  <header><div style="font-size:11px;letter-spacing:.22em;color:var(--mute)">CANAIS</div><h1 style="margin:2px 0 0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:27px;letter-spacing:.04em">INSTÂNCIAS WHATSAPP</h1></header>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+    <sc-for list="{{ insts }}" as="i" hint-placeholder-count="3">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:18px">{{ i.name }}</span><span style="font-size:12px;color:{{ i.color }}">● {{ i.status }}</span></div>
+        <span style="color:var(--mute)">{{ i.phone }} · {{ i.owner }}</span>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border-top:1px solid var(--line);padding-top:14px"><div><div style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:19px">{{ i.a }}</div><div style="font-size:11px;color:var(--mute)">conversas</div></div><div><div style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:19px">{{ i.b }}</div><div style="font-size:11px;color:var(--mute)">msgs hoje</div></div><div><div style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:19px">{{ i.c }}</div><div style="font-size:11px;color:var(--mute)">IA ativa</div></div></div>
+        <div style="display:flex;gap:8px"><button style="flex:1;background:none;border:1px solid var(--dim);color:var(--acc);border-radius:999px;padding:8px;cursor:pointer">{{ i.action }}</button><button style="background:none;border:1px solid var(--line);color:var(--mute);border-radius:999px;padding:8px 14px;cursor:pointer">⋯</button></div>
+      </div>
+    </sc-for>
+    <div style="border:1px dashed var(--dim);border-radius:14px;padding:20px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:grid;place-items:center;text-align:center;color:var(--acc);min-height:200px;gap:6px;background:#1210">+ Conectar novo número<br><span style="font-size:12.5px;color:var(--mute)">Escaneie o QR Code</span></div>
+  </div>
+</div>
+</sc-if>
+
+<!-- AUTOMAÇÕES -->
+<sc-if value="{{ isAuto }}">
+<div style="flex:1;display:grid;grid-template-columns:300px minmax(0,1fr);min-height:0">
+  <section style="border-right:1px solid var(--line);padding:24px 18px;display:flex;flex-direction:column;gap:10px;overflow:auto">
+    <h1 style="margin:0 0 6px;font-family:'Plus Jakarta Sans';font-weight:600;font-size:22px;letter-spacing:.06em">AUTOMAÇÕES</h1>
+    <button style="background:var(--fill);color:var(--ink);border:0;border-radius:999px;padding:10px;font-weight:700;cursor:pointer">+ Novo fluxo</button>
+    <sc-for list="{{ flows }}" as="f"><div style="{{ f.style }}"><span style="font-weight:600">{{ f.name }}</span><span style="font-size:12px;color:var(--mute)">{{ f.meta }}</span></div></sc-for>
+  </section>
+  <section style="overflow:auto;padding:28px 36px;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:22px 22px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:11px;letter-spacing:.2em;color:var(--mute)">FLUXO</div><div style="font-family:'Plus Jakarta Sans';font-weight:600;font-size:21px">Boas-vindas a novo lead</div></div><div style="display:flex;gap:8px"><button style="background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:8px 16px;cursor:pointer">Testar</button><button style="background:var(--fill);color:var(--ink);border:0;border-radius:999px;padding:8px 18px;font-weight:700;cursor:pointer">Publicar</button></div></div>
+    <div style="display:flex;align-items:center;gap:0;margin-top:20px;flex-wrap:wrap;row-gap:30px">
+      <sc-for list="{{ nodes }}" as="n">
+        <div style="display:flex;align-items:center"><div style="width:220px;background:var(--card);border:1px solid {{ n.border }};border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px"><span style="font-size:10.5px;letter-spacing:.2em;color:{{ n.color }}">{{ n.kind }}</span><span style="font-weight:600">{{ n.title }}</span><span style="font-size:12.5px;color:var(--mute)">{{ n.desc }}</span></div><sc-if value="{{ n.link }}"><div style="display:flex;align-items:center"><div style="width:36px;height:1px;background:var(--dim)"></div><div style="width:9px;height:9px;border:1.5px solid var(--acc);border-radius:50%"></div><div style="width:12px;height:1px;background:var(--dim)"></div></div></sc-if></div>
+      </sc-for>
+    </div>
+  </section>
+</div>
+</sc-if>
+
+<!-- CONFIG -->
+<sc-if value="{{ isSettings }}">
+<div style="flex:1;overflow:auto;padding:26px 32px;display:flex;flex-direction:column;gap:22px;max-width:1100px">
+  <header><div style="font-size:11px;letter-spacing:.22em;color:var(--mute)">WHITE-LABEL</div><h1 style="margin:2px 0 0;font-family:'Plus Jakarta Sans';font-weight:600;font-size:27px;letter-spacing:.04em">CONFIGURAÇÕES</h1></header>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start">
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:14px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">MARCA</span>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;letter-spacing:.12em;color:var(--mute)">NOME DO PRODUTO<input value="TechTie Flow" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 14px;color:var(--text);font-size:15px;outline:none"></label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;letter-spacing:.12em;color:var(--mute)">DOMÍNIO PERSONALIZADO<input value="crm.acme.com.br" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 14px;color:var(--text);font-size:15px;outline:none"></label>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:12px;letter-spacing:.12em;color:var(--mute)">COR DE DESTAQUE</span><div style="display:flex;gap:10px"><div style="width:34px;height:34px;border-radius:50%;background:var(--acc);outline:2px solid var(--text);outline-offset:2px"></div><div style="width:34px;height:34px;border-radius:50%;background:var(--green)"></div><div style="width:34px;height:34px;border-radius:50%;background:var(--ins)"></div><div style="width:34px;height:34px;border-radius:50%;background:var(--red)"></div></div></div>
+      <div style="border:1px dashed var(--dim);border-radius:10px;padding:18px;text-align:center;color:var(--mute)">Arraste o logotipo (PNG/SVG)</div></div>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">EQUIPES E PIPELINES</span>
+        <sc-for list="{{ teams }}" as="t"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:10px"><div style="display:flex;flex-direction:column"><span style="font-weight:600">{{ t.name }}</span><span style="font-size:12px;color:var(--mute)">{{ t.members }}</span></div><span style="color:var(--acc);font-size:12.5px">{{ t.pipe }}</span></div></sc-for></div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 10px 28px var(--sh),inset 0 1px 0 var(--hi);display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;letter-spacing:.2em;color:var(--mute)">PERFIS DE ACESSO</span>
+        <sc-for list="{{ roles }}" as="r"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span style="font-weight:600">{{ r.name }}</span><span style="color:var(--mute)">{{ r.desc }}</span></div></sc-for></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme: 'dark', view: 'inbox', conv: 0, deal: 'd1', pipe: 0 };
+  componentDidMount() { this.applyTheme(); }
+  componentDidUpdate() { this.applyTheme(); }
+  applyTheme() {
+    const L = { '--bg':'#f1efeb','--side':'#e9e6e0','--card':'#fbfaf8','--card2':'#f4f2ee','--bub':'#e9e6e0','--line':'#dcd8cf','--glow':'#e8e2d3','--out':'#e8dfc8','--outline':'#cdbf9c','--acc':'#8a6d2f','--acc2':'#6f5622','--dim':'#b9a572','--bar':'#c4ad74','--mute':'#6a6f77','--text':'#25272b','--fill':'#2a2c30','--fillh':'#3d4045','--ink':'#f6f1e4','--green':'#2f8f58','--red':'#c0504a','--ins':'#3f78b0','--sh':'rgba(40,30,10,.10)','--hi':'rgba(255,255,255,.7)' };
+    const st = document.documentElement.style;
+    Object.keys(L).forEach(k => this.state.theme === 'light' ? st.setProperty(k, L[k]) : st.removeProperty(k));
+  }
+  renderVals() {
+    const s = this.state, set = (o) => () => this.setState(o);
+    const navDef = [
+      ['inbox', 'Inbox', 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', 3],
+      ['pipeline', 'Negócios', 'M3 3h6v18H3zM15 3h6v10h-6z'],
+      ['agent', 'Agente de IA', 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'],
+      ['automations', 'Automações', 'M13 2L4 14h7l-1 8 9-12h-7z'],
+      ['dashboard', 'Dashboard', 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['instances', 'Instâncias', 'M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM11 18h2'],
+      ['settings', 'Configurações', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h3M2 12h3M12 2v3M12 19v3'],
+    ];
+    const active = s.view;
+    const nav = navDef.map(([k, label, icon, badge]) => ({
+      label, icon, badge, go: set({ view: k }),
+      style: 'display:flex;align-items:center;gap:12px;border:0;border-radius:999px;padding:10px 14px;cursor:pointer;font-size:14px;' + (k === active ? 'background:var(--line);color:var(--acc2);font-weight:600' : 'background:none;color:var(--mute)'),
+    }));
+    const steps = [['01', 'EMPRESA', 1], ['02', 'WHATSAPP', 2], ['03', 'PIPELINE', 0]].map(([n, label, st]) => ({ n, label, bar: st ? 'var(--acc)' : 'var(--line)', color: st ? 'var(--acc)' : 'var(--mute)' }));
+
+    const C = [
+      { name: 'Carlos Menezes', ini: 'CM', company: 'Menezes Engenharia', phone: '+55 11 98765-4321', email: 'carlos@menezes.eng.br', owner: 'Marina Alves', source: 'Landing page', tags: ['Quente', 'Integração ERP'], deal: 'Implantação CRM + WhatsApp', value: 'R$ 18.400', pipe: 'Comercial', stage: 'Proposta', time: '10:42', last: 'Consegue me mandar a proposta hoje?', unread: 2,
+        timeline: [{ t: 'Negócio movido para Proposta', w: 'Marina · hoje 10:15' }, { t: 'Reunião de descoberta', w: 'ontem 16:00' }, { t: 'Lead criado via formulário', w: '3 dias atrás' }] },
+      { name: 'Patrícia Duarte', ini: 'PD', company: 'Duarte Odontologia', phone: '+55 21 99123-0099', email: 'patricia@duarteodonto.com', owner: 'Rafael Lima', source: 'Indicação', tags: ['Clínica'], deal: 'Agente de IA para agendamento', value: 'R$ 6.900', pipe: 'Comercial', stage: 'Qualificação', time: '09:58', last: 'Bom dia! Vi o vídeo de vocês', unread: 1,
+        timeline: [{ t: 'Primeira mensagem recebida', w: 'hoje 09:58' }] },
+      { name: 'Grupo Aurora', ini: 'GA', company: 'Aurora Distribuidora', phone: '+55 31 98877-1122', email: 'ti@aurora.com.br', owner: 'Marina Alves', source: 'Campanha', tags: ['Enterprise'], deal: 'Dashboards de BI', value: 'R$ 42.000', pipe: 'Comercial', stage: 'Negociação', time: 'Ontem', last: 'Vamos fechar na sexta, ok?', unread: 0,
+        timeline: [{ t: 'Contrato enviado', w: 'ontem' }] },
+      { name: 'Bruno Tavares', ini: 'BT', company: 'Tavares & Filhos', phone: '+55 41 99555-7788', email: 'bruno@tavares.com', owner: 'Rafael Lima', source: 'Site', tags: [], deal: 'Site institucional', value: 'R$ 4.200', pipe: 'Comercial', stage: 'Novo lead', time: 'Ontem', last: 'Obrigado pelo retorno!', unread: 0, timeline: [{ t: 'Lead criado', w: 'ontem' }] },
+    ];
+    const cur = C[s.conv];
+    const convs = C.map((c, i) => ({ ...c, stage: c.stage.toUpperCase(), pick: set({ conv: i }), style: 'display:flex;gap:12px;padding:14px 18px;cursor:pointer;border-bottom:1px solid var(--card2);' + (i === s.conv ? 'background:var(--card2);box-shadow:inset 3px 0 0 var(--acc)' : '') }));
+    const msgs = [
+      { isIn: true, text: 'Olá! Vi que vocês fazem integração com ERP. Como funciona?', time: '10:21' },
+      { isOut: true, text: 'Oi, Carlos! Integramos via API e fazemos o mapeamento dos campos com vocês. Qual ERP usam?', time: '10:24' },
+      { isIn: true, text: 'Usamos o Omie. Consegue me mandar a proposta hoje?', time: '10:42' },
+      { isInsight: true, topic: 'INTENÇÃO DE COMPRA', text: 'Lead com alta intenção. Sugestão: confirmar escopo (CRM + WhatsApp + Omie) e enviar proposta ainda hoje.' },
+      { isNote: true, text: 'Desconto de até 8% autorizado pela Marina se fechar esta semana.' },
+    ];
+    const inboxTabs = [['Meus', 1], ['Fila', 0], ['Todos', 0]].map(([label, on]) => ({ label, style: 'font-size:12.5px;padding:5px 14px;border-radius:999px;' + (on ? 'background:var(--line);color:var(--acc2);font-weight:600' : 'border:1px solid var(--line);color:var(--mute)') }));
+
+    const pipesDef = [
+      { label: 'Vendas · SDR', cols: [['NOVO LEAD', '#6e6353', [['d4', 'Site institucional', 'Tavares & Filhos', 'R$ 4.200', 'RL', '1d', 'Obrigado pelo retorno!']]], ['QUALIFICAÇÃO', 'var(--ins)', [['d2', 'Agente de IA p/ agendamento', 'Duarte Odontologia', 'R$ 6.900', 'RL', '2h', 'Bom dia! Vi o vídeo de vocês']]], ['REUNIÃO', 'var(--acc)', [['d5', 'Automação de cobrança', 'Lopes Contábil', 'R$ 9.800', 'MA', '3d', '']]], ['GANHO', 'var(--green)', []]] },
+      { label: 'Comercial', cols: [['PROPOSTA', 'var(--acc)', [['d1', 'Implantação CRM + WhatsApp', 'Menezes Engenharia', 'R$ 18.400', 'MA', '4h', 'Consegue me mandar a proposta hoje?']]], ['NEGOCIAÇÃO', 'var(--acc)', [['d3', 'Dashboards de BI', 'Aurora Distribuidora', 'R$ 42.000', 'MA', '1d', 'Vamos fechar na sexta, ok?'], ['d6', 'Integração Omie', 'Vieira Logística', 'R$ 12.500', 'RL', '5d', '']]], ['FECHAMENTO', 'var(--green)', []], ['PERDIDO', 'var(--red)', []]] },
+      { label: 'Pós-venda', cols: [['ONBOARDING', 'var(--ins)', []], ['ATIVO', 'var(--green)', []], ['RENOVAÇÃO', 'var(--acc)', []]] },
+    ];
+    const pipes = pipesDef.map((p, i) => ({ label: p.label, pick: set({ pipe: i }), style: 'border:0;border-radius:999px;padding:7px 18px;cursor:pointer;font-size:13.5px;' + (i === s.pipe ? 'background:var(--line);color:var(--acc2);font-weight:600' : 'background:none;color:var(--mute)') }));
+    const cols = pipesDef[s.pipe].cols.map(([name, accent, cards]) => ({ name, accent, count: cards.length,
+      total: 'R$ ' + (cards.reduce((a, c) => a + parseFloat(c[3].replace(/[^\d,]/g, '').replace(/\./g, '')) , 0)).toLocaleString('pt-BR'),
+      cards: cards.map(([id, title, company, value, owner, age, wa]) => ({ title, company, value, owner, age, wa,
+        pick: set({ deal: id }),
+        style: 'background:var(--card);border:1px solid ' + (id === s.deal ? 'var(--acc)' : 'var(--line)') + ';border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer' })) }));
+    const dealData = {
+      d1: { title: 'Implantação CRM + WhatsApp', company: 'Menezes Engenharia', stage: 'Proposta', value: 'R$ 18.400', items: [{ name: 'TechTie Flow — plano Business', qty: '5 usuários × 12 meses', price: 'R$ 11.400' }, { name: 'Integração Omie', qty: 'Projeto único', price: 'R$ 5.000' }, { name: 'Onboarding e treinamento', qty: '2 sessões', price: 'R$ 2.000' }] },
+      d3: { title: 'Dashboards de BI', company: 'Aurora Distribuidora', stage: 'Negociação', value: 'R$ 42.000', items: [{ name: 'Dashboards de BI', qty: '6 painéis', price: 'R$ 36.000' }, { name: 'Suporte mensal', qty: '12 meses', price: 'R$ 6.000' }] },
+    };
+    const sel = dealData[s.deal] || { title: 'Negócio selecionado', company: 'Sem produtos ainda', stage: '—', value: 'R$ 0', items: [] };
+
+    const docs = [{ name: 'Catálogo de Integrações.pdf', meta: '42 trechos', status: 'Pronto', color: 'var(--green)' }, { name: 'Tabela de preços 2026.xlsx', meta: '18 trechos', status: 'Pronto', color: 'var(--green)' }, { name: 'FAQ comercial.docx', meta: '—', status: 'Processando', color: 'var(--acc)' }];
+    const kpis = [['NOVOS LEADS', '1.284', '▲ 12% vs. período anterior', 'var(--green)'], ['CONVERSAS ATIVAS', '236', '▲ 4%', 'var(--green)'], ['TAXA DE CONVERSÃO', '18,4%', '▼ 1,2 p.p.', 'var(--red)'], ['RECEITA GANHA', 'R$ 312 mil', '▲ 21%', 'var(--green)']].map(([label, value, delta, color]) => ({ label, value, delta, color }));
+    const hs = [40, 62, 55, 78, 70, 90, 48, 66, 84, 72, 95, 60];
+    const bars = hs.map((h, i) => ({ h: h + '%', d: String(i + 1).padStart(2, '0') }));
+    const funnel = [['Novo lead', '1.284', 100], ['Qualificado', '742', 58], ['Proposta', '361', 28], ['Negociação', '212', 17], ['Ganho', '236', 18]].map(([name, n, w]) => ({ name, n, w: w + '%', o: 0.5 + w / 200 }));
+    const team = [['Marina Alves', 148, '2m 10s', 31, 'R$ 142 mil'], ['Rafael Lima', 121, '3m 02s', 24, 'R$ 98 mil'], ['Agente de IA', 402, '8s', 12, 'R$ 72 mil']].map(([name, c, r, w, v]) => ({ name, c, r, w, v }));
+    const insts = [
+      { name: 'Comercial', phone: '+55 11 4000-1010', owner: 'Marina Alves', status: 'Conectada', color: 'var(--green)', a: 312, b: 1480, c: 'Sim', action: 'Gerenciar' },
+      { name: 'Suporte', phone: '+55 11 4000-2020', owner: 'Rafael Lima', status: 'Conectada', color: 'var(--green)', a: 188, b: 960, c: 'Não', action: 'Gerenciar' },
+      { name: 'Pós-venda', phone: '+55 11 4000-3030', owner: 'Equipe CS', status: 'Desconectada', color: 'var(--red)', a: 74, b: 0, c: 'Não', action: 'Reconectar' },
+    ];
+    const flows = [['Boas-vindas a novo lead', 'Ativo · 1.2k execuções', 1], ['Follow-up 24h sem resposta', 'Ativo · 340 execuções', 0], ['Proposta enviada → lembrete', 'Rascunho', 0]].map(([name, meta, on]) => ({ name, meta, style: 'display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:12px;cursor:pointer;border:1px solid ' + (on ? 'var(--acc)' : 'var(--line)') + ';background:' + (on ? 'var(--card2)' : 'var(--card)') }));
+    const nodes = [
+      { kind: 'GATILHO', color: 'var(--acc)', border: 'var(--dim)', title: 'Nova mensagem', desc: 'Contato novo na instância Comercial', link: true },
+      { kind: 'CONDIÇÃO', color: 'var(--ins)', border: 'var(--line)', title: 'Horário comercial?', desc: 'Seg–Sex, 08h–18h', link: true },
+      { kind: 'AÇÃO', color: 'var(--green)', border: 'var(--line)', title: 'Agente de IA responde', desc: 'Qualifica o lead', link: true },
+      { kind: 'AÇÃO', color: 'var(--green)', border: 'var(--line)', title: 'Criar negócio', desc: 'Pipeline Vendas · SDR → Novo lead', link: false },
+    ];
+    const teams = [{ name: 'Equipe SDR', members: '3 membros', pipe: 'Vendas · SDR' }, { name: 'Equipe Comercial', members: '4 membros', pipe: 'Comercial' }, { name: 'Customer Success', members: '2 membros', pipe: 'Pós-venda' }];
+    const roles = [{ name: 'Admin', desc: 'Tudo, incluindo faturamento' }, { name: 'Gestor', desc: 'Vê toda a equipe e relatórios' }, { name: 'Atendente', desc: 'Só os próprios negócios' }];
+    return {
+      showShell: s.view !== 'login' && s.view !== 'onboarding',
+      isLogin: s.view === 'login', isOnboarding: s.view === 'onboarding', isInbox: s.view === 'inbox', isPipeline: s.view === 'pipeline', isAgent: s.view === 'agent', isDash: s.view === 'dashboard', isInst: s.view === 'instances', isAuto: s.view === 'automations', isSettings: s.view === 'settings',
+      themeLabel: this.state.theme === 'dark' ? 'Modo claro' : 'Modo escuro', toggleTheme: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })), nav, steps, convs, cur, msgs, inboxTabs, pipes, cols, sel, docs, kpis, bars, funnel, team, insts, flows, nodes, teams, roles,
+      handoff: ['Lead pede para falar com uma pessoa', 'Negociação de desconto acima de 5%', 'Confiança da resposta abaixo de 70%'],
+      goLogin: set({ view: 'login' }), goOnboarding: set({ view: 'onboarding' }), goInbox: set({ view: 'inbox' }), goPipeline: set({ view: 'pipeline' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

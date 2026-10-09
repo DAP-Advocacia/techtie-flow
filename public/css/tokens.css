@@ -1,0 +1,73 @@
+/* Design tokens do TechTie Flow — ver docs/design-handoff/README.md.
+   Escuro é o padrão (:root); claro sobrescreve via data-theme="light" no <html>. */
+:root {
+  --bg: #1b1d21;
+  --side: #141619;
+  --card: #24272c;
+  --card2: #2c3036;
+  --bub: #2f333a;
+  --line: #3a3e46;
+  --glow: #2d3036;
+  --out: #3b4048;
+  --outline: #5a5f69;
+  --acc: #d6c093;
+  --acc2: #ead9b0;
+  --dim: #8b7a55;
+  --bar: #6f6850;
+  --mute: #a3a8b0;
+  --text: #f3ede2;
+  --fill: #e4d6b8;
+  --fillh: #f0e4c8;
+  --ink: #1b1d21;
+  --green: #6fbf8b;
+  --red: #e08a82;
+  --ins: #8bb4dd;
+  --sh: rgba(0, 0, 0, 0.28);
+  --hi: rgba(255, 255, 255, 0.05);
+
+  /* derivados — fundo translúcido de nota interna / sugestão de IA */
+  --note-bg: rgba(214, 192, 147, 0.08);
+  --ins-bg: rgba(139, 180, 221, 0.08);
+  --ins-line: rgba(139, 180, 221, 0.25);
+  --ins-line-strong: rgba(139, 180, 221, 0.5);
+
+  --radius-card: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+  --shadow-card: 0 10px 28px var(--sh), inset 0 1px 0 var(--hi);
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sidebar-w: 232px;
+}
+
+:root[data-theme='light'] {
+  /* Claro "papel": superfícies bege mais escuras e próximas entre si (sem branco puro, que
+     cansava a vista), brilho de topo discreto. Texto continua >= 4.5:1 sobre qualquer fundo. */
+  --bg: #e3dfd6;
+  --side: #d8d3c8;
+  --card: #ebe7de;
+  --card2: #e0dbd0;
+  --bub: #d8d3c8;
+  --line: #c8c2b3;
+  --glow: #d9d1bd;
+  --out: #ddd1b2;
+  --outline: #bda97a;
+  --acc: #7d6226;
+  --acc2: #61491a;
+  --dim: #a8935c;
+  --bar: #b49c5f;
+  --mute: #5b5f66;
+  --text: #26272a;
+  --fill: #2a2c30;
+  --fillh: #3d4045;
+  --ink: #f0ead9;
+  --green: #2b7f51;
+  --red: #b3463f;
+  --ins: #38709f;
+  --sh: rgba(40, 30, 10, 0.14);
+  --hi: rgba(255, 255, 255, 0.28);
+
+  --note-bg: rgba(125, 98, 38, 0.1);
+  --ins-bg: rgba(56, 112, 159, 0.1);
+  --ins-line: rgba(56, 112, 159, 0.28);
+  --ins-line-strong: rgba(56, 112, 159, 0.5);
+}

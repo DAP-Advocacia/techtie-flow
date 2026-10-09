@@ -1,0 +1,30 @@
+node_modules/
+auth_session/
+auth_session_backup*/
+auth_session_local_test/
+data/
+.env
+*.log
+
+# config local do MCP (pode conter token/endereço específico da máquina,
+# não é do projeto) — ver .claude/ abaixo pelo mesmo motivo
+.mcp.json
+
+# repositório Git próprio, já publicado separadamente (github.com/DanielCosta1997/control-plane)
+control-plane/
+
+# config/estado local do Claude Code (por máquina, não é do projeto)
+.claude/
+
+# gravações de demo com a instância de produção — contêm nome/dados reais
+# de cliente (PII). O material sanitizado pro portfólio mora em outro lugar.
+docs/demo-*/
+scripts/*-token*.txt
+
+# intermediários da montagem do vídeo de onboarding (.webm das cenas,
+# .mp3 da narração, segments) — descartáveis, reexecutáveis via
+# scripts/video/*.{mjs,py}. Só o .mp4 final (public/video/) é versionado.
+scripts/video/build/
+
+# saída do build estático (Vercel)
+dist/

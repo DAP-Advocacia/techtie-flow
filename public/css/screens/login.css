@@ -1,0 +1,260 @@
+/* Login + peças .auth-* compartilhadas com o onboarding (ver auth/common.js). */
+
+/* ---------- compartilhado (.auth-*) ---------- */
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auth-brand__mark {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--acc);
+  background: var(--card);
+}
+.auth-brand__name {
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  font-size: 16px;
+  color: var(--acc);
+}
+.auth-brand--lg {
+  gap: 12px;
+}
+.auth-brand--lg .auth-brand__mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  font-size: 19px;
+}
+.auth-brand--lg .auth-brand__name {
+  letter-spacing: 0.28em;
+  font-size: 24px;
+}
+
+.auth-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--mute);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.auth-theme:hover {
+  color: var(--acc);
+  border-color: var(--dim);
+}
+
+.auth-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--acc);
+  font-size: 13px;
+}
+.auth-link:hover {
+  color: var(--acc2);
+  text-decoration: underline;
+}
+
+.auth-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: auth-spin 0.8s linear infinite;
+}
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+.auth-form .input[aria-invalid='true'] {
+  border-color: var(--red);
+}
+.auth-form .field-error:empty {
+  display: none;
+}
+.auth-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- login ---------- */
+.login {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  background: radial-gradient(900px 600px at 25% 40%, var(--glow) 0%, var(--bg) 60%);
+}
+.login__top {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 1;
+}
+
+.login-hero {
+  padding: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 22px;
+  border-right: 1px solid var(--line);
+}
+.login-hero__eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  color: var(--acc);
+  margin-top: 40px;
+}
+.login-hero__title {
+  font-weight: 600;
+  font-size: clamp(34px, 3.4vw, 48px);
+  line-height: 1.04;
+  letter-spacing: 0.01em;
+}
+.login-hero__title span {
+  display: block;
+}
+.login-hero__strong {
+  color: var(--acc);
+}
+.login-hero__light {
+  font-weight: 300;
+}
+.login-hero__lead {
+  max-width: 460px;
+  color: var(--mute);
+  font-size: 16px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.login-panel {
+  display: grid;
+  place-items: center;
+  padding: 72px 40px 40px;
+}
+.login-panel__inner {
+  width: 100%;
+  max-width: 380px;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.login-form__title {
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: 0.04em;
+}
+.login-pass {
+  position: relative;
+}
+.login-pass__input {
+  padding-right: 46px;
+}
+.login-pass__eye {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  border-radius: 0 var(--radius-input) var(--radius-input) 0;
+  color: var(--mute);
+}
+.login-pass__eye:hover {
+  color: var(--acc);
+}
+.login-forgot {
+  align-self: flex-end;
+  margin-top: -6px;
+}
+.login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px;
+  font-size: 15px;
+}
+.login-create {
+  padding: 12px;
+  font-size: 14px;
+}
+.login-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--red);
+  border-radius: var(--radius-input);
+  padding: 10px 14px;
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.login-alert[hidden] {
+  display: none;
+}
+.login-alert svg {
+  flex: none;
+  margin-top: 1px;
+}
+.login-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mute);
+  text-align: center;
+}
+
+/* Abaixo do alvo desktop: empilha (hero vira cabeçalho). */
+@media (max-width: 900px) {
+  .login {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: min-content;
+  }
+  .login-hero {
+    padding: 72px 32px 32px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .login-hero__eyebrow {
+    margin-top: 12px;
+  }
+}

@@ -1,0 +1,28 @@
+name: CI
+
+# Escopo mínimo, alinhado ao que este projeto de fato tem: sem lint/teste
+# automatizado formal configurado (ver docs/qa-checklist.md — a verificação
+# real usada nas sessões é `node -c` por arquivo + harness de lógica isolada
+# via scratchpad, não uma suíte persistida). Este workflow formaliza a parte
+# disso que É possível automatizar em CI: instalar dependências limpas e
+# checar sintaxe de todo arquivo JavaScript do projeto.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Checa sintaxe de todo arquivo .js do projeto (exceto node_modules)
+        run: |
+          find . -name "*.js" -not -path "./node_modules/*" -print0 \
+            | xargs -0 -n1 node -c

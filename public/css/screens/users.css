@@ -1,0 +1,2 @@
+/* A tela de Usuários reaproveita o componente de Permissões: carrega os mesmos estilos. */
+@import url('/css/screens/permissions.css');

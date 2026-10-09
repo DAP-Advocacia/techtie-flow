@@ -1,0 +1,532 @@
+/* Automações: 2 colunas (lista 300px | canvas pontilhado). Tudo prefixado com .automations-. */
+.automations {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+/* ---------- lista de fluxos ---------- */
+.automations-list {
+  border-right: 1px solid var(--line);
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+}
+.automations-list__title {
+  margin: 0 0 6px;
+}
+.automations-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 12px;
+  padding-right: 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.automations-item:hover {
+  border-color: var(--dim);
+}
+.automations-item.is-selected {
+  border-color: var(--acc);
+  background: var(--card2);
+}
+.automations-item__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--text);
+  padding: 12px 6px 12px 14px;
+  border-radius: 12px;
+}
+.automations-item__name {
+  font-weight: 600;
+  /* até 2 linhas: o toggle come largura e o nome inteiro (title) ainda precisa ser legível */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.automations-item__meta {
+  font-size: 12px;
+  color: var(--mute);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.automations-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+}
+.automations-item__toggle {
+  flex: none;
+  transform: scale(0.8);
+  transform-origin: right center;
+}
+
+/* ---------- canvas ---------- */
+.automations-canvas {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 36px 40px;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.automations-canvas > * {
+  flex: none;
+}
+.automations-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.automations-head__id {
+  flex: 1;
+  /* largo o bastante para as ações quebrarem de linha antes de espremer o nome */
+  min-width: 340px;
+  max-width: 560px;
+}
+.automations-name {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  font: 600 21px/1.3 var(--font);
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  border-radius: 0;
+  padding: 2px 0;
+  outline: none;
+  text-overflow: ellipsis;
+}
+.automations-name:hover {
+  border-bottom-color: var(--line);
+}
+.automations-name:focus {
+  border-bottom-color: var(--acc);
+}
+.automations-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.automations-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--mute);
+  margin-right: 6px;
+}
+.automations-test {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--card);
+  border-color: var(--line);
+  font-weight: 500;
+  padding: 8px 16px;
+}
+.automations-test:hover:not(:disabled) {
+  border-color: var(--dim);
+}
+.automations-publish {
+  padding: 8px 18px;
+}
+
+/* ---------- aviso de validação ---------- */
+.automations-alert {
+  border: 1px solid var(--red);
+  background: var(--card);
+  border-left-width: 3px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  max-width: 760px;
+  font-size: 13.5px;
+}
+.automations-alert strong {
+  color: var(--red);
+}
+.automations-alert + .automations-alert {
+  margin-top: 10px;
+}
+.automations-alert--notice {
+  border-color: var(--acc);
+}
+.automations-alert--notice strong {
+  color: var(--acc);
+  font-weight: 600;
+}
+.automations-alert ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+
+/* ---------- fluxo de nós ---------- */
+.automations-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 30px;
+  margin-top: 12px;
+}
+.automations-step {
+  display: flex;
+  align-items: center;
+}
+.automations-node {
+  position: relative;
+  width: 220px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.automations-node--trigger {
+  border-color: var(--dim);
+}
+.automations-node:hover {
+  border-color: var(--acc);
+}
+.automations-node.is-selected {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px var(--acc);
+  background: var(--card2);
+}
+.automations-node.is-empty {
+  border-style: dashed;
+}
+.automations-node.has-issue {
+  border-color: var(--red);
+}
+.automations-node.is-running {
+  border-color: var(--acc);
+  background: var(--card2);
+  box-shadow: 0 0 0 4px var(--note-bg), 0 0 0 1px var(--acc);
+}
+.automations-node__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.automations-kind {
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.automations-node__num {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+.automations-node__warn {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--red);
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 800;
+}
+.automations-node__check {
+  display: inline-flex;
+  color: var(--green);
+}
+.automations-node__title {
+  font-weight: 600;
+}
+.automations-node__desc {
+  font-size: 12.5px;
+  color: var(--mute);
+}
+.automations-node.is-empty .automations-node__title,
+.automations-node.is-empty .automations-node__desc {
+  color: var(--mute);
+}
+
+/* conector: linha 36px + círculo + linha 12px (handoff). O círculo é o botão "+". */
+.automations-link {
+  display: flex;
+  align-items: center;
+}
+.automations-link__line {
+  width: 36px;
+  height: 1px;
+  background: var(--dim);
+}
+.automations-link__tail {
+  width: 12px;
+  height: 1px;
+  background: var(--dim);
+}
+.automations-step.is-wrap .automations-link__tail {
+  visibility: hidden; /* mantém a largura: evita o fluxo "pular" de linha de volta */
+}
+.automations-link__anchor {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.automations-add {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1.5px solid var(--acc);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--acc);
+  display: grid;
+  place-items: center;
+  transition: width 0.12s, height 0.12s, margin 0.12s, background 0.12s;
+}
+.automations-add svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+/* área de clique maior que o círculo visível */
+.automations-add::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+}
+.automations-add:hover,
+.automations-add:focus-visible,
+.automations-add.is-open {
+  width: 22px;
+  height: 22px;
+  margin: -6.5px;
+  background: var(--card);
+}
+.automations-add:hover svg,
+.automations-add:focus-visible svg,
+.automations-add.is-open svg {
+  opacity: 1;
+}
+/* "+" final: sempre visível, convida a continuar o fluxo */
+.automations-add--end {
+  width: 24px;
+  height: 24px;
+  border-style: dashed;
+  border-color: var(--dim);
+  background: var(--card);
+}
+.automations-add--end svg {
+  opacity: 1;
+}
+.automations-add--end:hover,
+.automations-add--end:focus-visible,
+.automations-add--end.is-open {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border-style: solid;
+  border-color: var(--acc);
+}
+
+.automations-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 18px);
+  left: 50%;
+  translate: -50% 0;
+  width: 240px;
+  background: var(--card2);
+  border: 1px solid var(--dim);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.automations-menu__group {
+  display: flex;
+  flex-direction: column;
+}
+.automations-menu__label {
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  padding: 6px 10px 4px;
+}
+.automations-menu__item {
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--text);
+}
+.automations-menu__item:hover,
+.automations-menu__item:focus-visible {
+  background: var(--line);
+  color: var(--acc2);
+}
+
+/* ---------- painel de edição / log ---------- */
+.automations-hint {
+  font-size: 13px;
+  color: var(--mute);
+  max-width: 560px;
+}
+.automations-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+  color-scheme: dark;
+}
+:root[data-theme='light'] .automations-panel {
+  color-scheme: light;
+}
+.automations-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.automations-panel__title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.automations-panel__name {
+  font-size: 17px;
+  font-weight: 600;
+}
+.automations-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.automations-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px 16px;
+  align-items: start;
+}
+.automations-wide {
+  grid-column: 1 / -1;
+}
+.automations-note {
+  font-size: 12.5px;
+  color: var(--mute);
+  line-height: 1.5;
+  grid-column: 1 / -1;
+}
+.automations-iconbtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--mute);
+  display: grid;
+  place-items: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+.automations-iconbtn:hover:not(:disabled) {
+  color: var(--acc);
+  border-color: var(--dim);
+}
+.automations-iconbtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.automations-iconbtn.is-danger:hover:not(:disabled) {
+  color: var(--red);
+  border-color: var(--red);
+}
+.automations-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text);
+  border: 1px solid var(--red);
+  border-radius: var(--radius-pill);
+  padding: 2px 4px 2px 12px;
+}
+.automations-confirm__yes {
+  background: var(--red);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.automations-log__state {
+  font-size: 12.5px;
+}
+.automations-log__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.automations-log__line {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.automations-log__line time {
+  color: var(--mute);
+}
+.automations-log__line.is-ok span::before {
+  content: '● ';
+  color: var(--green);
+}
+.automations-log__line.is-warn span::before {
+  content: '● ';
+  color: var(--red);
+}
+.automations-log__line.is-end span {
+  color: var(--green);
+  font-weight: 600;
+}

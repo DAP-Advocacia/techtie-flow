@@ -1,0 +1,409 @@
+/* Base + componentes compartilhados. Telas usam estas classes e só
+   acrescentam o que é específico delas em css/screens/<tela>.css. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: var(--acc);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--acc2);
+}
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dim);
+}
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* ---------- tipografia ---------- */
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.label {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.page-title {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.section-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.muted {
+  color: var(--mute);
+}
+.gold {
+  color: var(--acc);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- layout de página ---------- */
+.screen {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.page {
+  flex: 1;
+  overflow: auto;
+  padding: 26px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.page-header > .grow {
+  flex: 1;
+  min-width: 240px;
+}
+
+/* ---------- cartões ---------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card--flat {
+  box-shadow: none;
+}
+.card--dashed {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--dim);
+}
+
+/* ---------- botões ---------- */
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 9px 18px;
+  font-weight: 600;
+  background: none;
+  color: var(--text);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn--primary {
+  background: var(--fill);
+  color: var(--ink);
+  font-weight: 700;
+}
+.btn--primary:hover {
+  background: var(--fillh);
+}
+.btn--ghost {
+  border-color: var(--dim);
+  color: var(--acc);
+  font-weight: 500;
+}
+.btn--ghost:hover {
+  background: var(--card2);
+}
+.btn--quiet {
+  border-color: var(--line);
+  color: var(--mute);
+  font-weight: 500;
+}
+.btn--quiet:hover {
+  color: var(--acc);
+  border-color: var(--dim);
+}
+.btn--sm {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+.btn--block {
+  width: 100%;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- formulário ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.input,
+.textarea,
+.select {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 15px;
+  letter-spacing: normal;
+  text-transform: none;
+  outline: none;
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: var(--acc);
+}
+.input--inset,
+.textarea--inset {
+  background: var(--bg);
+}
+.textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+.field-error {
+  color: var(--red);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* ---------- pílulas, abas, badges ---------- */
+.pills {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+}
+.pill {
+  border: 0;
+  background: none;
+  color: var(--mute);
+  border-radius: var(--radius-pill);
+  padding: 6px 16px;
+  font-size: 13.5px;
+}
+.pill.is-active,
+.pill[aria-selected='true'] {
+  background: var(--line);
+  color: var(--acc2);
+  font-weight: 600;
+}
+.chip {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--acc);
+}
+.badge {
+  background: var(--fill);
+  color: var(--ink);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+}
+.badge--green {
+  background: var(--green);
+  color: var(--ink);
+}
+.status {
+  font-size: 12px;
+}
+.status--ok {
+  color: var(--green);
+}
+.status--err {
+  color: var(--red);
+}
+.status--warn {
+  color: var(--acc);
+}
+.tab-underline {
+  border: 0;
+  background: none;
+  color: var(--mute);
+  padding: 0 0 3px;
+  font-size: 12.5px;
+}
+.tab-underline.is-active {
+  color: var(--acc);
+  border-bottom: 2px solid var(--acc);
+}
+
+/* ---------- avatar ---------- */
+.avatar {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  color: var(--acc);
+}
+.avatar--sm {
+  width: 24px;
+  height: 24px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--dim);
+  color: var(--ink);
+  border: 0;
+}
+
+/* ---------- KPI com cantos chanfrados ---------- */
+.kpi {
+  --notch: 16px;
+  background: var(--line);
+  padding: 1px;
+  clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, var(--notch) 100%, 0 calc(100% - var(--notch)));
+}
+.kpi__body {
+  background: linear-gradient(160deg, var(--glow), var(--card));
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  clip-path: inherit;
+}
+
+/* ---------- toggle ---------- */
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  border: 0;
+  padding: 0;
+  position: relative;
+  background: var(--line);
+  transition: background 0.15s;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg);
+  transition: transform 0.15s;
+}
+.toggle[aria-checked='true'] {
+  background: var(--acc);
+}
+.toggle[aria-checked='true']::after {
+  transform: translateX(18px);
+}
+
+/* ---------- toast ---------- */
+.toast-host {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+.toast {
+  background: var(--card2);
+  border: 1px solid var(--dim);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 16px;
+  box-shadow: var(--shadow-card);
+  animation: toast-in 0.18s ease-out;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---------- estados vazios ---------- */
+.empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--mute);
+  padding: 32px;
+  gap: 6px;
+}
