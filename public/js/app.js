@@ -14,6 +14,7 @@ import { store, applyTheme } from './store.js';
 import { applySavedAccent } from './screens/settings/accent.js';
 import { canAccess, visible } from './access.js';
 import * as live from './live.js';
+import { MARK_SRC } from './screens/auth/logo.js';
 
 // shell:false = tela cheia, sem sidebar (login/onboarding).
 // require = [entidade, ação] que o motor de permissões exige para abrir a rota
@@ -85,7 +86,7 @@ function renderSidebar(active) {
   return h(
     'aside',
     { class: 'sidebar' },
-    h('div', { class: 'brand' }, h('div', { class: 'brand__mark' }, s.tenant.brand.logo?.dataUrl ? h('img', { src: s.tenant.brand.logo.dataUrl, alt: brand, class: 'brand__logo' }) : first[0] || 'T'), h('div', { class: 'brand__text' }, h('span', { class: 'brand__name' }, first), h('span', { class: 'brand__sub' }, (rest.join(' ') || 'FLOW').toUpperCase()))),
+    h('div', { class: 'brand' }, h('div', { class: 'brand__mark' }, s.tenant.brand.logo?.dataUrl ? h('img', { src: s.tenant.brand.logo.dataUrl, alt: brand, class: 'brand__logo' }) : /^techtie$/i.test(first) ? h('img', { src: MARK_SRC.small, alt: brand, class: 'brand__logo brand__logo--mark' }) : first[0] || 'T'), h('div', { class: 'brand__text' }, h('span', { class: 'brand__name' }, first), h('span', { class: 'brand__sub' }, (rest.join(' ') || 'FLOW').toUpperCase()))),
     h('div', { class: 'sidebar__group' }, 'OPERAÇÃO'),
     ...operation,
     admin.length ? h('div', { class: 'sidebar__group sidebar__group--spaced' }, 'ADMINISTRAÇÃO') : null,

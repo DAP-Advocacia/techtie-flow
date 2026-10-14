@@ -51,6 +51,16 @@
   height: 100%;
   object-fit: contain;
 }
+/* marca TechTie: sem moldura de quadrado, a arte já é o ícone */
+.brand__mark:has(.brand__logo--mark) {
+  border-color: transparent;
+  background: none;
+  width: 38px;
+  height: 38px;
+}
+.brand__logo--mark {
+  padding: 2px;
+}
 .brand__text {
   display: flex;
   flex-direction: column;
