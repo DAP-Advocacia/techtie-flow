@@ -1,13 +1,16 @@
-// Servidor estático do protótipo do TechTie Flow: serve public/ e cai no
-// index.html para rotas desconhecidas. Sem dependências e sem tocar no
-// Baileys/Supabase — o protótipo roda 100% com dados fictícios no navegador
-// (public/js/mock/). A API real (auth, tenants, WhatsApp) entra depois,
-// em cima deste mesmo processo.
+// Servidor do TechTie Flow. Dois modos, no mesmo processo:
+//  * PROTÓTIPO (padrão): serve public/ (+ /shared) e cai no index.html para rotas do SPA.
+//    Sem banco nem WhatsApp — dados fictícios no navegador (public/js/mock/).
+//  * OPERAÇÃO: com DATABASE_URL + AUTH_TOKEN_SECRET, liga também a API (/api/*), o WebSocket
+//    (/ws) e o canal de WhatsApp (Baileys). Veja .env.example e docs/piloto.md.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = Number(process.env.PORT || 3333);
+const { config, assertApiConfig } = require('./config');
+require('./logging').silenceSignalNoise(); // não imprime dump de sessão do libsignal (contém chaves privadas)
+
+const PORT = config.port;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 
@@ -31,12 +34,33 @@ function send(res, status, headers, body) {
   res.end(body);
 }
 
-const server = http.createServer((req, res) => {
+// ---- modo operação ----------------------------------------------------------
+let api = null;
+let hub = null;
+let channel = null;
+let pool = null;
+if (config.apiEnabled) {
+  assertApiConfig();
+  ({ pool } = require('./db'));
+  const { createHub } = require('./api/ws');
+  const { createApp } = require('./api/app');
+  hub = createHub({ pool, config });
+  if (config.whatsappEnabled) channel = require('./channels/baileys').createBaileysChannel({ pool, config, notify: hub.notify });
+  api = createApp({ pool, config, hub, channel });
+}
+
+const server = http.createServer(async (req, res) => {
+  if (api && (await api.handle(req, res))) return;
   let pathname;
   try {
     pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   } catch {
     return send(res, 400, { 'Content-Type': 'text/plain; charset=utf-8' }, 'requisição inválida');
+  }
+
+  // Modo operação: o front descobre sozinho que há API (mesma origem) — sem editar arquivo.
+  if (pathname === '/config.js' && api) {
+    return send(res, 200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' }, 'window.__TTF__ = { live: true, apiUrl: "" };\n');
   }
 
   if (pathname === '/healthz') {
@@ -78,6 +102,24 @@ const server = http.createServer((req, res) => {
   });
 });
 
+if (hub) hub.attach(server);
+
 server.listen(PORT, () => {
-  console.log(`[techtie-flow] protótipo em http://localhost:${PORT}`);
+  console.log(`[techtie-flow] ${api ? 'operação (API + WebSocket' + (channel ? ' + WhatsApp)' : ')') : 'protótipo'} em http://localhost:${PORT}`);
+  // retoma, escalonado, as sessões de WhatsApp já pareadas (sem bloquear o servidor)
+  channel?.resumeAll();
 });
+
+// Uma falha isolada (ex.: socket do WhatsApp) não pode derrubar a API para todos os tenants.
+process.on('unhandledRejection', (err) => console.error('[server] promessa rejeitada sem tratamento:', err?.message || err));
+process.on('uncaughtException', (err) => console.error('[server] exceção não capturada:', err?.message || err));
+
+// Encerramento limpo (deploy/reinício): fecha conexões e o pool antes de sair.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    console.log(`[server] ${sig}: encerrando…`);
+    hub?.close();
+    server.close(() => (pool ? pool.end().finally(() => process.exit(0)) : process.exit(0)));
+    setTimeout(() => process.exit(0), 10000).unref();
+  });
+}

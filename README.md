@@ -69,6 +69,10 @@ Rotas por hash: `#/login`, `#/onboarding`, `#/inbox`, `#/pipeline`, `#/agent`,
 - [docs/permissoes.md](docs/permissoes.md) — modelo de permissões (motor em
   `shared/permissions/`, testes em `test/`), decisões e revisão de segurança;
   [docs/permissoes-banco.md](docs/permissoes-banco.md) — camada Postgres (RLS).
+- [docs/piloto.md](docs/piloto.md) — como colocar o CRM para operar (banco, login,
+  WhatsApp real, front na Vercel falando com a API) e o roteiro de teste.
+- [docs/arquitetura-hospedagem.md](docs/arquitetura-hospedagem.md) —
+  hospedagem e dimensionamento para 800-1.200 WhatsApps (workers, banco, riscos).
 - [docs/roadmap-recursos.md](docs/roadmap-recursos.md) — recursos a
   adicionar (permissões, pipelines, automações, telefonia VoIP, etc.), com o
   Bitrix24 como referência, e as pesquisas pendentes (ligação por WhatsApp

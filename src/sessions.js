@@ -13,6 +13,16 @@ const { WhatsAppGateway } = require('./whatsapp');
  * sanitizado para evitar path traversal.
  */
 
+/**
+ * A sessão já foi pareada com uma conta de WhatsApp? Critério: `creds.me` (a conta; só existe
+ * depois do pareamento) — ou `registered === true`. A flag `registered` sozinha NÃO serve: no
+ * Baileys 7 ela continua `false` depois de parear por QR, e a regra antiga descartava, a cada
+ * reinício, sessões perfeitamente pareadas (o número aparecia como conectado, mas sem sessão).
+ */
+function isPairedCreds(creds) {
+  return !!creds && (creds.registered === true || (typeof creds.me?.id === 'string' && creds.me.id.length > 0));
+}
+
 function sanitize(id) {
   return String(id || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100);
 }
@@ -170,7 +180,7 @@ class SessionManager {
       if (!fs.existsSync(credsPath)) return false;
       try {
         const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-        if (!creds.registered) {
+        if (!isPairedCreds(creds)) {
           skippedUnregistered++;
           return false;
         }
@@ -223,4 +233,4 @@ class SessionManager {
   }
 }
 
-module.exports = { SessionManager, sanitize };
+module.exports = { SessionManager, sanitize, isPairedCreds };

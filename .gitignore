@@ -28,3 +28,4 @@ scripts/video/build/
 
 # saída do build estático (Vercel)
 dist/
+media_store/

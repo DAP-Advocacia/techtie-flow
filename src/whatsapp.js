@@ -40,6 +40,20 @@ const MAX_CONSECUTIVE_FAILURES = Number(process.env.MAX_RECONNECT_ATTEMPTS || 20
  * AVISO: isto usa o protocolo não-oficial do WhatsApp Web (engenharia reversa via Baileys).
  * Não é a API oficial da Meta. Veja o aviso de risco de banimento já dado na conversa.
  */
+// Resumo periódico de mídias de histórico indisponíveis (ver _processIncomingMessage).
+const missingHistoryMedia = new Map();
+let missingHistoryTimer = null;
+function noteMissingHistoryMedia(sessionId) {
+  missingHistoryMedia.set(sessionId, (missingHistoryMedia.get(sessionId) || 0) + 1);
+  if (missingHistoryTimer) return;
+  missingHistoryTimer = setTimeout(() => {
+    for (const [sid, n] of missingHistoryMedia) console.warn(`[whatsapp:${sid}] ${n} mídia(s) do histórico indisponíveis (links expirados no WhatsApp): só o texto/legenda foi salvo`);
+    missingHistoryMedia.clear();
+    missingHistoryTimer = null;
+  }, 15000);
+  missingHistoryTimer.unref?.();
+}
+
 class WhatsAppGateway extends EventEmitter {
   constructor({ authFolder, sessionId, isCardGroup }) {
     super();
@@ -900,10 +914,9 @@ class WhatsAppGateway extends EventEmitter {
           console.error('[whatsapp] falha ao baixar mídia recebida:', err.message);
           return null;
         }
-        console.warn(
-          '[whatsapp] mídia histórica indisponível (link do WhatsApp provavelmente expirado), salvando só o texto/legenda:',
-          err.message
-        );
+        // Mídia de HISTÓRICO quase sempre já expirou no WhatsApp (é esperado): em vez de uma linha
+        // (com URL enorme) por mensagem — milhares no primeiro pareamento —, conta e resume.
+        noteMissingHistoryMedia(this.sessionId);
       }
     }
 

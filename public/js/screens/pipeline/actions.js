@@ -6,6 +6,7 @@ import { store } from '../../store.js';
 import { fmtBRL } from '../../ui.js';
 import { decide, audit } from '../../access.js';
 import * as P from './perm.js';
+import * as live from '../../live.js';
 
 const uid = (prefix) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || '';
@@ -73,6 +74,7 @@ export function moveDeal(dealId, stageId, { reason = '' } = {}) {
     else delete d.lostReason;
     logTimeline(s, d.contactId, `Negócio movido para ${stage?.name || 'outra etapa'}`);
   });
+  if (live.enabled) live.moveDeal(dealId, stageId);
   return allowed(decision);
 }
 
@@ -140,6 +142,7 @@ export function createDeal({ title, contactId, newContact, value, ownerId, pipel
     s.deals.push(deal);
     logTimeline(s, cid, `Negócio criado em ${store.stage(stageId)?.name || 'pipeline'}`);
   });
+  if (live.enabled) live.createDeal(deal, newContact ? { id: deal.contactId, name: newContact.name, phone: newContact.phone, email: newContact.email } : null);
   return { ok: true, decision, deal };
 }
 

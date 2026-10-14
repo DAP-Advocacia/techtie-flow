@@ -7,6 +7,7 @@
 // a tela esconde/desabilita, mas quem garante é a regra no momento de agir).
 import { can, decide, denyMessage } from '../../access.js';
 import { canReadDeal, maskedContact, transferTargets, visibleConvs } from './perm.js';
+import * as live from '../../live.js';
 
 /** minúsculas e sem acento: 'Patrícia' casa com 'patricia'. */
 export const norm = (s) =>
@@ -111,6 +112,7 @@ export function markRead(store, convId) {
   store.update(() => {
     conv.unread = 0;
   });
+  if (live.enabled) live.markRead(convId);
 }
 
 /**
@@ -150,6 +152,7 @@ export function sendMessage(store, convId, type, text) {
     const deal = s.deals.find((x) => x.id === conv.dealId);
     if (deal) deal.lastMessage = body;
   });
+  if (live.enabled) live.sendMessage(convId, type === 'out' ? 'out' : 'note', body, msg);
   return { ok: true, msg, claimed, supervisedOf };
 }
 
@@ -196,6 +199,7 @@ export function transfer(store, convId, userId) {
     timelinePush(s, conv.contactId, text);
     systemMessage(s, convId, text);
   });
+  if (live.enabled) live.patchConversation(convId, { assigneeId: userId || null });
   return { ok: true, leaves: !can('conversation', 'read', conv) };
 }
 
@@ -209,6 +213,7 @@ export function resolve(store, convId) {
     timelinePush(s, conv.contactId, 'Conversa resolvida');
     systemMessage(s, convId, 'Conversa resolvida');
   });
+  if (live.enabled) live.patchConversation(convId, { status: 'resolved' });
   return { ok: true };
 }
 
@@ -222,6 +227,7 @@ export function reopen(store, convId) {
     timelinePush(s, conv.contactId, 'Conversa reaberta');
     systemMessage(s, convId, 'Conversa reaberta');
   });
+  if (live.enabled) live.patchConversation(convId, { status: conv.status });
   return { ok: true };
 }
 

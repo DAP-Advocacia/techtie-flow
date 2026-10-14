@@ -15,6 +15,8 @@ import { qrSvg } from './qr.js';
 import { CHANNELS, ATTENTION, ICON, META_NUMBERS, NAME_MAX, nameError, ownerOptions } from './channels.js';
 import { addInstance, markConnected } from './actions.js';
 import { check } from '../_ops/perm.js';
+import * as live from '../../live.js';
+import { openLiveConnect } from './live-connect.js';
 
 // Tempos da simulação. A fila imita o semáforo do gateway (docs, seção 2).
 const QUEUE_START = 3;
@@ -43,6 +45,8 @@ export function openConnectFlow({ instance = null, returnFocus, onFinish } = {})
     toast(need.msg);
     return null;
   }
+  // Modo operação: QR real e estados reais do gateway (nada simulado).
+  if (live.enabled) return openLiveConnect({ instance, returnFocus, onFinish });
   const st = {
     step: reconnect ? 'setup' : 'channel',
     channel: instance?.channel ?? null,

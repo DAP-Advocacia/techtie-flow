@@ -6,6 +6,7 @@ import { openDialog, openPopover, closePopover } from './dialog.js';
 import { authority, checkUserRoles, saveUserRoles, setUserStatus, checkUserStatus, saveUserTeams, checkInvite, inviteUser, roleAssignProblems, checkUserEdit, saveUserProfile, resendInvite, checkResetMfa, resetUserMfa, checkUserRemove, removeUser } from './actions.js';
 import { STATUS_LABELS, plural } from './labels.js';
 import { keepUi, selectEl, ICON, sr } from './util.js';
+import * as live from '../../live.js';
 
 /** Equipes em ordem de árvore (pai antes dos filhos) com a profundidade — tolera ciclo/pai inexistente. */
 export function flatTeams(teams) {
@@ -147,6 +148,18 @@ export function createUsersTab(S) {
   }
 
   // -------------------------------------------------------------- convite
+  function showInviteLink(mail, url) {
+    const box = h('input', { class: 'input', readonly: true, value: url, 'aria-label': 'Link do convite', onfocus: (e) => e.target.select() });
+    const dlg = openDialog({
+      eyebrow: 'Convite criado',
+      title: `Convite para ${mail}`,
+      width: 520,
+      content: h('div', { class: 'perm-form' }, h('p', null, 'Envie este link à pessoa (WhatsApp, e-mail…). Ele vale por 7 dias e só pode ser usado uma vez.'), box),
+      footer: [h('button', { class: 'btn btn--primary', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(url); toast('Link copiado.'); } catch { box.select(); } } }, 'Copiar link'), h('button', { class: 'btn btn--quiet', type: 'button', onclick: () => dlg.close() }, 'Fechar')],
+    });
+    box.focus();
+  }
+
   function inviteDialog() {
     const state = store.state;
     const a1 = authority('user', 'create');
@@ -181,6 +194,17 @@ export function createUsersTab(S) {
       eTop.hidden = !res.problems.length;
       eTop.textContent = res.problems.join(' ');
       if (!res.ok) return (res.errors.email ? email : res.errors.role ? roleSel : email).focus();
+      if (live.enabled) {
+        // Modo operação: cria o usuário no servidor e mostra o link para a pessoa definir a senha.
+        live.invite({ email: res.mail, name: form.name, roleId: form.roleId, teamId: form.teamId || undefined }).then((r) => {
+          dlg.close();
+          showInviteLink(res.mail, r.inviteUrl);
+        }).catch((e) => {
+          eTop.hidden = false;
+          eTop.textContent = e.message;
+        });
+        return;
+      }
       const out = inviteUser(store, form);
       if (!out.ok) return;
       dlg.close();
@@ -239,6 +263,7 @@ export function createUsersTab(S) {
   }
 
   function userMenu(anchor, user) {
+    if (live.enabled) return toast('Neste piloto, editar, redefinir MFA e remover usuários ainda não é salvo no servidor.');
     const state = store.state;
     const upd = authority('user', 'update');
     const inv = authority('user', 'create');
@@ -296,7 +321,7 @@ export function createUsersTab(S) {
           'div',
           { class: 'perm-chipcell' },
           roles.length ? roles.map((r) => h('span', { class: 'chip' }, r.name)) : h('span', { class: 'muted' }, 'Sem perfil'),
-          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ur:${u.id}`, 'aria-label': `Alterar perfis de ${u.name}`, 'aria-disabled': rolesAuth.ok ? null : 'true', title: rolesAuth.ok ? 'Atribuir ou remover perfis' : rolesAuth.hint, onclick: (e) => (rolesAuth.ok ? rolesPopover(e.currentTarget, u) : toast(rolesAuth.hint)) }, 'Alterar')
+          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ur:${u.id}`, 'aria-label': `Alterar perfis de ${u.name}`, 'aria-disabled': rolesAuth.ok ? null : 'true', title: rolesAuth.ok ? 'Atribuir ou remover perfis' : rolesAuth.hint, onclick: (e) => (live.enabled ? toast('Neste piloto, mudar perfis ainda não é salvo no servidor.') : rolesAuth.ok ? rolesPopover(e.currentTarget, u) : toast(rolesAuth.hint)) }, 'Alterar')
         )
       ),
       h(
@@ -306,7 +331,7 @@ export function createUsersTab(S) {
           'div',
           { class: 'perm-chipcell' },
           (u.teamIds || []).length ? u.teamIds.map((id) => h('span', { class: 'chip chip--team', title: teamPath(state, id) }, teamPath(state, id))) : h('span', { class: 'muted' }, 'Sem equipe'),
-          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ut:${u.id}`, 'aria-label': `Alterar equipes de ${u.name}`, 'aria-disabled': userAuth.ok ? null : 'true', title: userAuth.ok ? 'Alterar equipes' : userAuth.hint, onclick: (e) => (userAuth.ok ? teamsPopover(e.currentTarget, u) : toast(userAuth.hint)) }, 'Alterar')
+          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ut:${u.id}`, 'aria-label': `Alterar equipes de ${u.name}`, 'aria-disabled': userAuth.ok ? null : 'true', title: userAuth.ok ? 'Alterar equipes' : userAuth.hint, onclick: (e) => (live.enabled ? toast('Neste piloto, mudar equipes ainda não é salvo no servidor.') : userAuth.ok ? teamsPopover(e.currentTarget, u) : toast(userAuth.hint)) }, 'Alterar')
         )
       ),
       h(
@@ -322,6 +347,7 @@ export function createUsersTab(S) {
           onclick: () => {
             if (blockedHint) return toast(blockedHint);
             const res = setUserStatus(store, u.id, statusAction);
+            if (res.ok && live.enabled) live.setUserStatus(u.id, statusAction).catch((e) => toast(e.message));
             toast(res.ok ? `${u.name} ${statusAction === 'suspended' ? 'suspenso(a)' : 'reativado(a)'}.` : res.problems[0]);
           },
         }, statusAction === 'suspended' ? 'Suspender' : 'Reativar'),

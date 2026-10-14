@@ -11,8 +11,23 @@ const { createClient } = require('@supabase/supabase-js');
  * `hydrateMedia()`) já sabe buscar URLs relativas de forma autenticada.
  */
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+// Armazenamento: Supabase Storage quando SUPABASE_URL/SERVICE_ROLE_KEY existem; senão DISCO LOCAL
+// (MEDIA_FOLDER, padrão ./media_store). Antes, sem Supabase o createClient lançava ao carregar e
+// derrubava o gateway inteiro — e mídia recebida era descartada. O disco local serve ao piloto;
+// em produção com várias máquinas use o Storage (ou S3/R2).
+const fs = require('fs');
+const path = require('path');
+const useLocal = !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = useLocal ? null : createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const BUCKET = 'media';
+const LOCAL_DIR = path.resolve(process.env.MEDIA_FOLDER || './media_store');
+
+// Caminho local SEMPRE dentro de LOCAL_DIR: recusa ../ e caminhos absolutos (path traversal).
+function localPath(filename) {
+  const full = path.resolve(LOCAL_DIR, String(filename));
+  if (full !== LOCAL_DIR && !full.startsWith(LOCAL_DIR + path.sep)) throw new Error('caminho de mídia inválido');
+  return full;
+}
 
 const EXT_BY_MIMETYPE = {
   'image/jpeg': 'jpg',
@@ -61,7 +76,13 @@ function extFor(mimetype) {
 // mesmo áudio/imagem em conversas de instâncias diferentes (bug real
 // reportado pelo usuário: mesmo áudio aparecendo em duas conversas).
 async function saveMedia(sessionId, id, buffer, mimetype) {
-  const filename = `${encodeURIComponent(sessionId)}/${id}.${extFor(mimetype)}`;
+  const filename = `${encodeURIComponent(sessionId)}/${String(id).replace(/[^A-Za-z0-9_-]/g, '_')}.${extFor(mimetype)}`;
+  if (useLocal) {
+    const full = localPath(filename);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, buffer);
+    return `/api/whatsapp/media/${encodeURIComponent(filename)}`;
+  }
   const { error } = await supabase.storage.from(BUCKET).upload(filename, buffer, {
     contentType: mimetype,
     upsert: true,
@@ -75,6 +96,7 @@ async function saveMedia(sessionId, id, buffer, mimetype) {
 // eventual uso futuro fora do proxy (ver downloadMediaByFilename abaixo,
 // que é o que GET /media/:filename usa hoje).
 async function getSignedMediaUrl(filename, expiresIn = 300) {
+  if (useLocal) throw new Error('URL assinada só existe com Supabase Storage');
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(filename, expiresIn);
   if (error) throw error;
   return data.signedUrl;
@@ -90,6 +112,10 @@ async function getSignedMediaUrl(filename, expiresIn = 300) {
 // intermitente no fetch() autenticado do frontend (usuário reportou
 // 2026-09-29, ver ROADMAP item 10).
 async function downloadMediaByFilename(filename) {
+  if (useLocal) {
+    const buffer = fs.readFileSync(localPath(filename));
+    return { buffer, contentType: CONTENT_TYPE_BY_EXT[path.extname(filename).slice(1).toLowerCase()] || 'application/octet-stream' };
+  }
   const { data, error } = await supabase.storage.from(BUCKET).download(filename);
   if (error) throw error;
   return { buffer: Buffer.from(await data.arrayBuffer()), contentType: data.type };
@@ -100,6 +126,7 @@ async function downloadMediaByFilename(filename) {
 // (ver src/scheduler.js), sem passar pela rota HTTP nem gerar signed URL.
 async function downloadMedia(relativeUrl) {
   const filename = decodeURIComponent(String(relativeUrl).split('/').pop());
+  if (useLocal) return fs.readFileSync(localPath(filename));
   const { data, error } = await supabase.storage.from(BUCKET).download(filename);
   if (error) throw error;
   return Buffer.from(await data.arrayBuffer());
@@ -117,8 +144,14 @@ async function deleteMedia(relativeUrl) {
   const prefix = '/api/whatsapp/media/';
   const encoded = String(relativeUrl).startsWith(prefix) ? relativeUrl.slice(prefix.length) : relativeUrl;
   const filename = decodeURIComponent(encoded);
+  if (useLocal) {
+    fs.rmSync(localPath(filename), { force: true });
+    return;
+  }
   const { error } = await supabase.storage.from(BUCKET).remove([filename]);
   if (error) throw error;
 }
+
+const CONTENT_TYPE_BY_EXT = Object.fromEntries(Object.entries(EXT_BY_MIMETYPE).map(([mime, ext]) => [ext, mime]));
 
 module.exports = { saveMedia, getSignedMediaUrl, downloadMediaByFilename, downloadMedia, deleteMedia };

@@ -46,14 +46,34 @@ END $$;
 
 -- Reafirma os atributos mesmo se o papel já existia (alguém pode ter "ajudado"
 -- com BYPASSRLS: isso anularia TODO o isolamento).
-ALTER ROLE app_owner NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
-ALTER ROLE app_user  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+-- Só ALTERA se o papel estiver com atributo indevido. Motivo: no Supabase o `postgres` não é
+-- superusuário, e só superusuário pode alterar BYPASSRLS — mesmo "reafirmando" o valor que já
+-- está certo (daria `permission denied to alter role`). Um papel recém-criado já nasce correto;
+-- se estiver errado e não houver privilégio para corrigir, a migração FALHA em vez de seguir
+-- com um papel que ignora RLS.
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN SELECT rolname FROM pg_roles
+            WHERE rolname IN ('app_owner', 'app_user')
+              AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole) LOOP
+    EXECUTE format('ALTER ROLE %I NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE', r.rolname);
+  END LOOP;
+END $$;
 
 DO $$
 BEGIN
   -- Para o administrador poder SET ROLE app_owner (no Supabase o `postgres` não
   -- é superusuário; no PG16 quem cria o papel recebe ADMIN OPTION).
-  IF NOT pg_has_role(current_user, 'app_owner', 'MEMBER') THEN
+  -- PG16+: quem cria o papel recebe só ADMIN OPTION (pode administrá-lo), NÃO o direito de
+  -- assumi-lo; 'MEMBER' dá verdadeiro e o SET ROLE seguinte falha. Por isso verifica-se o
+  -- privilégio SET e concede-se WITH SET TRUE. Antes do PG16 não existe essa distinção.
+  IF current_setting('server_version_num')::int >= 160000 THEN
+    IF NOT pg_has_role(current_user, 'app_owner', 'SET') THEN
+      EXECUTE format('GRANT app_owner TO %I WITH SET TRUE', current_user);
+    END IF;
+  ELSIF NOT pg_has_role(current_user, 'app_owner', 'MEMBER') THEN
     EXECUTE format('GRANT app_owner TO %I', current_user);
   END IF;
   -- app_user NUNCA pode ser membro de app_owner (senão SET ROLE o promoveria).

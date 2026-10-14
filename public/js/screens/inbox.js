@@ -10,6 +10,7 @@ import { createComposer } from './inbox/composer.js';
 import { createPanel } from './inbox/panel.js';
 import { composerAccess, convAccess, otherAssignee, visibleConvs } from './inbox/perm.js';
 import { canMarkRead, firstName, markDelivered, markRead, messagesOf, receiveMessage, reopen, resolve, insightToFollowUp, sendMessage, tabCounts, transfer, visibleConversations } from './inbox/actions.js';
+import * as live from '../live.js';
 
 // Conversas em que o "lead" responde sozinho ~2s depois de uma mensagem nossa (demo).
 const LEAD_REPLIES = {
@@ -207,6 +208,8 @@ export default {
       const cAccess = conv ? composerAccess(store, conv, access, firstName) : null;
       if (shownId !== selectedId) {
         shownId = selectedId;
+        live.setViewing(selectedId); // modo operação: marca como lida o que chegar enquanto está aberta
+        live.loadMessages(selectedId); // modo operação: carrega as mensagens reais da conversa
         thread.reset();
         composer.show(selectedId, cAccess);
       } else if (cAccess) composer.setAccess(cAccess);
@@ -245,6 +248,7 @@ export default {
 
     return () => {
       disposed = true;
+      live.setViewing(null);
       unsubscribe();
       thread.destroy();
       for (const t of timers) clearTimeout(t);

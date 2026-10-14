@@ -13,6 +13,7 @@ import { h, icon, ICONS, initials, replaceChildren } from './ui.js';
 import { store, applyTheme } from './store.js';
 import { applySavedAccent } from './screens/settings/accent.js';
 import { canAccess, visible } from './access.js';
+import * as live from './live.js';
 
 // shell:false = tela cheia, sem sidebar (login/onboarding).
 // require = [entidade, ação] que o motor de permissões exige para abrir a rota
@@ -20,6 +21,7 @@ import { canAccess, visible } from './access.js';
 const ROUTES = [
   { id: 'login', label: 'Login', shell: false },
   { id: 'onboarding', label: 'Onboarding', shell: false },
+  { id: 'accept', label: 'Convite', shell: false },
   { id: 'inbox', label: 'Inbox', shell: true, nav: true, require: ['conversation', 'read'] },
   { id: 'pipeline', label: 'Negócios', shell: true, nav: true, require: ['deal', 'read'] },
   { id: 'agent', label: 'Agente de IA', shell: true, nav: true, require: ['ai_agent', 'read'] },
@@ -90,8 +92,10 @@ function renderSidebar(active) {
     ...admin,
     h('div', { class: 'sidebar__spacer' }),
     h('button', { class: 'sidebar__btn', type: 'button', onclick: () => store.setTheme(s.theme === 'dark' ? 'light' : 'dark') }, s.theme === 'dark' ? 'Modo claro' : 'Modo escuro'),
-    h('button', { class: 'sidebar__btn sidebar__btn--dashed', type: 'button', onclick: () => navigate('login') }, 'Ver login / onboarding'),
-    h(
+    live.enabled
+      ? h('button', { class: 'sidebar__btn sidebar__btn--dashed', type: 'button', onclick: () => live.logout() }, 'Sair')
+      : h('button', { class: 'sidebar__btn sidebar__btn--dashed', type: 'button', onclick: () => navigate('login') }, 'Ver login / onboarding'),
+    live.enabled ? null : h(
       'label',
       { class: 'sidebar__viewas' },
       h('span', null, 'PROTÓTIPO · VER COMO'),
@@ -127,6 +131,11 @@ function placeholder(route, err) {
 async function render() {
   const token = ++renderToken;
   const route = currentRoute();
+  // Modo operação: sem sessão só existem o login e o aceite de convite.
+  if (live.enabled && !live.hasToken() && !['login', 'accept'].includes(route.id)) {
+    location.hash = '#/login';
+    return;
+  }
   applyTheme();
 
   if (cleanup) {
@@ -185,4 +194,16 @@ store.subscribe(() => applyTheme());
 // Cor de destaque escolhida em Configurações precisa valer em qualquer tela
 // depois de recarregar, não só quando aquela tela é aberta.
 applySavedAccent();
-render();
+
+async function boot() {
+  // Modo operação com sessão guardada: carrega os dados reais ANTES do primeiro desenho.
+  if (live.enabled && live.hasToken()) {
+    try {
+      await live.hydrate();
+    } catch {
+      /* sessão inválida: o guarda de rota leva ao login */
+    }
+  }
+  render();
+}
+boot();

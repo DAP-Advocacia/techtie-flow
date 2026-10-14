@@ -3,7 +3,7 @@
 // (motor de permissões, que o backend também usa). Em hospedagem estática só existe UMA pasta
 // de saída, então juntamos as duas: dist/ = public/ + dist/shared/ = shared/.
 // (O src/server.js faz o mesmo mapeamento em tempo de execução para o desenvolvimento local.)
-import { cpSync, rmSync, mkdirSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { cpSync, rmSync, mkdirSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,6 +14,16 @@ rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 cpSync(join(root, 'public'), dist, { recursive: true });
 cpSync(join(root, 'shared'), join(dist, 'shared'), { recursive: true });
+
+// Modo operação no site estático: TTF_API_URL (ex.: https://api.suaempresa.com.br) aponta o front
+// para a API. Sem a variável, o site publicado fica em modo DEMO (dados fictícios).
+const apiUrl = (process.env.TTF_API_URL || '').trim().replace(/\/$/, '');
+if (apiUrl && !/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(apiUrl)) {
+  console.error('[build-static] TTF_API_URL inválida (use https://dominio, sem caminho)');
+  process.exit(1);
+}
+writeFileSync(join(dist, 'config.js'), `window.__TTF__ = ${JSON.stringify({ live: !!apiUrl, apiUrl })};\n`);
+console.log(`[build-static] modo ${apiUrl ? 'OPERAÇÃO → ' + apiUrl : 'DEMO'}`);
 
 // Conferência: toda referência absoluta ("/js/…", "/shared/…", "/css/…") dentro de dist/ precisa existir.
 // Falha o build se o site publicado fosse quebrar por arquivo ausente.

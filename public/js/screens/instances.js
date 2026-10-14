@@ -10,10 +10,11 @@ import { closeAllModals } from './instances/modal.js';
 import { openAssign, openConfirm, openManage, openRename } from './instances/dialogs.js';
 import { openConnectFlow } from './instances/connect-flow.js';
 import { check, blocked, createHints, banner, anyOk } from './_ops/perm.js';
+import * as live from '../live.js';
 
 export default {
   mount(el, { store }) {
-    seedInstances();
+    if (!live.enabled) seedInstances(); // número fictício de demonstração: só no protótipo
 
     let highlightId = null;
     let highlightTimer = null;
@@ -147,8 +148,11 @@ export default {
     function card(inst) {
       const st = statusMeta(inst.status);
       const att = inst.status === 'attention' ? ATTENTION[inst.attentionReason] || ATTENTION.badSession : null;
-      const busy = st.busy;
-      const needsReconnect = inst.status === 'disconnected' || inst.status === 'attention';
+      // Em operação, um número em pareamento (QR/conectando/fila) nunca trava o botão: precisa dar para
+      // REABRIR o QR depois de fechar o diálogo (o pareamento continua no servidor).
+      const pairing = live.enabled && ['qr', 'connecting', 'queued'].includes(inst.status);
+      const busy = st.busy && !pairing;
+      const needsReconnect = inst.status === 'disconnected' || inst.status === 'attention' || pairing;
       // Quem só lê (nenhuma ação de escrita liberada) vê "Detalhes" em vez de "Gerenciar".
       const readOnly = !anyOk(C.update(), C.connect(), C.remove(), check('ai_agent', 'update'));
 
@@ -169,7 +173,7 @@ export default {
           disabled: busy,
           onclick: () => (needsReconnect ? reconnect(inst) : manage(inst)),
         },
-        busy ? 'Conectando…' : needsReconnect ? 'Reconectar' : readOnly ? 'Detalhes' : 'Gerenciar'
+        busy ? 'Conectando…' : pairing ? 'Abrir QR Code' : needsReconnect ? 'Reconectar' : readOnly ? 'Detalhes' : 'Gerenciar'
       );
       // Reconectar é ação de escrita (instance.connect); abrir os detalhes é leitura.
       if (needsReconnect) hints.lock(primary, C.connect(), { other: busy });

@@ -3,6 +3,7 @@
 // inválidas" depois do loading; qualquer outra senha entra.
 import { h, icon, toast } from '../ui.js';
 import { AUTH_ICONS, EMAIL_RE, authBrand, ensureAuthCss, spinner, themeToggle } from './auth/common.js';
+import * as live from '../live.js';
 
 const FAKE_LATENCY_MS = 650;
 const MIN_PASSWORD = 6;
@@ -105,6 +106,24 @@ export default {
       const okEmail = checkEmail();
       const okPass = checkPass();
       if (!okEmail || !okPass) return (okEmail ? passInput : emailInput).focus();
+
+      if (live.enabled) {
+        // Modo operação: login de verdade (a senha nunca é validada no navegador).
+        setBusy(true);
+        (async () => {
+          try {
+            await live.login(emailInput.value.trim(), passInput.value);
+            await live.hydrate();
+            navigate('inbox');
+          } catch (err) {
+            setBusy(false);
+            alertBox.querySelector('span').textContent = err.message;
+            alertBox.hidden = false;
+            passInput.focus();
+          }
+        })();
+        return;
+      }
 
       setBusy(true);
       timer = setTimeout(() => {

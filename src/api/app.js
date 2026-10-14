@@ -1,0 +1,610 @@
+'use strict';
+// API HTTP do TechTie Flow (JSON). Regras de ouro:
+//  1. Toda decisão de acesso é do MOTOR (shared/permissions) no servidor; o front só reflete.
+//  2. Listagem = WHERE compilado pelo motor (nunca "carregar tudo e filtrar depois").
+//  3. Acesso por id = o registro é lido DO BANCO (com RLS + filtro do motor), e só então decidido.
+//  4. O contexto das operações (etapa de destino, quem pediu…) é derivado AQUI, do banco —
+//     nunca copiado do corpo da requisição.
+const crypto = require('crypto');
+const { hashPassword, verifyPassword, passwordProblem, signToken, verifyToken, newInviteToken, hashInviteToken, makeLimiter } = require('../auth');
+const { getAccess, invalidate, tx, listWhere, canAccess } = require('./access');
+const { toApiConversation } = require('./ws');
+const { downloadMediaByFilename } = require('../media');
+
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+const bad = (m) => new HttpError(400, m);
+const forbidden = (m = 'Seu perfil não permite esta ação.') => new HttpError(403, m);
+const notFound = (m = 'Não encontrado.') => new HttpError(404, m);
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const ms = (d) => (d ? new Date(d).getTime() : null);
+const num = (v) => (v === null || v === undefined ? null : Number(v));
+
+// --------------------------------------------------------------------- mapeamentos DB → API
+const apiContact = (r) => ({ id: r.id, name: r.name, company: '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null });
+const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], lastMessage: '' });
+const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null });
+const apiMessage = (r) => ({
+  id: r.id,
+  type: r.kind === 'note' ? 'note' : r.kind === 'system' ? 'system' : r.direction === 'in' ? 'in' : 'out',
+  kind: r.kind,
+  text: r.body || '',
+  mediaUrl: r.media_url || null,
+  mime: r.media_mime || null,
+  at: ms(r.created_at),
+  authorId: r.author_id || null,
+  status: r.status,
+});
+// linhas no formato que o MOTOR espera (atributos do catálogo)
+const convRow = (r) => ({ id: r.id, tenantId: r.tenant_id, ownerId: r.owner_id, teamId: r.team_id, assigneeId: r.assignee_id, instanceId: r.instance_id, status: r.status });
+const dealRow = (r, sharedWith) => ({ id: r.id, tenantId: r.tenant_id, ownerId: r.owner_id, teamId: r.team_id, pipelineId: r.pipeline_id, stageId: r.stage_id, status: r.status, value: num(r.value), sharedWith });
+
+// --------------------------------------------------------------------- infraestrutura HTTP
+async function readJson(req, limit = 1_000_000) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > limit) throw new HttpError(413, 'Corpo grande demais.');
+    chunks.push(chunk);
+  }
+  if (!size) return {};
+  try {
+    const v = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : (() => { throw bad('JSON inválido.'); })();
+  } catch (e) {
+    throw e instanceof HttpError ? e : bad('JSON inválido.');
+  }
+}
+
+function createApp({ pool, config, hub, channel }) {
+  /** IP do cliente: com TRUST_PROXY, o primeiro de X-Forwarded-For; senão o do socket. */
+  const ipOf = (req) => (config.trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
+  const routes = [];
+  const route = (method, p, handler, { auth = true } = {}) => routes.push({ method, auth, handler, re: new RegExp('^' + p.replace(/:([a-zA-Z]+)/g, '(?<$1>[^/]+)') + '/?$') });
+  // 10 tentativas por (IP + e-mail) e um teto bem mais alto por IP: um escritório inteiro atrás do
+  // mesmo IP (NAT) não pode ficar bloqueado por causa de poucos erros de digitação.
+  const loginLimiter = makeLimiter(10, 10 * 60 * 1000);
+  const loginIpLimiter = makeLimiter(300, 10 * 60 * 1000);
+  const ipLimiter = makeLimiter(600, 60 * 1000);
+  const inviteLimiter = makeLimiter(20, 10 * 60 * 1000);
+
+  const sendJson = (res, status, data, extra = {}) => {
+    const body = JSON.stringify(data);
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...extra });
+    res.end(body);
+  };
+
+  const uuidOr400 = (v, what) => {
+    if (!UUID.test(String(v || ''))) throw bad(`${what} inválido.`);
+    return String(v).toLowerCase();
+  };
+
+  /** Decide pelo motor e lança 403 com o motivo quando negado. Devolve a decisão. */
+  function must(access, entity, action, row, context) {
+    const d = access.E.decide(access.ctx, entity, action, row, context);
+    if (d.effect === 'allow') return d;
+    if (d.effect === 'approval') throw new HttpError(409, 'Esta ação precisa da aprovação de um gestor.');
+    const why = { mfa_required: 'Ação sensível: ative a verificação em duas etapas (MFA).', subject_inactive: 'Seu acesso está inativo.' }[d.reason];
+    throw forbidden(why);
+  }
+
+  const withShares = async (c, entity, row) => {
+    const r = await c.query('SELECT subject_type AS type, subject_id AS id, level FROM resource_shares WHERE entity = $1 AND resource_id = $2', [entity, row.id]);
+    return { ...row, sharedWith: r.rows };
+  };
+
+  /** Conversa visível ao usuário (filtro do motor + RLS) ou 404 — sem revelar que existe. */
+  async function visibleConversation(c, access, id) {
+    const w = listWhere(access, 'conversation', 'read');
+    const r = await c.query(`SELECT t.* FROM conversations t WHERE t.id = $${w.params.length + 1} AND ${w.sql}`, [...w.params, id]);
+    if (!r.rowCount) throw notFound('Conversa não encontrada.');
+    return r.rows[0];
+  }
+  async function visibleDeal(c, access, id) {
+    const w = listWhere(access, 'deal', 'read');
+    const r = await c.query(`SELECT t.* FROM deals t WHERE t.id = $${w.params.length + 1} AND ${w.sql}`, [...w.params, id]);
+    if (!r.rowCount) throw notFound('Negócio não encontrado.');
+    return r.rows[0];
+  }
+  const primaryTeam = (access) => access.teamIds[0] || null;
+  /** Trilha de auditoria NA MESMA transação da mudança (append-only no banco). */
+  const audit = (c, access, req, action, entity, entityId, diff) =>
+    c.query('INSERT INTO audit_log (tenant_id, actor_id, action, entity, entity_id, diff, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
+      access.tenantId, access.userId, action, entity, entityId, diff ? JSON.stringify(diff) : null, /^[0-9a-f:.]+$/i.test(req ? ipOf(req) : '') ? ipOf(req).replace(/^::ffff:/, '') : null,
+    ]);
+
+  // ===================================================================== AUTENTICAÇÃO
+  route(
+    'POST',
+    '/api/auth/login',
+    async ({ req, body }) => {
+      const email = String(body.email || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      const ip = ipOf(req);
+      // só tentativas que FALHAM contam por (IP + e-mail): entrar certo não gasta o limite
+      if (!loginLimiter.peek(`${ip}|${email}`) || !loginIpLimiter(ip)) throw new HttpError(429, 'Muitas tentativas. Aguarde alguns minutos.');
+      const found = EMAIL.test(email) ? (await pool.query('SELECT * FROM auth_lookup($1)', [email])).rows[0] : null;
+      // sempre gasta o tempo de uma verificação de senha (não revela se o e-mail existe)
+      const ok = await verifyPassword(password, found?.password_hash);
+      if (found && found.locked_until && new Date(found.locked_until) > new Date()) throw new HttpError(429, 'Conta temporariamente bloqueada por tentativas erradas. Tente mais tarde.');
+      if (!found || !ok) {
+        loginLimiter(`${ip}|${email}`);
+        if (found) await pool.query('SELECT auth_login_result($1, false)', [found.user_id]);
+        throw new HttpError(401, 'E-mail ou senha incorretos.');
+      }
+      const access = await getAccess(pool, { userId: found.user_id, tenantId: found.tenant_id });
+      if (!access || access.user.status !== 'active') throw new HttpError(403, 'Conta inativa. Fale com o administrador.');
+      await pool.query('SELECT auth_login_result($1, true)', [found.user_id]);
+      const token = signToken({ sub: found.user_id, tid: found.tenant_id }, config.authSecret, config.tokenTtlSeconds);
+      return { token, expiresIn: config.tokenTtlSeconds, user: access.user };
+    },
+    { auth: false }
+  );
+
+  route(
+    'POST',
+    '/api/auth/accept-invite',
+    async ({ req, body }) => {
+      if (!inviteLimiter(ipOf(req))) throw new HttpError(429, 'Muitas tentativas. Aguarde alguns minutos.');
+      const problem = passwordProblem(body.password);
+      if (problem) throw bad(problem);
+      const hash = await hashPassword(body.password);
+      const ok = (await pool.query('SELECT auth_accept_invite($1, $2) AS ok', [hashInviteToken(String(body.token || '')), hash])).rows[0].ok;
+      if (!ok) throw bad('Convite inválido ou expirado.');
+      return { ok: true };
+    },
+    { auth: false }
+  );
+
+  route('GET', '/api/health', async () => ({ ok: true }), { auth: false });
+
+  route('POST', '/api/ws-ticket', async ({ access }) => ({ ticket: signToken({ sub: access.userId, tid: access.tenantId, kind: 'ws' }, config.authSecret, 30) }));
+
+  route('GET', '/api/me', async ({ access }) => ({ user: access.user, tenant: { id: access.tenantId, name: access.tenant?.name }, permissions: access.E.effectiveMatrix(access.ctx) }));
+
+  // ===================================================================== BOOTSTRAP
+  // Estado inicial da tela, já FILTRADO pelo motor (o front nunca recebe o que não pode ver).
+  route('GET', '/api/bootstrap', async ({ access }) => {
+    const { E } = access;
+    return tx(
+      pool,
+      access,
+      async (c) => {
+        const where = (entity) => listWhere(access, entity, 'read');
+        const q = (table, entity, order, limit) => {
+          const w = where(entity);
+          return c.query(`SELECT t.* FROM ${table} t WHERE ${w.sql} ORDER BY ${order} LIMIT ${limit}`, w.params);
+        };
+        // em sequência: um cliente do pg não deve receber consultas simultâneas (deprecado no pg 9)
+        const contacts = await q('contacts', 'contact', 't.created_at DESC', 2000);
+        const deals = await q('deals', 'deal', 't.created_at DESC', 2000);
+        const convs = await q('conversations', 'conversation', 't.last_message_at DESC NULLS LAST', 500);
+        const readUsers = canAccess(access, 'user', 'read');
+        const users = (await c.query('SELECT id, name, email, status, mfa_enabled FROM users ORDER BY name')).rows;
+        const roleLinks = readUsers ? (await c.query('SELECT user_id, system_role_id, role_id FROM user_roles')).rows : [];
+        const memberLinks = (await c.query('SELECT team_id, user_id FROM team_members')).rows;
+        const pipelines = canAccess(access, 'pipeline', 'read') || canAccess(access, 'deal', 'read') ? (await c.query('SELECT id, name FROM pipelines ORDER BY name')).rows : [];
+        const stages = pipelines.length ? (await c.query('SELECT id, pipeline_id, name, kind FROM pipeline_stages ORDER BY pipeline_id, position')).rows : [];
+        const instances = canAccess(access, 'instance', 'read') ? (await c.query('SELECT id, name, channel, status, phone, attention_reason FROM instances ORDER BY name')).rows : [];
+        const teams = (await c.query('SELECT id, name, parent_id FROM teams ORDER BY name')).rows;
+
+        const dealByContact = new Map();
+        for (const d of deals.rows) if (d.contact_id && !dealByContact.has(d.contact_id)) dealByContact.set(d.contact_id, d.id);
+        const readRoles = canAccess(access, 'role', 'read');
+        return {
+          tenant: { id: access.tenantId, name: access.tenant?.name, policy: access.tenant?.settings || {} },
+          currentUserId: access.userId,
+          users: users.map((u) => ({
+            id: u.id,
+            tenantId: access.tenantId,
+            name: u.name,
+            email: readUsers || u.id === access.userId ? u.email : null,
+            status: u.status,
+            mfa: u.mfa_enabled,
+            roleIds: readUsers || u.id === access.userId ? roleLinks.filter((l) => l.user_id === u.id).map((l) => l.system_role_id || l.role_id) : [],
+            teamIds: memberLinks.filter((m) => m.user_id === u.id).map((m) => m.team_id),
+          })),
+          roles: [...E.SYSTEM_ROLES, ...(readRoles ? access.roleDefs : [])],
+          teams: teams.map((t) => ({ id: t.id, name: t.name, parentId: t.parent_id, members: memberLinks.filter((m) => m.team_id === t.id).length, pipelineId: null })),
+          pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, teamId: null, stages: stages.filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name, kind: s.kind, accent: s.kind === 'won' ? 'var(--green)' : s.kind === 'lost' ? 'var(--red)' : 'var(--acc)' })) })),
+          contacts: contacts.rows.map(apiContact),
+          deals: deals.rows.map(apiDeal),
+          conversations: convs.rows.map((r) => ({ ...toApiConversation(r), dealId: dealByContact.get(r.contact_id) || null })),
+          // "qr"/"conectando"/"fila" só valem se a sessão existe de fato agora; se o servidor reiniciou ou a
+          // sessão caiu, o que está gravado é passado: informa "desconectada" (e a tela oferece reconectar).
+          instances: instances.map((r) => apiInstance(['qr', 'connecting', 'queued', 'connected'].includes(r.status) && channel?.has && !channel.has({ id: r.id, tenantId: access.tenantId }) ? { ...r, status: 'disconnected' } : r)),
+          permissions: E.effectiveMatrix(access.ctx),
+        };
+      },
+      { readOnly: true }
+    );
+  });
+
+  // ===================================================================== CONVERSAS
+  route('GET', '/api/conversations/:id/messages', async ({ access, params, query }) => {
+    const id = uuidOr400(params.id, 'Conversa');
+    const limit = Math.min(Math.max(Number(query.get('limit')) || 100, 1), 300);
+    return tx(
+      pool,
+      access,
+      async (c) => {
+        await visibleConversation(c, access, id); // 404 se não puder ver
+        const r = await c.query('SELECT * FROM (SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at DESC, id LIMIT $2) m ORDER BY created_at, id', [id, limit]);
+        return { messages: r.rows.map(apiMessage) };
+      },
+      { readOnly: true }
+    );
+  });
+
+  route('POST', '/api/conversations/:id/messages', async ({ access, params, body }) => {
+    const id = uuidOr400(params.id, 'Conversa');
+    const kind = body.kind === 'note' ? 'note' : 'text';
+    const text = String(body.text ?? '').trim();
+    if (!text) throw bad('Escreva uma mensagem.');
+    if (text.length > 4000) throw bad('Mensagem longa demais (máx. 4.000 caracteres).');
+    const result = await tx(pool, access, async (c) => {
+      const conv = await visibleConversation(c, access, id);
+      must(access, 'conversation', kind === 'note' ? 'note' : 'send_message', convRow(conv));
+      let waId = null;
+      if (kind === 'text') {
+        const inst = (await c.query('SELECT id, name, channel, status FROM instances WHERE id = $1', [conv.instance_id])).rows[0];
+        if (!channel) throw new HttpError(503, 'Canal de WhatsApp indisponível.');
+        // O que está gravado pode estar velho (servidor reiniciado, sessão caída): vale a sessão VIVA.
+        if (!inst || inst.status !== 'connected' || (channel.has && !channel.has({ id: inst.id, tenantId: access.tenantId }))) {
+          throw new HttpError(409, 'O WhatsApp desta conversa está desconectado. Vá em Instâncias e reconecte o número.');
+        }
+        try {
+          const sent = await channel.sendText({ id: inst.id, tenantId: access.tenantId }, conv.phone, text);
+          waId = sent?.id || null;
+        } catch (e) {
+          throw new HttpError(e.status === 409 ? 409 : 502, e.status === 409 ? e.message : `Não foi possível enviar pelo WhatsApp agora (${String(e.message).slice(0, 120)}). Tente de novo.`);
+        }
+      }
+      const msg = (
+        await c.query(
+          `INSERT INTO messages (tenant_id, conversation_id, wa_message_id, direction, kind, body, author_id, status)
+           VALUES ($1, $2, $3, 'out', $4, $5, $6, 'sent') RETURNING *`,
+          [access.tenantId, id, waId, kind, text, access.userId]
+        )
+      ).rows[0];
+      // responder uma conversa da fila a atribui a quem respondeu (só se o motor permitir a transferência)
+      let assign = conv.assignee_id === null && kind === 'text' && access.E.decide(access.ctx, 'conversation', 'transfer', convRow(conv)).effect === 'allow';
+      const upd = (
+        await c.query(
+          `UPDATE conversations SET
+              last_message_at = CASE WHEN $2 THEN now() ELSE last_message_at END,
+              last_message    = CASE WHEN $2 THEN left($3, 300) ELSE last_message END,
+              assignee_id     = CASE WHEN $4 THEN $5::uuid ELSE assignee_id END,
+              team_id         = CASE WHEN $4 THEN $6::uuid ELSE team_id END,
+              status          = CASE WHEN $4 OR status = 'resolved' THEN 'open' ELSE status END
+            WHERE id = $1 RETURNING *`,
+          [id, kind === 'text', text, assign, access.userId, primaryTeam(access)]
+        )
+      ).rows[0];
+      return { message: apiMessage(msg), conversation: toApiConversation(upd) };
+    });
+    hub?.emit(access.tenantId, { type: 'message', conversation: result.conversation, message: result.message }, { entity: 'conversation', row: { id, tenantId: access.tenantId, assigneeId: result.conversation.assigneeId, instanceId: result.conversation.instanceId, status: result.conversation.status } }).catch(() => {});
+    return result;
+  });
+
+  route('POST', '/api/conversations/:id/read', async ({ access, params }) => {
+    const id = uuidOr400(params.id, 'Conversa');
+    await tx(pool, access, async (c) => {
+      const conv = await visibleConversation(c, access, id);
+      // só quem pode atender zera a não lida (supervisor/leitor não "consome" a fila de quem atende)
+      const row = convRow(conv);
+      const can = access.E.decide(access.ctx, 'conversation', 'send_message', row).effect === 'allow' || access.E.decide(access.ctx, 'conversation', 'note', row).effect === 'allow';
+      if (can) await c.query('UPDATE conversations SET unread_count = 0 WHERE id = $1', [id]);
+    });
+    return { ok: true };
+  });
+
+  route('PATCH', '/api/conversations/:id', async ({ req, access, params, body }) => {
+    const id = uuidOr400(params.id, 'Conversa');
+    const conv = await tx(pool, access, async (c) => {
+      const cur = await visibleConversation(c, access, id);
+      const row = convRow(cur);
+      let { assignee_id: assignee, team_id: team, status } = cur;
+      if (body.status !== undefined) {
+        if (!['open', 'queue', 'resolved'].includes(body.status)) throw bad('Status inválido.');
+        must(access, 'conversation', 'resolve', row);
+        status = body.status;
+      }
+      if (body.assigneeId !== undefined) {
+        must(access, 'conversation', 'transfer', row);
+        if (body.assigneeId === null) {
+          assignee = null;
+          team = null;
+          if (status !== 'resolved') status = 'queue';
+        } else {
+          const to = uuidOr400(body.assigneeId, 'Destino');
+          const target = await getAccess(pool, { userId: to, tenantId: access.tenantId });
+          if (!target || target.user.status !== 'active') throw bad('O destino precisa ser um usuário ativo.');
+          // o destino precisa poder ler E responder a conversa já atribuída a ele
+          const asTarget = { ...row, assigneeId: to, teamId: target.teamIds[0] || null };
+          if (target.E.decide(target.ctx, 'conversation', 'read', asTarget).effect !== 'allow') throw bad('O destino não tem permissão para atender esta conversa.');
+          assignee = to;
+          team = target.teamIds[0] || null;
+          if (status === 'queue') status = 'open';
+        }
+      }
+      const r = await c.query('UPDATE conversations SET assignee_id = $2, team_id = $3, status = $4 WHERE id = $1 RETURNING *', [id, assignee, team, status]);
+      if (assignee !== cur.assignee_id) await audit(c, access, req, 'conversation.transfer', 'conversation', id, { from: cur.assignee_id, to: assignee });
+      if (status !== cur.status && status === 'resolved') await audit(c, access, req, 'conversation.resolve', 'conversation', id, null);
+      return toApiConversation(r.rows[0]);
+    });
+    return { conversation: conv };
+  });
+
+  // ===================================================================== CONTATOS E NEGÓCIOS
+  route('POST', '/api/contacts', async ({ access, body }) => {
+    const name = String(body.name || '').trim();
+    const phone = String(body.phone || '').replace(/\D/g, '');
+    const email = body.email ? String(body.email).trim().toLowerCase() : null;
+    if (!name || name.length > 200) throw bad('Informe o nome (até 200 caracteres).');
+    if (phone && !/^[0-9]{8,15}$/.test(phone)) throw bad('Telefone inválido (8 a 15 dígitos).');
+    if (email && !EMAIL.test(email)) throw bad('E-mail inválido.');
+    const row = { id: crypto.randomUUID(), tenantId: access.tenantId, ownerId: access.userId, teamId: primaryTeam(access) };
+    must(access, 'contact', 'create', row);
+    try {
+      const r = await tx(pool, access, (c) => c.query('INSERT INTO contacts (id, tenant_id, owner_id, team_id, name, phone, email, source) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [row.id, row.tenantId, row.ownerId, row.teamId, name, phone || null, email, 'manual']));
+      return { contact: apiContact(r.rows[0]) };
+    } catch (e) {
+      if (e.code === '23505') throw new HttpError(409, 'Já existe um contato com este telefone.');
+      throw e;
+    }
+  });
+
+  route('POST', '/api/deals', async ({ access, body }) => {
+    const title = String(body.title || '').trim();
+    if (!title || title.length > 200) throw bad('Informe o título (até 200 caracteres).');
+    const pipelineId = uuidOr400(body.pipelineId, 'Funil');
+    const stageId = uuidOr400(body.stageId, 'Etapa');
+    const contactId = body.contactId ? uuidOr400(body.contactId, 'Contato') : null;
+    const value = body.value === undefined || body.value === null || body.value === '' ? null : Number(body.value);
+    if (value !== null && (!Number.isFinite(value) || value < 0 || value > 1e12)) throw bad('Valor inválido.');
+    return tx(pool, access, async (c) => {
+      const st = (await c.query('SELECT kind FROM pipeline_stages WHERE id = $1 AND pipeline_id = $2', [stageId, pipelineId])).rows[0];
+      if (!st) throw bad('A etapa não pertence a este funil.');
+      // quem cria define o responsável; só cria para outra pessoa quem puder (a decisão é sobre o registro final)
+      const ownerId = body.ownerId ? uuidOr400(body.ownerId, 'Responsável') : access.userId;
+      const owner = ownerId === access.userId ? access : await getAccess(pool, { userId: ownerId, tenantId: access.tenantId });
+      if (!owner || owner.user.status !== 'active') throw bad('O responsável precisa ser um usuário ativo.');
+      const row = { id: crypto.randomUUID(), tenantId: access.tenantId, ownerId, teamId: owner.teamIds[0] || null, pipelineId, stageId, status: st.kind, value };
+      must(access, 'deal', 'create', row);
+      const r = await c.query('INSERT INTO deals (id, tenant_id, owner_id, team_id, title, pipeline_id, stage_id, status, value, contact_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *', [row.id, row.tenantId, row.ownerId, row.teamId, title, pipelineId, stageId, row.status, value, contactId]);
+      return { deal: apiDeal(r.rows[0]) };
+    });
+  });
+
+  route('PATCH', '/api/deals/:id', async ({ req, access, params, body }) => {
+    const id = uuidOr400(params.id, 'Negócio');
+    return tx(pool, access, async (c) => {
+      const cur = await visibleDeal(c, access, id);
+      const before = await withShares(c, 'deal', dealRow(cur));
+      const patch = {}; // chaves do catálogo (camelCase) — só as que o cliente PODE pedir
+      const sets = [];
+      const vals = [];
+      const set = (col, v) => {
+        vals.push(v);
+        sets.push(`${col} = $${vals.length + 1}`);
+      };
+      let context;
+      if (body.title !== undefined) {
+        const t = String(body.title).trim();
+        if (!t || t.length > 200) throw bad('Título inválido.');
+        patch.title = t;
+        set('title', t);
+      }
+      if (body.value !== undefined) {
+        const v = Number(body.value);
+        if (!Number.isFinite(v) || v < 0 || v > 1e12) throw bad('Valor inválido.');
+        patch.value = v;
+        set('value', v);
+      }
+      if (body.stageId !== undefined) {
+        const to = uuidOr400(body.stageId, 'Etapa');
+        const stages = (await c.query('SELECT id, kind FROM pipeline_stages WHERE pipeline_id = $1 AND id IN ($2, $3)', [cur.pipeline_id, to, cur.stage_id])).rows;
+        const dest = stages.find((s) => s.id === to);
+        if (!dest) throw bad('A etapa não pertence ao funil deste negócio.');
+        const from = stages.find((s) => s.id === cur.stage_id);
+        // contexto da movimentação: DERIVADO DO BANCO (o cliente não pode declarar "etapa aberta")
+        context = { fromStageId: cur.stage_id, toStageId: to, fromStageKind: from?.kind || 'open', toStageKind: dest.kind };
+        patch.stageId = to;
+        patch.status = dest.kind;
+        set('stage_id', to);
+        set('status', dest.kind);
+        sets.push('stage_changed_at = now()');
+      }
+      if (body.ownerId !== undefined) {
+        const to = uuidOr400(body.ownerId, 'Responsável');
+        const target = await getAccess(pool, { userId: to, tenantId: access.tenantId });
+        if (!target || target.user.status !== 'active') throw bad('O responsável precisa ser um usuário ativo.');
+        patch.ownerId = to;
+        patch.teamId = target.teamIds[0] || null;
+        set('owner_id', to);
+        set('team_id', patch.teamId);
+      }
+      if (!sets.length) throw bad('Nada para alterar.');
+      const check = access.E.checkPatch(access.ctx, 'deal', before, patch, context);
+      if (!check.ok) throw forbidden(check.denied.some((d) => d.reason === 'immutable') ? 'Campo não editável.' : 'Seu perfil não permite esta alteração.');
+      // a etapa só muda se o motor também permitir `move` com o contexto real (negação do SDR p/ Ganho etc.)
+      if (context) must(access, 'deal', 'move', before, context);
+      const r = await c.query(`UPDATE deals SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, [id, ...vals]);
+      if (context || patch.ownerId) await audit(c, access, req, context ? 'deal.move' : 'deal.transfer', 'deal', id, context ? { from: context.fromStageId, to: context.toStageId } : { from: cur.owner_id, to: patch.ownerId });
+      return { deal: apiDeal(r.rows[0]) };
+    });
+  });
+
+  // ===================================================================== INSTÂNCIAS (WhatsApp)
+  route('POST', '/api/instances', async ({ access, body }) => {
+    const name = String(body.name || '').trim();
+    if (!name || name.length > 200) throw bad('Informe o nome (até 200 caracteres).');
+    must(access, 'instance', 'create', { tenantId: access.tenantId });
+    const r = await tx(pool, access, (c) => c.query("INSERT INTO instances (tenant_id, name, channel, status) VALUES ($1, $2, 'baileys', 'disconnected') RETURNING *", [access.tenantId, name]));
+    return { instance: apiInstance(r.rows[0]) };
+  });
+
+  const loadInstance = async (access, id, action) => {
+    const row = (await tx(pool, access, (c) => c.query('SELECT * FROM instances WHERE id = $1', [id]), { readOnly: true })).rows[0];
+    if (!row) throw notFound('Número não encontrado.');
+    must(access, 'instance', action, { id: row.id, tenantId: access.tenantId });
+    return row;
+  };
+
+  route('POST', '/api/instances/:id/connect', async ({ access, params }) => {
+    const inst = await loadInstance(access, uuidOr400(params.id, 'Número'), 'connect');
+    if (!channel) throw new HttpError(503, 'Canal de WhatsApp indisponível neste servidor.');
+    if (inst.channel !== 'baileys') throw bad('Este número usa a API oficial (conexão por Meta Business).');
+    await channel.connect({ id: inst.id, tenantId: access.tenantId });
+    return { ok: true };
+  });
+
+  route('GET', '/api/instances/:id/qr', async ({ access, params }) => {
+    const inst = await loadInstance(access, uuidOr400(params.id, 'Número'), 'connect');
+    return channel ? channel.state({ id: inst.id, tenantId: access.tenantId }) : { status: inst.status, qr: null };
+  });
+
+  route('POST', '/api/instances/:id/disconnect', async ({ access, params }) => {
+    const inst = await loadInstance(access, uuidOr400(params.id, 'Número'), 'connect');
+    if (channel) await channel.disconnect({ id: inst.id, tenantId: access.tenantId });
+    return { ok: true };
+  });
+
+  // ===================================================================== USUÁRIOS
+  route('POST', '/api/users/invite', async ({ req, access, body }) => {
+    const email = String(body.email || '').trim().toLowerCase();
+    const name = String(body.name || '').trim() || email.split('@')[0];
+    if (!EMAIL.test(email) || email.length > 254) throw bad('E-mail inválido.');
+    if (name.length > 200) throw bad('Nome longo demais.');
+    must(access, 'user', 'create', { tenantId: access.tenantId });
+    must(access, 'role', 'assign', { tenantId: access.tenantId });
+    const roleId = String(body.roleId || '');
+    const sysRole = access.E.SYSTEM_ROLES.find((r) => r.id === roleId);
+    const tenantRole = !sysRole && UUID.test(roleId) ? access.roleDefs.find((r) => r.id === roleId.toLowerCase()) : null;
+    const roleDef = sysRole || tenantRole;
+    if (!roleDef) throw bad('Perfil inexistente.');
+    // "ninguém concede o que não tem": o perfil atribuído não pode exceder o poder de quem convida
+    const esc = access.E.checkNoEscalation(access.ctx, roleDef);
+    if (!esc.ok) throw forbidden('Você não pode atribuir um perfil com mais poder do que o seu.');
+    const teamId = body.teamId ? uuidOr400(body.teamId, 'Equipe') : null;
+    const invite = newInviteToken();
+    const userId = crypto.randomUUID();
+    try {
+      await tx(pool, access, async (c) => {
+        await c.query("INSERT INTO users (id, tenant_id, email, name, status) VALUES ($1, $2, $3, $4, 'invited')", [userId, access.tenantId, email, name]);
+        await c.query('INSERT INTO user_roles (tenant_id, user_id, system_role_id, role_id, granted_by) VALUES ($1, $2, $3, $4, $5)', [access.tenantId, userId, sysRole ? roleDef.id : null, tenantRole ? roleDef.id : null, access.userId]);
+        if (teamId) await c.query('INSERT INTO team_members (tenant_id, team_id, user_id) VALUES ($1, $2, $3)', [access.tenantId, teamId, userId]);
+        await c.query('SELECT auth_register($1, $2, $3)', [userId, email, invite.hash]);
+        await audit(c, access, req, 'user.invite', 'user', userId, { email, role: roleDef.name });
+      });
+    } catch (e) {
+      if (e.code === '23505') throw new HttpError(409, 'Já existe uma conta com este e-mail.');
+      if (e.code === '23503') throw bad('Equipe inexistente.');
+      throw e;
+    }
+    const base = config.appUrl || req.headers.origin || '';
+    return { userId, inviteUrl: `${base}/#/accept?token=${invite.token}`, expiresInDays: 7 };
+  });
+
+  route('PATCH', '/api/users/:id', async ({ req, access, params, body }) => {
+    const id = uuidOr400(params.id, 'Usuário');
+    if (!['active', 'suspended'].includes(body.status)) throw bad('Status inválido.');
+    must(access, 'user', 'update', { tenantId: access.tenantId });
+    if (id === access.userId) throw bad('Você não pode alterar o seu próprio status.');
+    await tx(pool, access, async (c) => {
+      const users = (await c.query('SELECT u.id, u.tenant_id, u.status FROM users u')).rows;
+      const roleLinks = (await c.query('SELECT user_id, system_role_id, role_id FROM user_roles')).rows;
+      const target = users.find((u) => u.id === id);
+      if (!target) throw notFound('Usuário não encontrado.');
+      if (!['active', 'suspended'].includes(target.status)) throw bad('O usuário ainda não aceitou o convite.');
+      const asList = users.map((u) => ({ id: u.id, tenantId: u.tenant_id, status: u.status, roleIds: roleLinks.filter((l) => l.user_id === u.id).map((l) => l.system_role_id || l.role_id) }));
+      if (access.E.wouldRemoveLastAdmin(asList, access.ctx.roles, access.tenantId, { userId: id, status: body.status })) throw bad('Isto deixaria a empresa sem nenhum administrador ativo.');
+      await c.query('UPDATE users SET status = $2 WHERE id = $1', [id, body.status]);
+      await audit(c, access, req, body.status === 'suspended' ? 'user.suspend' : 'user.reactivate', 'user', id, { from: target.status, to: body.status });
+    });
+    invalidate(access.tenantId, id);
+    return { ok: true };
+  });
+
+  // ===================================================================== MÍDIA
+  route('GET', '/api/whatsapp/media/:filename', async ({ access, params, res }) => {
+    const media = `/api/whatsapp/media/${params.filename}`;
+    const msg = await tx(pool, access, async (c) => {
+      const m = (await c.query('SELECT conversation_id FROM messages WHERE media_url = $1 LIMIT 1', [media])).rows[0];
+      if (!m) throw notFound();
+      await visibleConversation(c, access, m.conversation_id); // só quem vê a conversa vê a mídia
+      return m;
+    }, { readOnly: true });
+    void msg;
+    let file;
+    try {
+      file = await downloadMediaByFilename(decodeURIComponent(params.filename));
+    } catch {
+      throw notFound();
+    }
+    res.writeHead(200, { 'Content-Type': file.contentType || 'application/octet-stream', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline' });
+    res.end(file.buffer);
+    return undefined; // resposta já enviada
+  });
+
+  // ===================================================================== despacho
+  function cors(req, res) {
+    const origin = req.headers.origin;
+    if (origin && config.corsOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Max-Age', '600');
+    }
+  }
+
+  /** Atende /api/*. Devolve false se a URL não for da API (o servidor segue para os estáticos). */
+  async function handle(req, res) {
+    const url = new URL(req.url, 'http://localhost');
+    if (!url.pathname.startsWith('/api/')) return false;
+    cors(req, res);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return true;
+    }
+    try {
+      if (!ipLimiter(ipOf(req))) throw new HttpError(429, 'Muitas requisições.');
+      const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
+      if (!r) throw notFound('Rota inexistente.');
+      const params = { ...(url.pathname.match(r.re)?.groups || {}) };
+      let access = null;
+      if (r.auth) {
+        const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
+        const claims = m && verifyToken(m[1], config.authSecret);
+        if (!claims || claims.kind || !UUID.test(claims.sub || '') || !UUID.test(claims.tid || '')) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
+        access = await getAccess(pool, { userId: claims.sub, tenantId: claims.tid });
+        if (!access || access.user.status !== 'active') throw new HttpError(401, 'Sessão inválida.');
+      }
+      const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readJson(req);
+      const out = await r.handler({ req, res, params, query: url.searchParams, body, access });
+      if (out !== undefined) sendJson(res, 200, out);
+    } catch (e) {
+      if (res.headersSent) return true;
+      if (e instanceof HttpError) sendJson(res, e.status, { error: e.message });
+      else {
+        console.error('[api] erro interno:', e);
+        sendJson(res, 500, { error: 'Erro interno.' });
+      }
+    }
+    return true;
+  }
+
+  return { handle };
+}
+
+module.exports = { createApp, HttpError };

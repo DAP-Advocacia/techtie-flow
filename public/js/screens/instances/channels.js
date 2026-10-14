@@ -47,6 +47,7 @@ export const STATUS = {
   disconnected: { label: 'Desconectada', cls: 'status--err' },
   queued: { label: 'Aguardando vaga na fila', cls: 'status--warn', busy: true },
   connecting: { label: 'Conectando', cls: 'status--warn', busy: true },
+  qr: { label: 'Aguardando leitura do QR', cls: 'status--warn', busy: true },
   attention: { label: 'Precisa de atenção', cls: 'status--warn' },
 };
 export const statusMeta = (s) => STATUS[s] || STATUS.disconnected;
