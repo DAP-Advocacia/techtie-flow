@@ -88,6 +88,18 @@ export function createUsersTab(S) {
       return res;
     }
     apply.addEventListener('click', () => {
+      if (live.enabled) {
+        // Modo operação: grava no servidor (que repete todas as travas) e recarrega os dados reais.
+        apply.disabled = true;
+        live.setUserRoles(user.id, next).then(() => {
+          pop.close();
+          toast(`Perfis de ${user.name} atualizados.`);
+        }).catch((e) => {
+          apply.disabled = false;
+          replaceChildren(msgBox, h('ul', { class: 'perm-errors perm-errors--plain' }, h('li', null, e.message)));
+        });
+        return;
+      }
       const res = saveUserRoles(store, user.id, next);
       if (!res.ok) return check();
       pop.close();
@@ -114,6 +126,17 @@ export function createUsersTab(S) {
       apply.disabled = !auth.ok || same;
     };
     apply.addEventListener('click', () => {
+      if (live.enabled) {
+        apply.disabled = true;
+        live.setUserTeams(user.id, next).then(() => {
+          pop.close();
+          toast(`Equipes de ${user.name} atualizadas.`);
+        }).catch((e) => {
+          apply.disabled = false;
+          replaceChildren(msgBox, h('ul', { class: 'perm-errors perm-errors--plain' }, h('li', null, e.message)));
+        });
+        return;
+      }
       const res = saveUserTeams(store, user.id, next);
       if (!res.ok) return replaceChildren(msgBox, h('ul', { class: 'perm-errors perm-errors--plain' }, res.problems.map((p) => h('li', null, p))));
       pop.close();
@@ -321,7 +344,7 @@ export function createUsersTab(S) {
           'div',
           { class: 'perm-chipcell' },
           roles.length ? roles.map((r) => h('span', { class: 'chip' }, r.name)) : h('span', { class: 'muted' }, 'Sem perfil'),
-          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ur:${u.id}`, 'aria-label': `Alterar perfis de ${u.name}`, 'aria-disabled': rolesAuth.ok ? null : 'true', title: rolesAuth.ok ? 'Atribuir ou remover perfis' : rolesAuth.hint, onclick: (e) => (live.enabled ? toast('Neste piloto, mudar perfis ainda não é salvo no servidor.') : rolesAuth.ok ? rolesPopover(e.currentTarget, u) : toast(rolesAuth.hint)) }, 'Alterar')
+          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ur:${u.id}`, 'aria-label': `Alterar perfis de ${u.name}`, 'aria-disabled': rolesAuth.ok ? null : 'true', title: rolesAuth.ok ? 'Atribuir ou remover perfis' : rolesAuth.hint, onclick: (e) => (rolesAuth.ok ? rolesPopover(e.currentTarget, u) : toast(rolesAuth.hint)) }, 'Alterar')
         )
       ),
       h(
@@ -331,7 +354,7 @@ export function createUsersTab(S) {
           'div',
           { class: 'perm-chipcell' },
           (u.teamIds || []).length ? u.teamIds.map((id) => h('span', { class: 'chip chip--team', title: teamPath(state, id) }, teamPath(state, id))) : h('span', { class: 'muted' }, 'Sem equipe'),
-          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ut:${u.id}`, 'aria-label': `Alterar equipes de ${u.name}`, 'aria-disabled': userAuth.ok ? null : 'true', title: userAuth.ok ? 'Alterar equipes' : userAuth.hint, onclick: (e) => (live.enabled ? toast('Neste piloto, mudar equipes ainda não é salvo no servidor.') : userAuth.ok ? teamsPopover(e.currentTarget, u) : toast(userAuth.hint)) }, 'Alterar')
+          h('button', { class: 'perm-linkbtn', type: 'button', 'data-fk': `ut:${u.id}`, 'aria-label': `Alterar equipes de ${u.name}`, 'aria-disabled': userAuth.ok ? null : 'true', title: userAuth.ok ? 'Alterar equipes' : userAuth.hint, onclick: (e) => (userAuth.ok ? teamsPopover(e.currentTarget, u) : toast(userAuth.hint)) }, 'Alterar')
         )
       ),
       h(

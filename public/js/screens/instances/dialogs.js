@@ -5,12 +5,13 @@ import { store } from '../../store.js';
 import { openModal } from './modal.js';
 import { CHANNELS, ATTENTION, NAME_MAX, channelBadge, nameError, ownerOptions, statusMeta } from './channels.js';
 import { updateInstance } from './actions.js';
+import * as live from '../../live.js';
 import { check, blocked, createHints } from '../_ops/perm.js';
 
 const cancelBtn = (m, label = 'Cancelar') => h('button', { class: 'btn btn--quiet', type: 'button', onclick: () => m.close() }, label);
 
 export function openRename(inst, { returnFocus, onDone } = {}) {
-  if (blocked(check('instance', 'update'))) return null;
+  if (blocked(check('instance', 'update', inst))) return null;
   const m = openModal({ title: 'Renomear instância', eyebrow: inst.name, size: 'sm', returnFocus });
   const err = h('div', { class: 'field-error', id: 'instances-rename-err', role: 'alert' });
   const input = h('input', { class: 'input', type: 'text', value: inst.name, maxlength: String(NAME_MAX), autocomplete: 'off', 'aria-describedby': 'instances-rename-err' });
@@ -28,7 +29,7 @@ export function openRename(inst, { returnFocus, onDone } = {}) {
       },
       { event: 'instance.update', detail: `Instância "${old}" renomeada para "${name}"` }
     );
-    if (!done) return blocked(check('instance', 'update')) || m.close();
+    if (!done) return blocked(check('instance', 'update', inst)) || m.close();
     toast(`Instância renomeada para ${name}`);
     m.close();
     onDone?.();
@@ -48,7 +49,7 @@ export function openRename(inst, { returnFocus, onDone } = {}) {
 }
 
 export function openAssign(inst, { returnFocus, onDone } = {}) {
-  if (blocked(check('instance', 'update'))) return null;
+  if (blocked(check('instance', 'update', inst))) return null;
   const m = openModal({ title: 'Vincular responsável', eyebrow: inst.name, size: 'sm', returnFocus });
   const select = h('select', { class: 'select' }, ownerOptions(store.state, inst.ownerName).map((n) => h('option', { value: n, selected: n === inst.ownerName }, n)));
   replaceChildren(
@@ -68,7 +69,7 @@ export function openAssign(inst, { returnFocus, onDone } = {}) {
             },
             { event: 'instance.update', detail: `Responsável de "${inst.name}" alterado para ${owner}` }
           );
-          if (!done) return blocked(check('instance', 'update')) || m.close();
+          if (!done) return blocked(check('instance', 'update', inst)) || m.close();
           toast(`${inst.name} agora é de ${owner}`);
           m.close();
           onDone?.();
@@ -100,11 +101,19 @@ export function openConfirm({ title, eyebrow, message, confirmLabel, busyLabel =
     ok.disabled = true;
     cancel.disabled = true;
     ok.textContent = busyLabel;
-    timer = setTimeout(() => {
-      busy = false;
-      onConfirm();
-      m.close();
-    }, 700);
+    timer = setTimeout(async () => {
+      try {
+        await onConfirm(); // pode ser assíncrono (modo operação): se falhar, o diálogo continua aberto com o motivo
+        busy = false;
+        m.close();
+      } catch (e) {
+        busy = false;
+        ok.disabled = !!blockedReason;
+        cancel.disabled = false;
+        ok.textContent = confirmLabel;
+        toast(e?.message || 'Não foi possível concluir.');
+      }
+    }, live.enabled ? 0 : 700);
   });
   replaceChildren(m.body, h('p', { class: 'instances-msg' }, message), blockedReason ? h('div', { class: 'instances-note instances-note--warn', role: 'alert' }, blockedReason) : null);
   replaceChildren(m.foot, cancel, ok);
@@ -121,8 +130,8 @@ export function openManage(inst, { returnFocus, onRename, onAssign, onDisconnect
   // Ligar/desligar a IA na instância é alterar o Agente de IA: exige ai_agent.update (não instance.update).
   const hints = createHints();
   const cAi = check('ai_agent', 'update');
-  const cUpdate = check('instance', 'update');
-  const cConnect = check('instance', 'connect');
+  const cUpdate = check('instance', 'update', inst);
+  const cConnect = check('instance', 'connect', inst);
   const aiSwitch = toggle(
     !!inst.aiActive,
     (v) => {

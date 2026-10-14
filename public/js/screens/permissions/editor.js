@@ -12,6 +12,10 @@ import { matrixSections, meter, legend } from './matrix.js';
 import { advancedSection, deniesSection } from './rules.js';
 import { partitionsSection, fieldsSection } from './restrict.js';
 import { keepUi, selectEl, ICON, sr } from './util.js';
+import { summarySection, quickSection } from './simple.js';
+
+// O bloco "Modo avançado" lembra se estava aberto (sobrevive a trocar de perfil/aba).
+let advancedOpen = false;
 
 /**
  * createEditor(opts) -> { el, ed, destroy }
@@ -44,6 +48,7 @@ export function createEditor(opts) {
 
   const hosts = {};
   const cards = [];
+  const byId = {};
   const addCard = (id, title, sub, build, { wide = false } = {}) => {
     const host = h('div', { class: 'perm-card__body' });
     hosts[id] = { host, build };
@@ -54,6 +59,7 @@ export function createEditor(opts) {
       host
     );
     cards.push(el);
+    byId[id] = el;
     return el;
   };
 
@@ -159,11 +165,14 @@ export function createEditor(opts) {
     return h('div', { class: 'perm-sec-body' }, legend(), matrixSections({ cell, scrollKey: 'edit' }));
   }
 
+  // Camada simples (padrão): resumo em português + ajustes rápidos. O resto fica no "Modo avançado".
+  addCard('summary', 'Em resumo', 'O que este perfil permite, em português — calculado das regras abaixo.', () => summarySection(ed), { wide: true });
+  if (!readOnly && draft) addCard('quick', 'Ajustes rápidos', 'Os controles mais usados. Para detalhes finos, abra o modo avançado no fim da página.', () => quickSection(ed), { wide: true });
   addCard('matrix', 'Matriz de permissões', 'Escolha, para cada recurso e ação, até onde o perfil alcança.', buildMatrix, { wide: true });
   addCard('adv', 'Regras avançadas', 'Permissões com condição ou aprovação.', () => advancedSection(ed), { wide: true });
   addCard('deny', 'Negações', 'Travas que vencem qualquer permissão.', () => deniesSection(ed), { wide: true });
-  addCard('part', 'Recortes', null, () => partitionsSection(ed));
-  addCard('fields', 'Campos sensíveis', null, () => fieldsSection(ed));
+  addCard('part', 'Quais números e funis esta pessoa enxerga', null, () => partitionsSection(ed));
+  addCard('fields', 'Esconder dados sensíveis', null, () => fieldsSection(ed));
 
   // ---------------- barra de salvar ----------------
   const bar = !readOnly && draft
@@ -175,10 +184,16 @@ export function createEditor(opts) {
       )
     : null;
 
-  const grid = h('div', { class: 'perm-grid2' }, cards[3], cards[4]);
+  const grid = h('div', { class: 'perm-grid2' }, byId.part, byId.fields);
   hosts.head = { host: h('div', { class: 'perm-card__body' }), build: buildHead };
   const head = h('div', { class: 'card perm-card perm-card--head' }, hosts.head.host);
-  const el = h('div', { class: 'perm-editor' }, head, errBoxEl, cards[0], cards[1], cards[2], grid, bar);
+  const advanced = h(
+    'details',
+    { class: 'perm-advanced', open: advancedOpen, ontoggle: (e) => { advancedOpen = e.target.open; } },
+    h('summary', { class: 'perm-advanced__sum' }, 'Modo avançado', h('span', { class: 'perm-hint' }, ' — matriz completa, regras com condição ou aprovação e travas')),
+    h('div', { class: 'perm-advanced__body' }, byId.matrix, byId.adv, byId.deny)
+  );
+  const el = h('div', { class: 'perm-editor' }, head, errBoxEl, byId.summary, byId.quick || null, grid, advanced, bar);
 
   function renderHost(id) {
     const { host, build } = hosts[id];
@@ -236,13 +251,15 @@ export function createEditor(opts) {
   /** Re-renderiza seções (com foco/rolagem preservados) e atualiza o cromo. */
   function refresh(names, { focus } = {}) {
     validateNow();
-    keepUi(rootEl, () => names.forEach(renderHost));
+    // o resumo e os ajustes rápidos acompanham QUALQUER mudança (matriz, regras, recortes, campos)
+    const all = [...new Set([...names, 'summary', ...(hosts.quick ? ['quick'] : [])])];
+    keepUi(rootEl, () => all.forEach(renderHost));
     if (focus) el.querySelector(`[data-fk="${CSS.escape(focus)}"]`)?.focus();
     touch();
   }
 
   // montagem inicial
-  for (const id of ['head', 'matrix', 'adv', 'deny', 'part', 'fields']) renderHost(id);
+  for (const id of ['head', 'summary', 'quick', 'matrix', 'adv', 'deny', 'part', 'fields']) if (hosts[id]) renderHost(id);
   touch();
 
   return { el, ed, destroy() {} };

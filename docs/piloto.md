@@ -81,3 +81,20 @@ subdomínios do mesmo domínio, trocar por cookie `httpOnly` (pendência de segu
 - Credenciais do Baileys no banco e workers por número (docs/arquitetura-hospedagem.md); backup do `AUTH_FOLDER`.
 - Backlog de segurança do motor (docs/permissoes.md §11) e persistência real de perfis e equipes.
 - Cloud API oficial da Meta; envio de mídia; automações e agente de IA com dados reais.
+
+## Números individuais (pessoais) e números da empresa
+
+Todo número de WhatsApp (instância) pode ter **responsável** (`instances.owner_id`) e **equipe** (`team_id`):
+
+| | Número da empresa | Número pessoal |
+|---|---|---|
+| Responsável | nenhum | quem criou |
+| Conversas novas | fila de todos que atendem | direto para o responsável |
+| Quem cria | quem tem `instance.create` em "Tudo" (envia `companyNumber: true`) | qualquer um com `instance.create` em "Só o dele" |
+| Quem enxerga/conecta | quem tem alcance "Tudo" | o dono; a equipe se o alcance for "Equipe"; "Tudo" |
+
+Perfis de fábrica: **Atendente/SDR** → ler, criar, renomear e conectar `own` (só os números dele);
+**Gestor** → `team_tree`; **Admin** → tudo. Aplique a migração com `node db/migrate.mjs` (0003).
+
+Pendente: trocar o responsável de um número depois de criado ("Vincular responsável" ainda é só visual em modo operação),
+remover/renomear número persistido no servidor, e nome do número na Inbox para quem não lê o número da empresa.

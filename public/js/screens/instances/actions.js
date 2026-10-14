@@ -3,7 +3,7 @@
 import { store } from '../../store.js';
 import { generatePhone } from './channels.js';
 import { audit } from '../../access.js';
-import { check } from '../_ops/perm.js';
+import { check, checkCreateInstance } from '../_ops/perm.js';
 
 let seeded = false;
 
@@ -48,7 +48,7 @@ export const findInstance = (id) => store.state.instances.find((i) => i.id === i
  * Devolve false (sem gravar, sem lançar) se o motor negar ou a instância não existir.
  */
 export function updateInstance(id, fn, { entity = 'instance', action = 'update', event, detail } = {}) {
-  if (!check(entity, action).ok) return false;
+  if (!check(entity, action, entity === 'instance' ? findInstance(id) : undefined).ok) return false;
   let found = false;
   store.update((s) => {
     const i = s.instances.find((x) => x.id === id);
@@ -63,7 +63,7 @@ export function updateInstance(id, fn, { entity = 'instance', action = 'update',
 
 /** Devolve a nova instância, ou null se o motor negar `instance.create`. */
 export function addInstance({ name, channel, ownerName, phone }) {
-  if (!check('instance', 'create').ok) return null;
+  if (!checkCreateInstance().ok) return null;
   const slug = name
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -104,7 +104,7 @@ export function markConnected(id) {
 /** Remove a instância (exige instance.delete). Devolve true se removeu. */
 export function removeInstance(id) {
   const inst = findInstance(id);
-  if (!inst || !check('instance', 'delete').ok) return false;
+  if (!inst || !check('instance', 'delete', inst).ok) return false;
   store.update((s) => {
     s.instances = s.instances.filter((i) => i.id !== id);
   });

@@ -128,9 +128,11 @@ export const ENTITIES = dict({
     attrs: { instanceId: 'uuid', direction: 'text' },
   }),
   product: config({ table: 'products', actions: ['read', 'create', 'update', 'delete'] }),
-  pipeline: config({ table: 'pipelines', actions: ['read', 'create', 'update', 'delete'] }),
+  // partições valem também para a própria lista: perfil recortado para o funil/número X só enxerga X
+  pipeline: config({ table: 'pipelines', actions: ['read', 'create', 'update', 'delete'], partitions: { pipelineId: 'id' } }),
   automation: config({ table: 'automations', actions: ['read', 'create', 'update', 'delete', 'publish'] }),
-  instance: config({ table: 'instances', actions: ['read', 'create', 'update', 'delete', 'connect'] }),
+  // Número de WhatsApp: pode ter responsável/equipe (número individual). Sem responsável = número da empresa.
+  instance: record({ table: 'instances', actions: ['read', 'create', 'update', 'delete', 'connect'], partitions: { instanceId: 'id' } }),
   ai_agent: config({ table: 'ai_agents', actions: ['read', 'update'] }),
   report: config({ table: 'reports', actions: ['read', 'create', 'export'] }),
   user: config({ table: 'users', actions: ['read', 'create', 'update', 'delete'] }),

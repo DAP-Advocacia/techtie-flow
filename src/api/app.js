@@ -8,6 +8,7 @@
 const crypto = require('crypto');
 const { hashPassword, verifyPassword, passwordProblem, signToken, verifyToken, newInviteToken, hashInviteToken, makeLimiter } = require('../auth');
 const { getAccess, invalidate, tx, listWhere, canAccess } = require('./access');
+const { withTenant } = require('../db-tenant');
 const { toApiConversation } = require('./ws');
 const { downloadMediaByFilename } = require('../media');
 
@@ -29,7 +30,7 @@ const num = (v) => (v === null || v === undefined ? null : Number(v));
 // --------------------------------------------------------------------- mapeamentos DB → API
 const apiContact = (r) => ({ id: r.id, name: r.name, company: '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null });
 const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], lastMessage: '' });
-const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null });
+const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null, ownerId: r.owner_id || null, teamId: r.team_id || null, ownerName: r.owner_name || '' });
 const apiMessage = (r) => ({
   id: r.id,
   type: r.kind === 'note' ? 'note' : r.kind === 'system' ? 'system' : r.direction === 'in' ? 'in' : 'out',
@@ -114,6 +115,14 @@ function createApp({ pool, config, hub, channel }) {
     return r.rows[0];
   }
   const primaryTeam = (access) => access.teamIds[0] || null;
+  /** Definição do perfil (de fábrica ou do tenant). Lê do BANCO: o cache de acesso não conhece perfil recém-criado. */
+  async function roleDefinition(c, access, rid) {
+    const sys = access.E.SYSTEM_ROLES.find((r) => r.id === rid);
+    if (sys) return { def: sys, system: true };
+    if (!UUID.test(String(rid))) return null;
+    const r = (await c.query('SELECT * FROM roles WHERE id = $1', [String(rid).toLowerCase()])).rows[0];
+    return r ? { def: { ...r.definition, id: r.id, name: r.name, description: r.description || '', tenantId: r.tenant_id, system: false }, system: false } : null;
+  }
   /** Trilha de auditoria NA MESMA transação da mudança (append-only no banco). */
   const audit = (c, access, req, action, entity, entityId, diff) =>
     c.query('INSERT INTO audit_log (tenant_id, actor_id, action, entity, entity_id, diff, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
@@ -186,18 +195,42 @@ function createApp({ pool, config, hub, channel }) {
         const contacts = await q('contacts', 'contact', 't.created_at DESC', 2000);
         const deals = await q('deals', 'deal', 't.created_at DESC', 2000);
         const convs = await q('conversations', 'conversation', 't.last_message_at DESC NULLS LAST', 500);
+        // Quem pode ver uma conversa precisa saber QUEM é o contato dela (nome/telefone), mesmo que o
+        // contato em si não esteja no seu escopo (contato criado pelo WhatsApp não tem dono nem equipe).
+        // Exceção estreita: só os contatos das conversas que o motor já liberou, lidos fora do teto de
+        // leitura por escopo (RLS camada 2) e passando pela ocultação de campos do perfil.
+        const have = new Set(contacts.rows.map((r) => r.id));
+        const missing = [...new Set(convs.rows.map((r) => r.contact_id).filter((cid) => cid && !have.has(cid)))];
+        const viaConversation = missing.length
+          ? (await withTenant(pool, { tenantId: access.tenantId, userId: access.userId, readScopes: 'tenant', readOnly: true }, (c2) => c2.query('SELECT * FROM contacts WHERE id = ANY($1::uuid[])', [missing]))).rows
+          : [];
         const readUsers = canAccess(access, 'user', 'read');
         const users = (await c.query('SELECT id, name, email, status, mfa_enabled FROM users ORDER BY name')).rows;
-        const roleLinks = readUsers ? (await c.query('SELECT user_id, system_role_id, role_id FROM user_roles')).rows : [];
+        // Todos recebem o PRÓPRIO perfil (o front calcula menu e telas com ele); os dos outros, só quem lê usuários.
+        const roleLinks = (await c.query(readUsers ? 'SELECT user_id, system_role_id, role_id FROM user_roles' : 'SELECT user_id, system_role_id, role_id FROM user_roles WHERE user_id = $1', readUsers ? [] : [access.userId])).rows;
         const memberLinks = (await c.query('SELECT team_id, user_id FROM team_members')).rows;
-        const pipelines = canAccess(access, 'pipeline', 'read') || canAccess(access, 'deal', 'read') ? (await c.query('SELECT id, name FROM pipelines ORDER BY name')).rows : [];
-        const stages = pipelines.length ? (await c.query('SELECT id, pipeline_id, name, kind FROM pipeline_stages ORDER BY pipeline_id, position')).rows : [];
-        const instances = canAccess(access, 'instance', 'read') ? (await c.query('SELECT id, name, channel, status, phone, attention_reason FROM instances ORDER BY name')).rows : [];
+        // Funis e números passam pelo filtro do motor (recorte por funil/número do perfil). Quem lê negócios mas
+        // não tem pipeline.read (ex.: Financeiro) continua vendo os funis dos seus negócios.
+        const pw = listWhere(access, 'pipeline', 'read');
+        const pipelines = canAccess(access, 'pipeline', 'read')
+          ? (await c.query(`SELECT t.id, t.name FROM pipelines t WHERE ${pw.sql} ORDER BY t.name`, pw.params)).rows
+          : canAccess(access, 'deal', 'read') ? (await c.query('SELECT id, name FROM pipelines ORDER BY name')).rows : [];
+        const stages = pipelines.length ? (await c.query('SELECT id, pipeline_id, name, kind FROM pipeline_stages WHERE pipeline_id = ANY($1::uuid[]) ORDER BY pipeline_id, position', [pipelines.map((p) => p.id)])).rows : [];
+        const iw = listWhere(access, 'instance', 'read');
+        const instances = canAccess(access, 'instance', 'read') ? (await c.query(`SELECT t.id, t.name, t.channel, t.status, t.phone, t.attention_reason, t.owner_id, t.team_id, (SELECT u.name FROM users u WHERE u.id = t.owner_id) AS owner_name FROM instances t WHERE ${iw.sql} ORDER BY t.name`, iw.params)).rows : [];
         const teams = (await c.query('SELECT id, name, parent_id FROM teams ORDER BY name')).rows;
 
         const dealByContact = new Map();
         for (const d of deals.rows) if (d.contact_id && !dealByContact.has(d.contact_id)) dealByContact.set(d.contact_id, d.id);
         const readRoles = canAccess(access, 'role', 'read');
+        // perfis do tenant lidos do BANCO (o cache de acesso não conhece um perfil recém-criado)
+        // Quem NÃO lê perfis recebe ao menos a definição dos PRÓPRIOS perfis personalizados: o front calcula menu
+        // e telas com ela (sem isso, quem tem um perfil personalizado aparece como "Sem perfil" e sem acesso a nada).
+        const tenantRoles = (
+          readRoles
+            ? await c.query('SELECT * FROM roles ORDER BY name')
+            : await c.query('SELECT r.* FROM roles r WHERE r.id IN (SELECT role_id FROM user_roles WHERE user_id = $1 AND role_id IS NOT NULL) ORDER BY r.name', [access.userId])
+        ).rows.map((r) => apiRole(r));
         return {
           tenant: { id: access.tenantId, name: access.tenant?.name, policy: access.tenant?.settings || {} },
           currentUserId: access.userId,
@@ -211,11 +244,12 @@ function createApp({ pool, config, hub, channel }) {
             roleIds: readUsers || u.id === access.userId ? roleLinks.filter((l) => l.user_id === u.id).map((l) => l.system_role_id || l.role_id) : [],
             teamIds: memberLinks.filter((m) => m.user_id === u.id).map((m) => m.team_id),
           })),
-          roles: [...E.SYSTEM_ROLES, ...(readRoles ? access.roleDefs : [])],
+          roles: [...E.SYSTEM_ROLES, ...tenantRoles],
           teams: teams.map((t) => ({ id: t.id, name: t.name, parentId: t.parent_id, members: memberLinks.filter((m) => m.team_id === t.id).length, pipelineId: null })),
           pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, teamId: null, stages: stages.filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name, kind: s.kind, accent: s.kind === 'won' ? 'var(--green)' : s.kind === 'lost' ? 'var(--red)' : 'var(--acc)' })) })),
-          contacts: contacts.rows.map(apiContact),
-          deals: deals.rows.map(apiDeal),
+          // maskRow: campos que o perfil não pode ver (telefone, valor…) NEM saem do servidor
+          contacts: [...contacts.rows, ...viaConversation].map((r) => apiContact(E.maskRow(access.ctx, 'contact', r))),
+          deals: deals.rows.map((r) => apiDeal(E.maskRow(access.ctx, 'deal', r))),
           conversations: convs.rows.map((r) => ({ ...toApiConversation(r), dealId: dealByContact.get(r.contact_id) || null })),
           // "qr"/"conectando"/"fila" só valem se a sessão existe de fato agora; se o servidor reiniciou ou a
           // sessão caiu, o que está gravado é passado: informa "desconectada" (e a tela oferece reconectar).
@@ -444,18 +478,27 @@ function createApp({ pool, config, hub, channel }) {
   });
 
   // ===================================================================== INSTÂNCIAS (WhatsApp)
-  route('POST', '/api/instances', async ({ access, body }) => {
+  route('POST', '/api/instances', async ({ req, access, body }) => {
     const name = String(body.name || '').trim();
     if (!name || name.length > 200) throw bad('Informe o nome (até 200 caracteres).');
-    must(access, 'instance', 'create', { tenantId: access.tenantId });
-    const r = await tx(pool, access, (c) => c.query("INSERT INTO instances (tenant_id, name, channel, status) VALUES ($1, $2, 'baileys', 'disconnected') RETURNING *", [access.tenantId, name]));
-    return { instance: apiInstance(r.rows[0]) };
+    // Quem cria vira o RESPONSÁVEL: o número nasce PESSOAL dele (as conversas dele vão direto para ele).
+    // Quem tem alcance "tudo" pode criar um número da empresa (sem responsável) com companyNumber:true.
+    const asCompany = { tenantId: access.tenantId, ownerId: null, teamId: null };
+    const company = body.companyNumber === true && access.E.decide(access.ctx, 'instance', 'create', asCompany).effect === 'allow';
+    const row = company ? asCompany : { tenantId: access.tenantId, ownerId: access.userId, teamId: primaryTeam(access) };
+    must(access, 'instance', 'create', row);
+    const r = await tx(pool, access, async (c) => {
+      const ins = await c.query("INSERT INTO instances (tenant_id, name, channel, status, owner_id, team_id) VALUES ($1, $2, 'baileys', 'disconnected', $3, $4) RETURNING *", [access.tenantId, name, row.ownerId, row.teamId]);
+      await audit(c, access, req, 'instance.create', 'instance', ins.rows[0].id, { personal: !company });
+      return ins;
+    });
+    return { instance: apiInstance({ ...r.rows[0], owner_name: company ? '' : access.user.name }) };
   });
 
   const loadInstance = async (access, id, action) => {
     const row = (await tx(pool, access, (c) => c.query('SELECT * FROM instances WHERE id = $1', [id]), { readOnly: true })).rows[0];
     if (!row) throw notFound('Número não encontrado.');
-    must(access, 'instance', action, { id: row.id, tenantId: access.tenantId });
+    must(access, 'instance', action, { id: row.id, tenantId: access.tenantId, ownerId: row.owner_id, teamId: row.team_id });
     return row;
   };
 
@@ -478,6 +521,30 @@ function createApp({ pool, config, hub, channel }) {
     return { ok: true };
   });
 
+  // Remove o número: encerra a sessão (apaga as credenciais) e apaga o registro. Conversas do número só saem
+  // com `?withConversations=1` e só se o usuário puder apagar TODAS elas (o motor decide, conversa a conversa).
+  route('DELETE', '/api/instances/:id', async ({ req, access, params, query }) => {
+    const id = uuidOr400(params.id, 'Número');
+    const inst = await loadInstance(access, id, 'delete');
+    const withConversations = query.get('withConversations') === '1';
+    const stats = (await tx(pool, access, (c) => c.query('SELECT (SELECT count(*)::int FROM conversations WHERE instance_id = $1) AS convs, (SELECT count(*)::int FROM calls WHERE instance_id = $1) AS calls', [id]), { readOnly: true })).rows[0];
+    if (stats.calls) throw new HttpError(409, `Este número tem ${stats.calls} chamada(s) registrada(s). Apague-as antes de remover.`);
+    if (stats.convs && !withConversations) throw new HttpError(409, `Há ${stats.convs} ${stats.convs === 1 ? 'conversa' : 'conversas'} neste número. Confirme para apagá-las junto com o número.`);
+    await tx(pool, access, async (c) => {
+      if (stats.convs) {
+        const dw = listWhere(access, 'conversation', 'delete');
+        const allowed = (await c.query(`SELECT count(*)::int n FROM conversations t WHERE t.instance_id = $${dw.params.length + 1} AND (${dw.sql})`, [...dw.params, id])).rows[0].n;
+        if (allowed !== stats.convs) throw forbidden('Você não pode apagar todas as conversas deste número, então ele não pode ser removido.');
+        await c.query('DELETE FROM conversations WHERE instance_id = $1', [id]);
+      }
+      await c.query('DELETE FROM instances WHERE id = $1', [id]);
+      await audit(c, access, req, 'instance.delete', 'instance', id, { name: inst.name, conversations: stats.convs });
+    });
+    // só depois de apagar o registro: encerra a sessão e apaga as credenciais (um "permissão negada" acima não derruba o número)
+    if (channel) await channel.disconnect({ id, tenantId: access.tenantId }).catch(() => {});
+    return { ok: true };
+  });
+
   // ===================================================================== USUÁRIOS
   route('POST', '/api/users/invite', async ({ req, access, body }) => {
     const email = String(body.email || '').trim().toLowerCase();
@@ -487,10 +554,11 @@ function createApp({ pool, config, hub, channel }) {
     must(access, 'user', 'create', { tenantId: access.tenantId });
     must(access, 'role', 'assign', { tenantId: access.tenantId });
     const roleId = String(body.roleId || '');
-    const sysRole = access.E.SYSTEM_ROLES.find((r) => r.id === roleId);
-    const tenantRole = !sysRole && UUID.test(roleId) ? access.roleDefs.find((r) => r.id === roleId.toLowerCase()) : null;
-    const roleDef = sysRole || tenantRole;
-    if (!roleDef) throw bad('Perfil inexistente.');
+    const found = await tx(pool, access, (c) => roleDefinition(c, access, roleId), { readOnly: true });
+    if (!found) throw bad('Perfil inexistente.');
+    const roleDef = found.def;
+    const sysRole = found.system ? roleDef : null;
+    const tenantRole = found.system ? null : roleDef;
     // "ninguém concede o que não tem": o perfil atribuído não pode exceder o poder de quem convida
     const esc = access.E.checkNoEscalation(access.ctx, roleDef);
     if (!esc.ok) throw forbidden('Você não pode atribuir um perfil com mais poder do que o seu.');
@@ -531,6 +599,129 @@ function createApp({ pool, config, hub, channel }) {
       await audit(c, access, req, body.status === 'suspended' ? 'user.suspend' : 'user.reactivate', 'user', id, { from: target.status, to: body.status });
     });
     invalidate(access.tenantId, id);
+    return { ok: true };
+  });
+
+
+  // Troca TODOS os perfis de um usuário (substitui o conjunto). Travas: quem altera precisa de
+  // role.assign; não altera os próprios perfis; só concede/retira perfil que ELE MESMO poderia conceder
+  // (anti-escalonamento, nos dois sentidos: não dá o que não tem nem rebaixa quem tem mais poder);
+  // nunca deixa a empresa sem administrador ativo.
+  route('POST', '/api/users/:id/roles', async ({ req, access, params, body }) => {
+    const id = uuidOr400(params.id, 'Usuário');
+    must(access, 'role', 'assign', { tenantId: access.tenantId });
+    if (id === access.userId) throw bad('Você não pode alterar os seus próprios perfis.');
+    const wanted = Array.isArray(body.roleIds) ? [...new Set(body.roleIds.map((r) => String(r).toLowerCase()))] : null;
+    if (!wanted || wanted.length < 1 || wanted.length > 10) throw bad('Escolha de 1 a 10 perfis.');
+    await tx(pool, access, async (c) => {
+      const defOf = async (rid) => (await roleDefinition(c, access, rid))?.def || null;
+      const wantedDefs = [];
+      for (const rid of wanted) wantedDefs.push((await defOf(rid)) || (() => { throw bad('Perfil inexistente.'); })());
+      const users = (await c.query('SELECT u.id, u.tenant_id, u.status FROM users u')).rows;
+      const links = (await c.query('SELECT user_id, system_role_id, role_id FROM user_roles')).rows;
+      const target = users.find((u) => u.id === id);
+      if (!target) throw notFound('Usuário não encontrado.');
+      const current = links.filter((l) => l.user_id === id).map((l) => l.system_role_id || l.role_id);
+      for (const def of wantedDefs) {
+        if (!current.includes(def.id) && !access.E.checkNoEscalation(access.ctx, def).ok) throw forbidden('Você não pode atribuir um perfil com mais poder do que o seu.');
+      }
+      for (const rid of current) {
+        const def = !wanted.includes(rid) ? await defOf(rid) : null;
+        if (def && !access.E.checkNoEscalation(access.ctx, def).ok) throw forbidden('Você não pode retirar um perfil com mais poder do que o seu.');
+      }
+      if (access.E.wouldRemoveLastAdmin(users.map((u) => ({ id: u.id, tenantId: u.tenant_id, status: u.status, roleIds: links.filter((l) => l.user_id === u.id).map((l) => l.system_role_id || l.role_id) })), access.ctx.roles, access.tenantId, { userId: id, roleIds: wanted })) {
+        throw bad('Isto deixaria a empresa sem nenhum administrador ativo.');
+      }
+      await c.query('DELETE FROM user_roles WHERE user_id = $1', [id]);
+      for (const def of wantedDefs) {
+        const sys = access.E.SYSTEM_ROLES.some((r) => r.id === def.id);
+        await c.query('INSERT INTO user_roles (tenant_id, user_id, system_role_id, role_id, granted_by) VALUES ($1, $2, $3, $4, $5)', [access.tenantId, id, sys ? def.id : null, sys ? null : def.id, access.userId]);
+      }
+      await audit(c, access, req, 'role.assign', 'user', id, { from: current, to: wanted });
+    });
+    invalidate(access.tenantId, id);
+    return { ok: true };
+  });
+
+  // Troca as equipes de um usuário. Equipe define o alcance de "Equipe" e "Equipe e subequipes", então
+  // mexer nela é mexer em permissão: exige user.update e não vale para si mesmo.
+  route('POST', '/api/users/:id/teams', async ({ req, access, params, body }) => {
+    const id = uuidOr400(params.id, 'Usuário');
+    must(access, 'user', 'update', { tenantId: access.tenantId });
+    if (id === access.userId) throw bad('Você não pode alterar a sua própria equipe.');
+    const teamIds = Array.isArray(body.teamIds) ? [...new Set(body.teamIds.map((t) => uuidOr400(t, 'Equipe')))] : null;
+    if (!teamIds || teamIds.length > 20) throw bad('Lista de equipes inválida.');
+    await tx(pool, access, async (c) => {
+      if (!(await c.query('SELECT 1 FROM users WHERE id = $1', [id])).rowCount) throw notFound('Usuário não encontrado.');
+      if (teamIds.length && (await c.query('SELECT id FROM teams WHERE id = ANY($1::uuid[])', [teamIds])).rowCount !== teamIds.length) throw bad('Equipe inexistente.');
+      const before = (await c.query('SELECT team_id FROM team_members WHERE user_id = $1', [id])).rows.map((r) => r.team_id);
+      await c.query('DELETE FROM team_members WHERE user_id = $1', [id]);
+      for (const t of teamIds) await c.query('INSERT INTO team_members (tenant_id, team_id, user_id) VALUES ($1, $2, $3)', [access.tenantId, t, id]);
+      await audit(c, access, req, 'user.teams', 'user', id, { from: before, to: teamIds });
+    });
+    invalidate(access.tenantId, id);
+    return { ok: true };
+  });
+
+  // ===================================================================== PERFIS DO TENANT
+  // Perfis de fábrica vivem no código e são imutáveis; estes são os do tenant (tabela roles, JSONB).
+  const apiRole = (r) => ({ ...r.definition, id: r.id, name: r.name, description: r.description || '', tenantId: r.tenant_id, system: false });
+
+  /** Valida o perfil candidato pelo MOTOR e recusa escalonamento (o ator só concede o que ele mesmo tem). */
+  function vetRole(access, id, { name, description, definition }) {
+    const nm = String(name ?? '').trim();
+    if (!nm || nm.length > 60) throw bad('Nome do perfil: de 1 a 60 caracteres.');
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) throw bad('Definição do perfil inválida.');
+    if (JSON.stringify(definition).length > 100000) throw bad('Definição do perfil grande demais.');
+    const def = { grants: definition.grants ?? [], denies: definition.denies ?? [], partitions: definition.partitions ?? {}, fields: definition.fields ?? [] };
+    const candidate = { id, name: nm, description: String(description ?? '').slice(0, 500), tenantId: access.tenantId, system: false, ...def };
+    const errors = access.E.validateRole(candidate);
+    if (errors.length) throw bad(`Perfil inválido: ${errors.slice(0, 3).map((e) => e.message).join('; ')}`);
+    if (!access.E.checkNoEscalation(access.ctx, candidate).ok) throw forbidden('Você não pode criar ou alterar um perfil com mais poder do que o seu.');
+    return { candidate, def };
+  }
+
+  route('POST', '/api/roles', async ({ req, access, body }) => {
+    must(access, 'role', 'create', { tenantId: access.tenantId });
+    const id = crypto.randomUUID();
+    const { candidate, def } = vetRole(access, id, body);
+    const cloned = access.E.SYSTEM_ROLES.some((r) => r.id === body.clonedFrom) ? body.clonedFrom : null;
+    const role = await tx(pool, access, async (c) => {
+      const r = (await c.query('INSERT INTO roles (id, tenant_id, name, description, cloned_from, definition) VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING *', [id, access.tenantId, candidate.name, candidate.description, cloned, JSON.stringify(def)])).rows[0];
+      await audit(c, access, req, 'role.create', 'role', id, { name: candidate.name });
+      return apiRole(r);
+    });
+    return { role };
+  });
+
+  route('PATCH', '/api/roles/:id', async ({ req, access, params, body }) => {
+    const id = uuidOr400(params.id, 'Perfil');
+    must(access, 'role', 'update', { tenantId: access.tenantId });
+    const result = await tx(pool, access, async (c) => {
+      const cur = (await c.query('SELECT * FROM roles WHERE id = $1 FOR UPDATE', [id])).rows[0];
+      if (!cur) throw notFound('Perfil não encontrado.');
+      const before = apiRole(cur);
+      const { candidate, def } = vetRole(access, id, { name: body.name ?? before.name, description: body.description ?? before.description, definition: body.definition ?? { grants: before.grants, denies: before.denies, partitions: before.partitions, fields: before.fields } });
+      const r = (await c.query('UPDATE roles SET name = $2, description = $3, definition = $4::jsonb WHERE id = $1 RETURNING *', [id, candidate.name, candidate.description, JSON.stringify(def)])).rows[0];
+      await audit(c, access, req, 'role.update', 'role', id, { changes: access.E.diffRoles(before, candidate).length });
+      const holders = (await c.query('SELECT user_id FROM user_roles WHERE role_id = $1', [id])).rows;
+      return { role: apiRole(r), holders: holders.map((h) => h.user_id) };
+    });
+    for (const uid of result.holders) invalidate(access.tenantId, uid);
+    return { role: result.role };
+  });
+
+  route('DELETE', '/api/roles/:id', async ({ req, access, params }) => {
+    const id = uuidOr400(params.id, 'Perfil');
+    must(access, 'role', 'delete', { tenantId: access.tenantId });
+    await tx(pool, access, async (c) => {
+      const cur = (await c.query('SELECT name FROM roles WHERE id = $1 FOR UPDATE', [id])).rows[0];
+      if (!cur) throw notFound('Perfil não encontrado.');
+      const used = (await c.query('SELECT count(*)::int n FROM user_roles WHERE role_id = $1', [id])).rows[0].n;
+      if (used) throw new HttpError(409, `${used === 1 ? '1 usuário usa' : `${used} usuários usam`} este perfil. Troque o perfil deles antes de excluir.`);
+      await c.query('DELETE FROM roles WHERE id = $1', [id]);
+      await audit(c, access, req, 'role.delete', 'role', id, { name: cur.name });
+    });
     return { ok: true };
   });
 

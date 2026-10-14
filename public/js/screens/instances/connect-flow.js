@@ -14,7 +14,7 @@ import { openModal } from './modal.js';
 import { qrSvg } from './qr.js';
 import { CHANNELS, ATTENTION, ICON, META_NUMBERS, NAME_MAX, nameError, ownerOptions } from './channels.js';
 import { addInstance, markConnected } from './actions.js';
-import { check } from '../_ops/perm.js';
+import { check, checkCreateInstance } from '../_ops/perm.js';
 import * as live from '../../live.js';
 import { openLiveConnect } from './live-connect.js';
 
@@ -40,7 +40,7 @@ const fmtCountdown = (ms) => {
 export function openConnectFlow({ instance = null, returnFocus, onFinish } = {}) {
   const reconnect = !!instance;
   // Defesa em profundidade: criar exige instance.create; reconectar, instance.connect.
-  const need = check('instance', reconnect ? 'connect' : 'create');
+  const need = reconnect ? check('instance', 'connect', instance) : checkCreateInstance();
   if (!need.ok) {
     toast(need.msg);
     return null;
@@ -321,7 +321,7 @@ export function openConnectFlow({ instance = null, returnFocus, onFinish } = {})
 
   // O motor negou na hora de gravar (perfil mudou durante o pareamento): nada é gravado.
   function denied() {
-    toast(check('instance', reconnect ? 'connect' : 'create').msg || 'Ação não permitida.');
+    toast((reconnect ? check('instance', 'connect', instance) : checkCreateInstance()).msg || 'Ação não permitida.');
     m.close({ force: true });
   }
 

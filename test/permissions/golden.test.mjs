@@ -32,8 +32,10 @@ const ROWS = {
   foreign: base({ tenantId: 'B', ownerId: ME, teamId: 'T1' }),
   // conversas: o "dono" é o assigneeId
   cOwn: base({ assigneeId: ME, teamId: 'T1' }),
-  cQueue: base({ assigneeId: null, teamId: null }),
-  cQueueT2: base({ assigneeId: null, teamId: 'T2' }),
+  cQueue: base({ assigneeId: null, teamId: null, status: 'queue' }),
+  // histórico importado do WhatsApp: sem responsável, mas RESOLVIDO — não pode vazar pela regra da fila
+  cHistory: base({ assigneeId: null, teamId: null, status: 'resolved' }),
+  cQueueT2: base({ assigneeId: null, teamId: 'T2', status: 'queue' }),
   cTeam: base({ assigneeId: 'other', teamId: 'T1' }),
   cSub: base({ assigneeId: 'other', teamId: 'T1a' }),
   cOther: base({ assigneeId: 'other', teamId: 'T2' }),
@@ -132,6 +134,8 @@ const GOLDEN = [
   // ---- conversas ----
   ['ler conversa atribuída a mim', 'conversation', 'read', 'cOwn', undefined, 'aaaada'],
   ['ler conversa NA FILA (sem responsável)', 'conversation', 'read', 'cQueue', undefined, 'aaaada'],
+  ['conversa RESOLVIDA sem responsável (histórico importado): fora da fila, só Admin e Somente leitura leem', 'conversation', 'read', 'cHistory', undefined, 'adddda'],
+  ['responder conversa resolvida sem responsável: só o Admin', 'conversation', 'send_message', 'cHistory', undefined, 'addddd'],
   ['ler conversa na fila de outra equipe', 'conversation', 'read', 'cQueueT2', undefined, 'aaaada'],
   ['ler conversa de colega da equipe', 'conversation', 'read', 'cTeam', undefined, 'aaddda'],
   ['ler conversa de colega da subequipe', 'conversation', 'read', 'cSub', undefined, 'aaddda'],
@@ -190,9 +194,20 @@ const GOLDEN = [
   ['ler automação', 'automation', 'read', 'cfg', undefined, 'aadddd'],
   ['atualizar automação', 'automation', 'update', 'cfg', undefined, 'aadddd'],
   ['publicar automação', 'automation', 'publish', 'cfg', undefined, 'addddd'],
-  ['ler instância de WhatsApp', 'instance', 'read', 'cfg', undefined, 'aaaadd'],
-  ['conectar instância', 'instance', 'connect', 'cfg', undefined, 'addddd'],
-  ['criar instância', 'instance', 'create', 'cfg', undefined, 'addddd'],
+  // número de WhatsApp tem responsável: 'cfg' (sem dono) é o número DA EMPRESA; own/team/other são pessoais
+  ['ler número da empresa (sem responsável)', 'instance', 'read', 'cfg', undefined, 'addddd'],
+  ['conectar número da empresa', 'instance', 'connect', 'cfg', undefined, 'addddd'],
+  ['criar número da empresa', 'instance', 'create', 'cfg', undefined, 'addddd'],
+  ['ler número pessoal próprio', 'instance', 'read', 'own', undefined, 'aaaadd'],
+  ['ler número pessoal de colega da equipe', 'instance', 'read', 'team', undefined, 'aadddd'],
+  ['ler número pessoal de outra equipe', 'instance', 'read', 'other', undefined, 'addddd'],
+  ['conectar número pessoal próprio', 'instance', 'connect', 'own', undefined, 'aaaadd'],
+  ['conectar número pessoal de colega da equipe', 'instance', 'connect', 'team', undefined, 'aadddd'],
+  ['criar número pessoal próprio', 'instance', 'create', 'own', undefined, 'aaaadd'],
+  ['renomear número pessoal próprio', 'instance', 'update', 'own', undefined, 'aaaadd'],
+  ['remover número pessoal próprio', 'instance', 'delete', 'own', undefined, 'aaaadd'],
+  ['remover número pessoal de colega da equipe', 'instance', 'delete', 'team', undefined, 'aadddd'],
+  ['remover número da empresa', 'instance', 'delete', 'cfg', undefined, 'addddd'],
   ['ler agente de IA', 'ai_agent', 'read', 'cfg', undefined, 'aadddd'],
   ['atualizar agente de IA', 'ai_agent', 'update', 'cfg', undefined, 'addddd'],
   ['ler configurações do tenant', 'tenant_settings', 'read', 'cfg', undefined, 'addddd'],
@@ -293,7 +308,7 @@ const MATRIX = {
     rule('product', ['read', 'create', 'update'], 'tenant'),
     rule('pipeline', ['read', 'update'], 'tenant'),
     rule('automation', ['read', 'create', 'update'], 'tenant'),
-    rule('instance', ['read'], 'tenant'),
+    rule('instance', ['read', 'create', 'update', 'connect', 'delete'], 'team_tree'),
     rule('ai_agent', ['read'], 'tenant'),
     rule('user', ['read'], 'tenant'),
     rule('role', ['read'], 'tenant'),
@@ -310,7 +325,7 @@ const MATRIX = {
     rule('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'tenant', { conditional: true }),
     rule('product', ['read'], 'tenant'),
     rule('pipeline', ['read'], 'tenant'),
-    rule('instance', ['read'], 'tenant'),
+    rule('instance', ['read', 'create', 'update', 'connect', 'delete'], 'own'),
   ],
   role_sdr: [
     rule('contact', ['read', 'create', 'update'], 'team'),
@@ -321,7 +336,7 @@ const MATRIX = {
     rule('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'tenant', { conditional: true }),
     rule('product', ['read'], 'tenant'),
     rule('pipeline', ['read'], 'tenant'),
-    rule('instance', ['read'], 'tenant'),
+    rule('instance', ['read', 'create', 'update', 'connect', 'delete'], 'own'),
   ],
   role_finance: [
     rule('deal', ['read', 'export'], 'tenant'),
@@ -434,7 +449,8 @@ describe('matriz dourada: estrutura dos perfis de sistema', () => {
     }
     // apagar/exportar dados de cliente: só Admin (tenant) e Gestor (árvore de equipes); Financeiro só exporta deal
     for (const r of SYSTEM_ROLES.filter((x) => ['role_agent', 'role_sdr', 'role_viewer'].includes(x.id))) {
-      for (const g of r.grants) for (const a of ['delete', 'export', 'import']) assert.ok(!g.actions.includes(a), `${r.id} ${g.entity} ${a}`);
+      // o número de WhatsApp pessoal não é dado de cliente: o dono pode remover o dele
+      for (const g of r.grants.filter((x) => x.entity !== 'instance')) for (const a of ['delete', 'export', 'import']) assert.ok(!g.actions.includes(a), `${r.id} ${g.entity} ${a}`);
     }
   });
 });

@@ -9,7 +9,7 @@ import { openMenu, closeMenu } from './instances/menu.js';
 import { closeAllModals } from './instances/modal.js';
 import { openAssign, openConfirm, openManage, openRename } from './instances/dialogs.js';
 import { openConnectFlow } from './instances/connect-flow.js';
-import { check, blocked, createHints, banner, anyOk } from './_ops/perm.js';
+import { check, blocked, createHints, banner, anyOk, checkCreateInstance } from './_ops/perm.js';
 import * as live from '../live.js';
 
 export default {
@@ -23,11 +23,13 @@ export default {
     // tem a sua: criar, conectar/reconectar/desconectar, renomear/vincular e remover.
     // Calculadas a cada desenho (o cache do adaptador cai a cada mudança do store).
     const hints = createHints();
+    // Cada número tem dono: connect/update/remove são decididos POR NÚMERO (o atendente só mexe nos dele).
+    // Criar: o novo número nasce do usuário atual (pessoal); quem só pode "criar o próprio" é liberado.
     const C = {
-      create: () => check('instance', 'create'),
-      connect: () => check('instance', 'connect'),
-      update: () => check('instance', 'update'),
-      remove: () => check('instance', 'delete'),
+      create: () => checkCreateInstance(),
+      connect: (inst) => check('instance', 'connect', inst),
+      update: (inst) => check('instance', 'update', inst),
+      remove: (inst) => check('instance', 'delete', inst),
     };
     const bannerEl = banner(false);
 
@@ -44,7 +46,7 @@ export default {
       });
 
     const reconnect = (inst) =>
-      !blocked(C.connect()) &&
+      !blocked(C.connect(inst)) &&
       openConnectFlow({ instance: inst, returnFocus: () => refocus(inst.id, 'primary')(), onFinish: flash });
 
     /** Destaca por 2s o cartão que acabou de ser conectado. */
@@ -59,7 +61,7 @@ export default {
     }
 
     const disconnect = (inst, returnFocus) =>
-      !blocked(C.connect()) &&
+      !blocked(C.connect(inst)) &&
       openConfirm({
         title: `Desconectar ${inst.name}?`,
         eyebrow: 'Desconectar número',
@@ -81,12 +83,32 @@ export default {
             { action: 'connect', event: 'instance.disconnect', detail: `Instância "${inst.name}" desconectada` }
           );
           if (done) toast(`${inst.name} desconectada`);
-          else blocked(C.connect());
+          else blocked(C.connect(inst));
         },
       });
 
+    // Modo operação: remove de verdade no servidor (sessão, credenciais e registro); as conversas vão junto,
+    // por isso o aviso — não bloqueia como no protótipo.
+    const removeLive = (inst, returnFocus) => {
+      const used = conversationsUsing(inst.id);
+      return openConfirm({
+        title: `Remover ${inst.name}?`,
+        eyebrow: 'Remover número',
+        message: `${inst.name}${inst.phone ? ` (${inst.phone})` : ''} sai da lista, a sessão do WhatsApp é encerrada e as credenciais são apagadas.${used ? ` As ${used} ${used === 1 ? 'conversa' : 'conversas'} deste número e as mensagens delas também serão apagadas.` : ''} Esta ação não pode ser desfeita.`,
+        confirmLabel: 'Remover',
+        busyLabel: 'Removendo…',
+        danger: true,
+        returnFocus,
+        onConfirm: async () => {
+          await live.deleteInstance(inst.id, true);
+          toast(`${inst.name} removida`);
+        },
+      });
+    };
+
     const remove = (inst, returnFocus) => {
-      if (blocked(C.remove())) return null;
+      if (blocked(C.remove(inst))) return null;
+      if (live.enabled) return removeLive(inst, returnFocus);
       const used = conversationsUsing(inst.id);
       const others = usageNotes(inst.id);
       const reasons = [];
@@ -103,7 +125,7 @@ export default {
         blockedReason: reasons.join(' '),
         onConfirm: () => {
           if (removeInstance(inst.id)) toast(`${inst.name} removida`);
-          else blocked(C.remove());
+          else blocked(C.remove(inst));
         },
       });
     };
@@ -128,9 +150,9 @@ export default {
 
     // Itens do menu ⋯ com o bloqueio de cada um vindo do motor (`locked` = motivo).
     const menuItems = (inst, back) => {
-      const u = C.update();
-      const c = C.connect();
-      const d = C.remove();
+      const u = C.update(inst);
+      const c = C.connect(inst);
+      const d = C.remove(inst);
       const items = [
         { label: 'Renomear', locked: u.ok ? '' : u.msg, onSelect: () => openRename(inst, { returnFocus: back }) },
         { label: 'Vincular responsável', locked: u.ok ? '' : u.msg, onSelect: () => openAssign(inst, { returnFocus: back }) },
@@ -154,7 +176,7 @@ export default {
       const busy = st.busy && !pairing;
       const needsReconnect = inst.status === 'disconnected' || inst.status === 'attention' || pairing;
       // Quem só lê (nenhuma ação de escrita liberada) vê "Detalhes" em vez de "Gerenciar".
-      const readOnly = !anyOk(C.update(), C.connect(), C.remove(), check('ai_agent', 'update'));
+      const readOnly = !anyOk(C.update(inst), C.connect(inst), C.remove(inst), check('ai_agent', 'update'));
 
       const note = att
         ? h('div', { class: 'instances-note instances-note--warn', role: 'note' }, icon(ICON.warn, 16), h('div', null, h('strong', null, att.title), h('span', null, att.text)))
@@ -176,7 +198,7 @@ export default {
         busy ? 'Conectando…' : pairing ? 'Abrir QR Code' : needsReconnect ? 'Reconectar' : readOnly ? 'Detalhes' : 'Gerenciar'
       );
       // Reconectar é ação de escrita (instance.connect); abrir os detalhes é leitura.
-      if (needsReconnect) hints.lock(primary, C.connect(), { other: busy });
+      if (needsReconnect) hints.lock(primary, C.connect(inst), { other: busy });
       const menuBtn = h('button', { class: 'btn btn--quiet instances-card__menu', type: 'button', 'data-focus': 'menu', 'aria-label': `Mais ações de ${inst.name}`, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: (e) => openCardMenu(inst, e.currentTarget) }, '⋯');
       // Se nenhum item do menu é permitido, o próprio ⋯ fica desabilitado (com o motivo).
       const allLocked = menuItems(inst, () => null).every((i) => i.locked);
@@ -194,7 +216,7 @@ export default {
           'div',
           { class: 'instances-card__actions' },
           primary,
-          inst.status === 'attention' ? hints.lock(h('button', { class: 'btn btn--quiet instances-card__remove', type: 'button', onclick: () => remove(inst, refocus(inst.id, 'primary')) }, 'Remover'), C.remove()) : null,
+          inst.status === 'attention' ? hints.lock(h('button', { class: 'btn btn--quiet instances-card__remove', type: 'button', onclick: () => remove(inst, refocus(inst.id, 'primary')) }, 'Remover'), C.remove(inst)) : null,
           menuBtn
         )
       );
@@ -213,8 +235,8 @@ export default {
     function draw() {
       closeMenu();
       hints.lock(addCard, C.create());
-      bannerEl.hidden = anyOk(C.create(), C.connect(), C.update(), C.remove());
       const list = store.state.instances;
+      bannerEl.hidden = anyOk(C.create(), ...list.flatMap((i) => [C.connect(i), C.update(i), C.remove(i)]));
       const count = (s) => list.filter((i) => i.status === s).length;
       const parts = [];
       const on = count('connected');

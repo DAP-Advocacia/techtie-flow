@@ -2,7 +2,8 @@
 // preenchida passam na validação; senha curta (< 6) vira "credenciais
 // inválidas" depois do loading; qualquer outra senha entra.
 import { h, icon, toast } from '../ui.js';
-import { AUTH_ICONS, EMAIL_RE, authBrand, ensureAuthCss, spinner, themeToggle } from './auth/common.js';
+import { AUTH_ICONS, EMAIL_RE, ensureAuthCss, spinner, themeToggle } from './auth/common.js';
+import { techtieMark } from './auth/logo.js';
 import * as live from '../live.js';
 
 const FAKE_LATENCY_MS = 650;
@@ -25,7 +26,7 @@ export default {
       inputmode: 'email',
       spellcheck: 'false',
       'aria-describedby': 'login-email-err',
-      value: 'marina@acme.com.br',
+      value: live.enabled ? '' : 'marina@acme.com.br', // em operação o campo começa vazio
     });
     const passInput = h('input', {
       class: 'input login-pass__input',
@@ -78,7 +79,8 @@ export default {
     const form = h(
       'form',
       { class: 'login-form auth-form', novalidate: true, 'aria-labelledby': 'login-title' },
-      h('h2', { class: 'login-form__title', id: 'login-title' }, 'ENTRAR'),
+      h('h2', { class: 'login-form__title', id: 'login-title' }, 'Entrar'),
+      h('p', { class: 'login-form__sub' }, 'Acesse sua conta para continuar.'),
       alertBox,
       h('div', { class: 'field' }, h('label', { for: 'login-email' }, 'E-mail'), emailInput, emailErr),
       h('div', { class: 'field' }, h('label', { for: 'login-pass' }, 'Senha'), h('div', { class: 'login-pass' }, passInput, eyeBtn), passErr),
@@ -95,8 +97,10 @@ export default {
         'Esqueci a senha'
       ),
       submitBtn,
-      h('button', { class: 'btn btn--ghost login-create', type: 'button', onclick: () => navigate('onboarding') }, 'Criar conta da empresa'),
-      h('p', { class: 'login-hint' }, 'Protótipo: use qualquer e-mail válido e uma senha com 6 caracteres ou mais.')
+      // criar conta e a dica de senha são do protótipo; em operação o acesso é por convite
+      ...(live.enabled
+        ? [h('p', { class: 'login-hint' }, 'Acesso por convite. Peça ao administrador da sua empresa.')]
+        : [h('button', { class: 'btn btn--ghost login-create', type: 'button', onclick: () => navigate('onboarding') }, 'Criar conta da empresa'), h('p', { class: 'login-hint' }, 'Protótipo: use qualquer e-mail válido e uma senha com 6 caracteres ou mais.')])
     );
 
     form.addEventListener('submit', (e) => {
@@ -154,10 +158,20 @@ export default {
         h(
           'section',
           { class: 'login-hero', 'aria-label': 'Apresentação' },
-          authBrand({ large: true }),
+          h('span', { class: 'login-hero__wm', 'aria-hidden': 'true' }, techtieMark(420)),
+          h(
+            'div',
+            { class: 'login-hero__brand' },
+            techtieMark(76),
+            h('div', { class: 'login-hero__wordmark' }, 'TECHTIE'),
+            h('div', { class: 'login-hero__flow' }, 'FLOW'),
+            h('div', { class: 'login-hero__tag' }, 'TECHNOLOGY DRIVES BUSINESS')
+          ),
+          h('div', { class: 'login-hero__rule', 'aria-hidden': 'true' }),
           h('div', { class: 'login-hero__eyebrow' }, 'CRM + CONTACT CENTER'),
-          h('h1', { class: 'login-hero__title' }, h('span', { class: 'login-hero__strong' }, 'ATENDA, VENDA E AUTOMATIZE'), h('span', { class: 'login-hero__light' }, 'TUDO NO MESMO LUGAR.')),
-          h('p', { class: 'login-hero__lead' }, 'WhatsApp, funil de vendas, agente de IA e BI em uma plataforma só — sem depender de outro CRM.')
+          h('h1', { class: 'login-hero__title' }, h('span', { class: 'login-hero__strong' }, 'Atenda, venda e automatize'), h('span', { class: 'login-hero__light' }, 'tudo no mesmo lugar.')),
+          h('p', { class: 'login-hero__lead' }, 'WhatsApp, funil de vendas, agente de IA e BI em uma plataforma só — sem depender de outro CRM.'),
+          h('ul', { class: 'login-hero__keys', 'aria-label': 'Pilares' }, ['Automatize', 'Conecte', 'Escale', 'Fature'].map((k) => h('li', null, k)))
         ),
         h('section', { class: 'login-panel' }, h('div', { class: 'login-panel__inner' }, form))
       )

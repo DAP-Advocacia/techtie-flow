@@ -1,6 +1,7 @@
 // Peças compartilhadas entre #/login e #/onboarding (telas sem sidebar).
 import { h, icon } from '../../ui.js';
 import { store } from '../../store.js';
+import { techtieMark } from './logo.js';
 
 export const AUTH_ICONS = {
   sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
@@ -33,7 +34,8 @@ export function authBrand({ large = false } = {}) {
   return h(
     'div',
     { class: 'auth-brand' + (large ? ' auth-brand--lg' : '') },
-    h('div', { class: 'auth-brand__mark', 'aria-hidden': 'true' }, name[0] || 'T'),
+    // marca TechTie (o "T" gravata) quando o produto é o TechTie; produto white-label com outro nome mantém a inicial
+    name.startsWith('TECHTIE') ? techtieMark(large ? 40 : 26) : h('div', { class: 'auth-brand__mark', 'aria-hidden': 'true' }, name[0] || 'T'),
     h('span', { class: 'auth-brand__name' }, name)
   );
 }

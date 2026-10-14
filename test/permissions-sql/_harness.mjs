@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repoRoot = path.resolve(here, '..', '..');
 export const MIGRATION = path.join(repoRoot, 'db', 'migrations', '0001_permissions.sql');
+export const MIGRATION_PERSONAL = path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql');
 export const IMAGE = 'postgres:16-alpine';
 const ADMIN_PW = 'ttf-admin-pw';
 export const APP_PW = 'ttf-app-pw';
@@ -124,7 +125,8 @@ export async function startPostgres(pg, tag, { migrate = true } = {}) {
     if (!ready) throw new Error('Postgres não ficou pronto a tempo');
 
     const applyMigration = async () => {
-      const sql = fs.readFileSync(MIGRATION, 'utf8');
+      // 0001 (permissões) + 0003 (dono/equipe do número): o catálogo trata `instance` como registro com dono
+      const sql = fs.readFileSync(MIGRATION, 'utf8') + '\n' + fs.readFileSync(MIGRATION_PERSONAL, 'utf8');
       const c = await admin.connect();
       let failed = false;
       try {

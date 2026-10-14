@@ -8,6 +8,13 @@
 //     mas um clique programático num botão desabilitado não pode alterar nada.
 import { h, icon, toast } from '../../ui.js';
 import { decide, denyMessage } from '../../access.js';
+import { store } from '../../store.js';
+
+/** Registro de um NÚMERO NOVO do usuário atual (pessoal): é com ele que se decide `instance.create`. */
+export function ownInstanceRow() {
+  const me = store.state.users.find((u) => u.id === store.state.currentUserId);
+  return { ownerId: store.state.currentUserId, teamId: me?.teamIds?.[0] ?? null };
+}
 
 const VERBS = {
   'ai_agent.update': 'alterar o Agente de IA',
@@ -22,6 +29,13 @@ const VERBS = {
   'tenant_settings.update': 'alterar as configurações da empresa',
   'report.export': 'exportar relatórios',
 };
+
+/** Criar um número = criar E conectar (sem poder conectar ele ficaria criado e travado, sem QR Code). */
+export function checkCreateInstance() {
+  const row = ownInstanceRow();
+  const create = check('instance', 'create', row);
+  return create.ok ? check('instance', 'connect', row) : create;
+}
 
 /** Decisão do motor → { ok, msg, d }. `msg` vazio quando permitido. */
 export function check(entity, action, row, context) {

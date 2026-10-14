@@ -36,6 +36,11 @@
   --radius-pill: 999px;
   --shadow-card: 0 10px 28px var(--sh), inset 0 1px 0 var(--hi);
   --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* marca TechTie (ouro facetado) */
+  --logo-hi: #f4dfa6;
+  --logo-mid: #cfa65a;
+  --logo-lo: #9a7433;
+  --logo-deep: #5e4520;
   --sidebar-w: 232px;
 }
 
@@ -70,4 +75,8 @@
   --ins-bg: rgba(56, 112, 159, 0.1);
   --ins-line: rgba(56, 112, 159, 0.28);
   --ins-line-strong: rgba(56, 112, 159, 0.5);
+  --logo-hi: #b8923f;
+  --logo-mid: #8e6c27;
+  --logo-lo: #6b4f18;
+  --logo-deep: #4a3510;
 }

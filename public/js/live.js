@@ -243,9 +243,22 @@ export const createDeal = (local, newContact) =>
   });
 
 export const invite = (form) => request('/api/users/invite', { method: 'POST', body: form }).then(async (r) => (await hydrate({ keepMessages: true }), r));
+export const setUserRoles = (userId, roleIds) => request(`/api/users/${userId}/roles`, { method: 'POST', body: { roleIds } }).then(() => hydrate({ keepMessages: true }));
+export const setUserTeams = (userId, teamIds) => request(`/api/users/${userId}/teams`, { method: 'POST', body: { teamIds } }).then(() => hydrate({ keepMessages: true }));
+/** Cria/edita um perfil do tenant no servidor (que valida pelo motor e recusa escalonamento). */
+export async function saveRole(role, { isNew, clonedFrom }) {
+  const payload = { name: role.name, description: role.description || '', definition: { grants: role.grants, denies: role.denies, partitions: role.partitions || {}, fields: role.fields || [] } };
+  const r = isNew ? await request('/api/roles', { method: 'POST', body: { ...payload, clonedFrom } }) : await request(`/api/roles/${role.id}`, { method: 'PATCH', body: payload });
+  // o perfil JÁ está salvo no servidor: se a atualização da tela falhar, não é falha de salvar
+  await hydrate({ keepMessages: true }).catch((e) => console.error('[perfil] salvo, mas a tela não atualizou:', e));
+  return r.role;
+}
+export const deleteRole = (roleId) => request(`/api/roles/${roleId}`, { method: 'DELETE' }).then(() => hydrate({ keepMessages: true }));
 export const setUserStatus = (userId, status) => request(`/api/users/${userId}`, { method: 'PATCH', body: { status } }).then(() => hydrate({ keepMessages: true }));
 
 export const createInstance = (name) => request('/api/instances', { method: 'POST', body: { name } }).then((r) => (store.update((s) => upsertInstance(s, r.instance)), r.instance));
 export const connectInstance = (id) => request(`/api/instances/${id}/connect`, { method: 'POST' });
 export const instanceState = (id) => request(`/api/instances/${id}/qr`);
+/** Remove o número no servidor (encerra a sessão e apaga as credenciais). `withConversations`: leva as conversas junto. */
+export const deleteInstance = (id, withConversations = false) => request(`/api/instances/${id}${withConversations ? '?withConversations=1' : ''}`, { method: 'DELETE' }).then(() => hydrate({ keepMessages: true }));
 export const disconnectInstance = (id) => request(`/api/instances/${id}/disconnect`, { method: 'POST' });

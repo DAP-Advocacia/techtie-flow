@@ -48,7 +48,10 @@ async function ingestMessage(deps, m) {
         // Histórico importado no pareamento NÃO é atendimento novo: nasce "resolvida" para não lotar a
         // fila com centenas de conversas antigas. Se o cliente escrever de novo, o UPDATE abaixo a
         // reabre (volta para a fila). Conversa nascida de mensagem ao vivo entra na fila normalmente.
-        `INSERT INTO conversations (tenant_id, instance_id, contact_id, phone, status) VALUES ($1, $2, $3, $4, $5)
+        // Número PESSOAL (instância com responsável): a conversa já nasce atribuída ao dono (e à equipe do
+        // número), sem passar pela fila de todos. Número da empresa (sem responsável): vai para a fila.
+        `INSERT INTO conversations (tenant_id, instance_id, contact_id, phone, status, assignee_id, team_id)
+         SELECT $1, i.id, $3, $4, CASE WHEN i.owner_id IS NOT NULL AND $5::text = 'queue' THEN 'open' ELSE $5::text END, i.owner_id, i.team_id FROM instances i WHERE i.id = $2
          ON CONFLICT (tenant_id, instance_id, contact_id) WHERE contact_id IS NOT NULL DO NOTHING`,
         [m.tenantId, m.instanceId, contact.id, phone, m.isHistory ? 'resolved' : 'queue']
       );
@@ -103,7 +106,7 @@ async function setInstanceStatus(deps, { tenantId, instanceId, status, phone, re
   const row = await withTenant(deps.pool, { tenantId, readScopes: 'tenant' }, async (c) => {
     const r = await c.query(
       `UPDATE instances SET status = $2, phone = COALESCE($3, phone), attention_reason = $4, updated_at = now()
-        WHERE id = $1 RETURNING id, name, channel, status, phone, attention_reason`,
+        WHERE id = $1 RETURNING id, name, channel, status, phone, attention_reason, owner_id, team_id`,
       [instanceId, status, phone || null, reason || null]
     );
     return r.rows[0];

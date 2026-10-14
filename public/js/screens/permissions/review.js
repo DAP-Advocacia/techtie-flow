@@ -7,6 +7,7 @@ import { checkRoleSave, saveRole } from './actions.js';
 import { describeChange, makeNamer, plural } from './labels.js';
 import { newRoleId, pathLabel } from './model.js';
 import { ICON } from './util.js';
+import * as live from '../../live.js';
 
 const MARK = { added: ['+', 'perm-diff--add', 'Adicionou'], removed: ['−', 'perm-diff--rem', 'Removeu'], changed: ['~', 'perm-diff--chg', 'Alterou'] };
 
@@ -62,7 +63,23 @@ export function openReview({ store, draft, onSaved }) {
       class: 'btn btn--primary',
       type: 'button',
       'data-autofocus': true,
-      onclick: () => {
+      onclick: async () => {
+        if (live.enabled) {
+          // Modo operação: o servidor valida de novo (motor + anti-escalonamento) e grava; a tela só reflete.
+          const pre = checkRoleSave(store.state, draft, draft.isNew ? 'role_t_novo' : draft.base.id);
+          if (!pre.ok) return paint();
+          saveBtn.disabled = true;
+          try {
+            const role = await live.saveRole(pre.after, { isNew: draft.isNew, clonedFrom: draft.cloneOf?.id });
+            dlg.close();
+            toast(draft.isNew ? 'Perfil criado e registrado na auditoria.' : 'Perfil salvo e registrado na auditoria.');
+            onSaved?.({ ok: true, roleId: role.id, id: role.id });
+          } catch (e) {
+            saveBtn.disabled = false;
+            toast(e.message);
+          }
+          return;
+        }
         const res = saveRole(store, draft);
         if (!res.ok) {
           paint();

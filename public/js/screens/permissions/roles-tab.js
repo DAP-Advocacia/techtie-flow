@@ -10,6 +10,7 @@ import { openReview } from './review.js';
 import { normalizeRole, clone, blankRole } from './model.js';
 import { makeNamer, plural } from './labels.js';
 import { keepUi, selectEl, ICON } from './util.js';
+import * as live from '../../live.js';
 
 export function createRolesTab(S) {
   const { store } = S;
@@ -179,7 +180,17 @@ export function createRolesTab(S) {
     const ok = await confirmDialog({ eyebrow: 'Excluir perfil', title: `Excluir “${role.name}”?`, message: 'O perfil será removido e a exclusão fica registrada na auditoria. Ninguém usa este perfil hoje.', confirmLabel: 'Excluir perfil', danger: true });
     if (!ok) return;
     st.drafts.delete(role.id);
-    const res = deleteRole(store, role.id);
+    let res;
+    if (live.enabled) {
+      try {
+        await live.deleteRole(role.id);
+        res = { ok: true };
+      } catch (e) {
+        return toast(e.message);
+      }
+    } else {
+      res = deleteRole(store, role.id);
+    }
     if (!res.ok) return toast(res.problems[0]);
     st.selected = firstRoleId();
     render();
@@ -190,10 +201,14 @@ export function createRolesTab(S) {
   // --------------------------------------------------------------- render
   function buildMain() {
     const state = store.state;
-    let sel = st.drafts.get(st.selected) || roleById(st.selected);
+    // Perfil NOVO vive só no rascunho; perfil existente vem do estado (o rascunho dele é recuperado por draftFor).
+    // Antes, um rascunho de perfil existente era tratado como se fosse o perfil — e quebrava (`.filter` de undefined)
+    // em qualquer redesenho com rascunho aberto, como o que acontece logo depois de salvar.
+    const pick = (id) => { const d = st.drafts.get(id); return d?.isNew ? d : roleById(id); };
+    let sel = pick(st.selected);
     if (!sel) {
       st.selected = firstRoleId();
-      sel = st.drafts.get(st.selected) || roleById(st.selected);
+      sel = pick(st.selected);
     }
     if (!sel) {
       replaceChildren(mainHost, h('div', { class: 'empty card' }, h('div', { class: 'section-title gold' }, 'Nenhum perfil'), h('div', null, 'Crie o primeiro perfil com “Novo perfil”.')));

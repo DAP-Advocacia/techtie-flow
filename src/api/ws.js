@@ -76,9 +76,9 @@ function createHub({ pool, config }) {
       const row = { id: conv.id, tenantId: p.tenantId, ownerId: null, teamId: p.conversation.team_id || null, assigneeId: conv.assigneeId, instanceId: conv.instanceId, status: conv.status };
       emit(p.tenantId, { type: 'message', conversation: conv, message: p.message }, { entity: 'conversation', row }).catch(() => {});
     } else if (type === 'instance') {
-      const inst = { id: p.instance.id, name: p.instance.name, channel: p.instance.channel, status: p.instance.status, phone: p.instance.phone || null, attentionReason: p.instance.attention_reason || null };
+      const inst = { id: p.instance.id, name: p.instance.name, channel: p.instance.channel, status: p.instance.status, phone: p.instance.phone || null, attentionReason: p.instance.attention_reason || null, ownerId: p.instance.owner_id || null, teamId: p.instance.team_id || null };
       // o QR dá acesso à conta de WhatsApp: só vai a quem pode conectar números
-      emit(p.tenantId, { type: 'instance', instance: inst, qr: p.qr || null }, { entity: 'instance', action: p.qr ? 'connect' : 'read', row: { id: inst.id, tenantId: p.tenantId } }).catch(() => {});
+      emit(p.tenantId, { type: 'instance', instance: inst, qr: p.qr || null }, { entity: 'instance', action: p.qr ? 'connect' : 'read', row: { id: inst.id, tenantId: p.tenantId, ownerId: inst.ownerId, teamId: inst.teamId } }).catch(() => {});
     }
   }
 
