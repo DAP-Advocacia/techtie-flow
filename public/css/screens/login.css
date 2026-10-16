@@ -107,32 +107,26 @@
 }
 
 /* ---------- login ---------- */
-/* Direção: a prancha da marca — preto texturizado (pedra), um fio dourado, tipografia espaçada, tudo contido.
-   Sem brilhos, degradês ou cartão: o formulário fica direto sobre o fundo. */
+/* Direção: a prancha da marca — preto profundo, logo grande, fio dourado vertical, tipografia espaçada.
+   Sem grão, brilho forte ou cartão. */
 .tt-mark {
   display: inline-block;
   flex: none;
   line-height: 0;
 }
 .login {
+  --login-bg: #0b0c0e;
   flex: 1;
   min-height: 0;
   position: relative;
   overflow: auto;
   display: grid;
   place-items: center;
-  padding: 56px 24px 40px;
-  background-color: var(--bg);
-  /* luz suave vinda de cima (como na parede iluminada da prancha) + grão fino de pedra */
-  background-image:
-    radial-gradient(900px 520px at 50% -8%, rgba(255, 255, 255, 0.045), transparent 70%),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.5'/></svg>");
-  background-blend-mode: normal;
+  padding: 56px 32px 48px;
+  background: var(--login-bg);
 }
 :root[data-theme='light'] .login {
-  background-image:
-    radial-gradient(900px 520px at 50% -8%, rgba(255, 255, 255, 0.5), transparent 70%),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.12'/></svg>");
+  --login-bg: var(--bg);
 }
 .login__top {
   position: absolute;
@@ -142,11 +136,11 @@
 }
 .login-stage {
   width: 100%;
-  max-width: 360px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
+  max-width: 980px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 360px);
+  align-items: center;
+  gap: 72px;
 }
 .login-brand {
   display: flex;
@@ -155,28 +149,30 @@
   text-align: center;
 }
 .login-brand .tt-mark {
-  margin-bottom: 22px;
+  margin-bottom: 30px;
 }
 .login-brand__name {
-  font-size: 30px;
+  font-size: clamp(30px, 3.6vw, 44px);
   font-weight: 500;
-  letter-spacing: 0.46em;
-  margin-right: -0.46em; /* o espaçamento depois da última letra descentralizaria o nome */
-  color: var(--acc2);
+  letter-spacing: 0.42em;
+  margin-right: -0.42em; /* o espaço depois da última letra descentralizaria o nome */
+  background: linear-gradient(180deg, var(--logo-hi), var(--logo-mid) 75%, var(--logo-lo));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .login-brand__tag {
-  margin-top: 10px;
-  font-size: 10px;
-  letter-spacing: 0.38em;
-  margin-right: -0.38em;
-  color: var(--dim);
+  margin-top: 14px;
+  font-size: 11px;
+  letter-spacing: 0.34em;
+  margin-right: -0.34em;
+  color: var(--mute);
 }
-.login-rule {
-  width: 36px;
-  height: 1px;
-  margin: 34px auto 30px;
-  background: var(--acc);
-  opacity: 0.7;
+.login-divider {
+  align-self: stretch;
+  min-height: 300px;
+  background: linear-gradient(180deg, transparent, var(--acc) 18%, var(--acc) 82%, transparent);
+  opacity: 0.55;
 }
 .login-form {
   display: flex;
@@ -208,6 +204,16 @@
 }
 .login-form .input[aria-invalid='true'] {
   border-bottom-color: var(--red);
+}
+/* O Chrome pinta os campos preenchidos automaticamente de azul-claro; cobre com a cor do fundo */
+.login-form .input:-webkit-autofill,
+.login-form .input:-webkit-autofill:hover,
+.login-form .input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--login-bg) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--login-bg) inset;
+  transition: background-color 600000s ease-in-out 0s;
 }
 .login-pass {
   position: relative;
@@ -297,13 +303,30 @@
   text-align: center;
 }
 
-@media (max-width: 820px) {
+/* telas médias/celular: a marca vai para cima do formulário, fio horizontal no meio */
+@media (max-width: 860px) {
   .login {
     align-items: start;
-    padding-top: calc(env(safe-area-inset-top) + 72px);
+    padding-top: calc(env(safe-area-inset-top) + 64px);
+  }
+  .login-stage {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 380px;
+    gap: 0;
   }
   .login-brand .tt-mark {
-    width: 72px !important;
-    height: 72px !important;
+    width: 132px !important;
+    height: 132px !important;
+    margin-bottom: 20px;
+  }
+  .login-brand__name {
+    font-size: 28px;
+  }
+  .login-divider {
+    min-height: 0;
+    height: 1px;
+    width: 44px;
+    margin: 30px auto 28px;
+    background: var(--acc);
   }
 }

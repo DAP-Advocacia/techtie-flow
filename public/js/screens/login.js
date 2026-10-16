@@ -149,7 +149,7 @@ export default {
       }, FAKE_LATENCY_MS);
     });
 
-    // Composição sóbria (prancha da marca): logo, nome espaçado, um fio dourado e o formulário. Sem texto de venda.
+    // Composição da prancha da marca: logo grande + nome à esquerda, fio dourado, formulário à direita.
     el.append(
       h(
         'div',
@@ -158,14 +158,8 @@ export default {
         h(
           'main',
           { class: 'login-stage' },
-          h(
-            'header',
-            { class: 'login-brand' },
-            techtieMark(88),
-            h('div', { class: 'login-brand__name' }, 'TECHTIE'),
-            h('div', { class: 'login-brand__tag' }, 'TECHNOLOGY DRIVES BUSINESS')
-          ),
-          h('div', { class: 'login-rule', 'aria-hidden': 'true' }),
+          h('header', { class: 'login-brand' }, techtieMark(210), h('div', { class: 'login-brand__name' }, 'TECHTIE'), h('div', { class: 'login-brand__tag' }, 'TECHNOLOGY DRIVES BUSINESS')),
+          h('div', { class: 'login-divider', 'aria-hidden': 'true' }),
           form
         )
       )
