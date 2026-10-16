@@ -11,3 +11,9 @@ control-plane
 .claude
 HANDOFF.md
 handoff.json
+media_store
+dist
+test
+docs
+imagens*
+scripts

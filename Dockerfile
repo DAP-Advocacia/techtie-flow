@@ -18,13 +18,17 @@ RUN npm ci --omit=dev
 
 COPY . .
 
-# A sessão do Baileys mora aqui. Precisa ser um volume persistente no
-# EasyPanel, senão o QR Code é pedido de novo a cada deploy.
+# A sessão do Baileys mora aqui. Precisa ser um volume persistente (Coolify/EasyPanel),
+# senão o QR Code é pedido de novo a cada deploy.
 ENV AUTH_FOLDER=/app/auth_session
 RUN mkdir -p /app/auth_session
 
 ENV NODE_ENV=production
 ENV PORT=3333
 EXPOSE 3333
+
+# Saúde: a API responde /api/health (só existe com DATABASE_URL + AUTH_TOKEN_SECRET definidos).
+# start-period generoso: o servidor religa as sessões do WhatsApp em fila ao subir.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3333)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "src/server.js"]
