@@ -65,6 +65,9 @@ export function icon(d, size = 18) {
 
 /** Paths de ícone usados em mais de um lugar. Telas podem ter os seus próprios. */
 export const ICONS = {
+  home: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
+  contacts: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  desktop: 'M3 4h18v12H3zM8 20h8M12 16v4',
   inbox: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
   pipeline: 'M3 3h6v18H3zM15 3h6v10h-6z',
   agent: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z',

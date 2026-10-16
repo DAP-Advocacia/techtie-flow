@@ -239,6 +239,7 @@ export default {
       // pedido de conversa que o usuário não pode ler = ignorado (descartado), nunca selecionado
       if (visibleConvs(store).some((c) => c.id === requestedId)) {
         selectedId = requestedId;
+        if (isMobile()) setView('thread'); // veio de um atalho (Início, Contatos…): abre direto a conversa
         // a aba atual pode esconder a conversa pedida (ex.: está na fila ou resolvida)
         if (!visibleConversations(store, { tab, query: '' }).some((c) => c.id === requestedId)) tab = 'all';
       }

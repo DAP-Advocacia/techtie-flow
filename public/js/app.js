@@ -16,6 +16,7 @@ import { canAccess, visible } from './access.js';
 import * as live from './live.js';
 import { MARK_SRC } from './screens/auth/logo.js';
 import * as pwa from './pwa.js';
+import { isMobile } from './mobile.js';
 
 pwa.register();
 
@@ -26,18 +27,21 @@ const ROUTES = [
   { id: 'login', label: 'Login', shell: false },
   { id: 'onboarding', label: 'Onboarding', shell: false },
   { id: 'accept', label: 'Convite', shell: false },
+  { id: 'home', label: 'Início', shell: true, nav: true },
   { id: 'inbox', label: 'Inbox', shell: true, nav: true, require: ['conversation', 'read'] },
   { id: 'pipeline', label: 'Negócios', shell: true, nav: true, require: ['deal', 'read'] },
+  { id: 'contacts', label: 'Contatos', shell: true, nav: true, require: ['contact', 'read'] },
   { id: 'agent', label: 'Agente de IA', shell: true, nav: true, require: ['ai_agent', 'read'] },
-  { id: 'automations', label: 'Automações', shell: true, nav: true, require: ['automation', 'read'] },
+  // desktopOnly: no celular a tela é substituída por um aviso (são telas densas, feitas para o computador)
+  { id: 'automations', label: 'Automações', shell: true, nav: true, desktopOnly: true, require: ['automation', 'read'] },
   { id: 'dashboard', label: 'Dashboard', shell: true, nav: true, require: ['report', 'read'] },
   { id: 'instances', label: 'Instâncias', shell: true, nav: true, require: ['instance', 'read'] },
-  { id: 'users', label: 'Usuários', shell: true, nav: true, admin: true, require: ['user', 'read'] },
-  { id: 'settings', label: 'Configurações', shell: true, nav: true, admin: true, require: ['tenant_settings', 'read'] },
-  { id: 'permissions', label: 'Permissões', shell: true, nav: true, admin: true, require: ['role', 'read'] },
+  { id: 'users', label: 'Usuários', shell: true, nav: true, admin: true, desktopOnly: true, require: ['user', 'read'] },
+  { id: 'settings', label: 'Configurações', shell: true, nav: true, admin: true, desktopOnly: true, require: ['tenant_settings', 'read'] },
+  { id: 'permissions', label: 'Permissões', shell: true, nav: true, admin: true, desktopOnly: true, require: ['role', 'read'] },
 ];
 const allowedRoute = (r) => !r.require || canAccess(r.require[0], r.require[1]);
-const DEFAULT_ROUTE = 'inbox';
+const DEFAULT_ROUTE = 'home';
 
 const root = document.getElementById('app');
 let cleanup = null;
@@ -66,6 +70,24 @@ function unreadTotal() {
   return visible('conversation', store.state.conversations).reduce((n, c) => n + (c.unread || 0), 0);
 }
 
+/** Barra de abas do celular: o que mais se usa na rua. O resto fica no menu ☰. */
+function renderTabbar(active) {
+  const unread = unreadTotal();
+  const tabs = ['home', 'inbox', 'pipeline', 'contacts', 'dashboard'].map((id) => ROUTES.find((r) => r.id === id)).filter((r) => r && allowedRoute(r));
+  return h(
+    'nav',
+    { class: 'tabbar', 'aria-label': 'Principal' },
+    tabs.map((r) =>
+      h(
+        'a',
+        { class: 'tabbar__item' + (r.id === active ? ' is-active' : ''), href: `#/${r.id}`, 'aria-current': r.id === active ? 'page' : null },
+        h('span', { class: 'tabbar__icon' }, icon(ICONS[r.id], 22), r.id === 'inbox' && unread ? h('span', { class: 'tabbar__badge' }, unread > 99 ? '99+' : unread) : null),
+        h('span', { class: 'tabbar__label' }, r.label)
+      )
+    )
+  );
+}
+
 function renderSidebar(active) {
   const s = store.state;
   const user = store.user();
@@ -73,7 +95,7 @@ function renderSidebar(active) {
     const badge = r.id === 'inbox' ? unreadTotal() : 0;
     return h(
       'a',
-      { class: 'nav-item' + (r.id === active ? ' is-active' : ''), href: `#/${r.id}` },
+      { class: 'nav-item' + (r.id === active ? ' is-active' : ''), href: `#/${r.id}`, 'data-desktop': r.desktopOnly ? 'true' : null },
       icon(ICONS[r.id]),
       h('span', { class: 'nav-item__label' }, r.label),
       badge ? h('span', { class: 'badge' }, badge) : null
@@ -89,7 +111,7 @@ function renderSidebar(active) {
   return h(
     'aside',
     { class: 'sidebar' },
-    h('div', { class: 'brand' }, h('div', { class: 'brand__mark' }, s.tenant.brand.logo?.dataUrl ? h('img', { src: s.tenant.brand.logo.dataUrl, alt: brand, class: 'brand__logo' }) : /^techtie$/i.test(first) ? h('img', { src: MARK_SRC.small, alt: brand, class: 'brand__logo brand__logo--mark' }) : first[0] || 'T'), h('div', { class: 'brand__text' }, h('span', { class: 'brand__name' }, first), h('span', { class: 'brand__sub' }, (rest.join(' ') || 'FLOW').toUpperCase()))),
+    h('a', { class: 'brand', href: '#/home', 'aria-label': 'Início' }, h('div', { class: 'brand__mark' }, s.tenant.brand.logo?.dataUrl ? h('img', { src: s.tenant.brand.logo.dataUrl, alt: brand, class: 'brand__logo' }) : /^techtie$/i.test(first) ? h('img', { src: MARK_SRC.small, alt: brand, class: 'brand__logo brand__logo--mark' }) : first[0] || 'T'), h('div', { class: 'brand__text' }, h('span', { class: 'brand__name' }, first), h('span', { class: 'brand__sub' }, (rest.join(' ') || 'FLOW').toUpperCase()))),
     h('div', { class: 'sidebar__group' }, 'OPERAÇÃO'),
     ...operation,
     admin.length ? h('div', { class: 'sidebar__group sidebar__group--spaced' }, 'ADMINISTRAÇÃO') : null,
@@ -157,7 +179,11 @@ async function render() {
 
   if (route.shell) {
     const sidebarHost = h('div', { class: 'sidebar-host' });
-    const draw = () => replaceChildren(sidebarHost, renderSidebar(route.id));
+    const tabHost = h('div', { class: 'sidebar-host' });
+    const draw = () => {
+      replaceChildren(sidebarHost, renderSidebar(route.id));
+      replaceChildren(tabHost, renderTabbar(route.id));
+    };
     draw();
     const unsubStore = store.subscribe(draw);
     const unsubPwa = pwa.onChange(draw);
@@ -176,7 +202,7 @@ async function render() {
     const backdrop = h('div', { class: 'nav-backdrop', onclick: () => setNav(false) });
     sidebarHost.addEventListener('click', (e) => e.target.closest('.nav-item') && setNav(false));
     app.addEventListener('keydown', (e) => e.key === 'Escape' && setNav(false));
-    app.append(mobilebar, backdrop, sidebarHost, h('main', { class: 'app__main' }, screenEl));
+    app.append(mobilebar, backdrop, sidebarHost, h('main', { class: 'app__main' }, screenEl), tabHost);
     replaceChildren(root, app);
   } else {
     replaceChildren(root, h('div', { class: 'app' }, h('main', { class: 'app__main' }, screenEl)));
@@ -189,6 +215,21 @@ async function render() {
   try {
     if (!allowedRoute(route)) {
       replaceChildren(screenEl, h('div', { class: 'empty', style: 'flex:1' }, h('div', { class: 'section-title gold' }, 'Acesso negado'), h('div', null, `Seu perfil não tem acesso a "${route.label}".`), h('div', { class: 'muted' }, 'Peça acesso a um administrador da sua empresa.')));
+      cleanup = () => unsubSidebar?.();
+      return;
+    }
+    if (route.desktopOnly && isMobile()) {
+      replaceChildren(
+        screenEl,
+        h(
+          'div',
+          { class: 'desktop-only' },
+          h('span', { class: 'desktop-only__icon' }, icon(ICONS.desktop, 34)),
+          h('h1', { class: 'desktop-only__title' }, `${route.label} é no computador`),
+          h('p', { class: 'desktop-only__text' }, 'Esta tela é densa demais para o celular. Abra o TechTie Flow no computador para usá-la; aqui ficam o atendimento, os negócios, os contatos e o dashboard.'),
+          h('a', { class: 'btn btn--primary desktop-only__btn', href: '#/home' }, 'Voltar ao Início')
+        )
+      );
       cleanup = () => unsubSidebar?.();
       return;
     }

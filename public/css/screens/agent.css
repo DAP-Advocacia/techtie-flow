@@ -379,3 +379,25 @@
     opacity: 0.7;
   }
 }
+
+/* ---------- celular: uma coluna ---------- */
+@media (max-width: 820px) {
+  .agent-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .agent-col {
+    gap: 16px;
+  }
+  .agent-instance-field,
+  .agent-instance {
+    width: 100%;
+    min-width: 0;
+  }
+  .agent-pill {
+    flex-wrap: wrap;
+  }
+  .agent-prompt-bar {
+    flex-wrap: wrap;
+  }
+}

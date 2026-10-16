@@ -415,3 +415,24 @@
     transition: none;
   }
 }
+
+/* ---------- celular ---------- */
+@media (max-width: 820px) {
+  .dashboard-kpis {
+    gap: 10px;
+  }
+  .dashboard-kpi__value {
+    font-size: 26px;
+  }
+  .dashboard-row {
+    gap: 12px;
+  }
+  .dashboard-card {
+    gap: 12px;
+  }
+  /* a tabela da equipe tem muitas colunas: rola na horizontal dentro do próprio cartão */
+  .dashboard-tablewrap {
+    margin: 0 -4px;
+    -webkit-overflow-scrolling: touch;
+  }
+}

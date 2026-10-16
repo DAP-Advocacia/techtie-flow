@@ -18,8 +18,51 @@
   display: contents;
 }
 .mobilebar,
-.nav-backdrop {
+.nav-backdrop,
+.tabbar {
   display: none;
+}
+a.brand {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* aviso das telas só de computador (mostrado só no celular) */
+.desktop-only {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 28px;
+  text-align: center;
+}
+.desktop-only__icon {
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--acc);
+}
+.desktop-only__title {
+  margin: 8px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.desktop-only__text {
+  margin: 0;
+  max-width: 340px;
+  color: var(--mute);
+  line-height: 1.55;
+}
+.desktop-only__btn {
+  margin-top: 10px;
+  padding: 12px 24px;
+  text-decoration: none;
 }
 
 /* ---------- sidebar ---------- */
@@ -260,6 +303,59 @@
   .app.is-nav-open .nav-backdrop {
     opacity: 1;
     pointer-events: auto;
+  }
+  /* barra de abas inferior (o que mais se usa); o resto fica no menu ☰ */
+  .tabbar {
+    display: flex;
+    flex: none;
+    border-top: 1px solid var(--line);
+    background: var(--side);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar__item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 9px 2px 7px;
+    color: var(--mute);
+    font-size: 11px;
+    text-decoration: none;
+  }
+  .tabbar__item.is-active {
+    color: var(--acc2);
+    font-weight: 600;
+  }
+  .tabbar__icon {
+    position: relative;
+    display: grid;
+  }
+  .tabbar__badge {
+    position: absolute;
+    top: -5px;
+    left: 56%;
+    min-width: 17px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: var(--acc);
+    color: var(--ink);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+  }
+  /* no menu: telas só de computador aparecem apagadas, com a etiqueta */
+  .nav-item[data-desktop='true'] {
+    opacity: 0.6;
+  }
+  .nav-item[data-desktop='true']::after {
+    content: 'computador';
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mute);
   }
   /* alvos de toque maiores */
   .nav-item {

@@ -2,7 +2,8 @@
 // Referência: docs/design-handoff (seção 4). Dados 100% em store.state.
 // Permissões: a tela só REFLETE o motor (shared/permissions via access.js, decisões em
 // pipeline/perm.js): negócios visíveis, pipelines, mover, proposta, conversa, campos e compartilhamento.
-import { h, replaceChildren, toast } from '../ui.js';
+import { h, icon, replaceChildren, toast } from '../ui.js';
+import { isMobile } from '../mobile.js';
 import { renderBoard, clearDrag, autoScroll } from './pipeline/board.js';
 import { renderPanel, renderPanelEmpty } from './pipeline/panel.js';
 import { openNewDeal } from './pipeline/new-deal.js';
@@ -21,6 +22,7 @@ const view = {
   selectedByPipeline: {}, // pipelineId -> dealId (a seleção volta ao trocar de aba)
   sending: new Set(), // dealIds com envio de proposta em andamento
   pendingFocus: null, // chave data-focus a devolver ao foco quando o elemento estiver utilizável de novo
+  mStage: null, // celular: etapa mostrada (o quadro vira uma lista por etapa)
 };
 let liveRender = null; // render da instância montada (o envio simulado pode terminar depois de sair)
 
@@ -30,6 +32,7 @@ export default {
     view.pipelineId = null;
     view.selectedByPipeline = {};
     view.pendingFocus = null;
+    view.mStage = null;
 
     // Negócios antigos/importados podem vir sem lista de itens.
     store.state.deals.forEach((d) => {
@@ -57,14 +60,19 @@ export default {
     const board = h('div', { class: 'pipeline-board', id: 'pipeline-board', role: 'tabpanel', 'aria-label': 'Quadro do pipeline', onscroll: () => closeMoveMenu({ restoreFocus: false }), ondragover: (e) => autoScroll(e, board) });
     const panel = h('aside', { class: 'pipeline-panel', 'aria-label': 'Proposta do negócio selecionado' });
 
-    el.append(
-      h(
-        'div',
-        { class: 'pipeline' },
+    // Celular: em vez do quadro Kanban (colunas lado a lado), abas por etapa + lista vertical dos negócios da etapa;
+    // tocar num negócio abre a proposta em tela cheia. Mover de etapa continua pelo menu "Mover para…" do cartão.
+    const stagebar = h('div', { class: 'pipeline-stagebar', role: 'tablist', 'aria-label': 'Etapas' });
+    const mback = h('button', { class: 'pipeline-mback', type: 'button', onclick: () => setMView('board') }, icon('M15 5l-7 7 7 7', 22), h('span', null, 'Negócios'));
+    const pipelineEl = h('div', { class: 'pipeline', 'data-mview': 'board' });
+    const setMView = (v) => (pipelineEl.dataset.mview = v);
+
+    pipelineEl.append(
         h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), pills, h('div', { class: 'pipeline-header__new' }, newBtn, newHint)),
-        h('div', { class: 'pipeline-body' }, board, panel)
-      )
+        stagebar,
+        h('div', { class: 'pipeline-body' }, mback, board, panel)
     );
+    el.append(pipelineEl);
 
     // ---- leitura do estado (sempre sobre o que o motor deixa o usuário ver) ----
     /** Pipeline selecionado: sempre um dos visíveis (o lembrado, senão o da equipe do usuário, senão o primeiro). */
@@ -89,6 +97,32 @@ export default {
       if (first) view.selectedByPipeline[pipeline.id] = first.id;
       else delete view.selectedByPipeline[pipeline.id];
       return first;
+    }
+
+    /** Abas de etapa do celular (com a contagem de negócios de cada uma). */
+    function drawStagebar(pipeline, deals) {
+      const stages = pipeline?.stages || [];
+      if (!stages.some((st) => st.id === view.mStage)) view.mStage = (stages.find((st) => A.dealsInStage(st.id, deals).length) || stages[0])?.id ?? null;
+      replaceChildren(
+        stagebar,
+        ...stages.map((st) =>
+          h(
+            'button',
+            {
+              class: 'stage-chip' + (st.id === view.mStage ? ' is-active' : ''),
+              type: 'button',
+              role: 'tab',
+              'aria-selected': String(st.id === view.mStage),
+              onclick: () => {
+                view.mStage = st.id;
+                render();
+              },
+            },
+            st.name,
+            h('span', { class: 'stage-chip__n' }, A.dealsInStage(st.id, deals).length)
+          )
+        )
+      );
     }
 
     // ---- render ----
@@ -146,6 +180,7 @@ export default {
         );
         renderPanelEmpty(panel, 'Sem acesso a negócios.');
       } else {
+        drawStagebar(pipeline, deals);
         renderBoard(board, {
           pipeline,
           deals,
@@ -153,12 +188,14 @@ export default {
           levels,
           onSelect: (id) => {
             view.selectedByPipeline[pipeline.id] = id;
+            if (isMobile()) setMView('deal'); // celular: abre a proposta do negócio em tela cheia
             render();
           },
           onMove: (id, stageId) => requestMove(id, stageId),
           onOpenMenu: openMenu,
         });
 
+        board.querySelectorAll('.pipeline-col').forEach((col) => col.classList.toggle('is-mshow', col.dataset.stageId === view.mStage));
         renderPanel(panel, {
           deal,
           sending: !!deal && view.sending.has(deal.id),

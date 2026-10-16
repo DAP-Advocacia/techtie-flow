@@ -79,8 +79,7 @@ export default {
     const form = h(
       'form',
       { class: 'login-form auth-form', novalidate: true, 'aria-labelledby': 'login-title' },
-      h('h2', { class: 'login-form__title', id: 'login-title' }, 'Entrar'),
-      h('p', { class: 'login-form__sub' }, 'Acesse sua conta para continuar.'),
+      h('h2', { class: 'auth-sr', id: 'login-title' }, 'Entrar'),
       alertBox,
       h('div', { class: 'field' }, h('label', { for: 'login-email' }, 'E-mail'), emailInput, emailErr),
       h('div', { class: 'field' }, h('label', { for: 'login-pass' }, 'Senha'), h('div', { class: 'login-pass' }, passInput, eyeBtn), passErr),
@@ -118,7 +117,7 @@ export default {
           try {
             await live.login(emailInput.value.trim(), passInput.value);
             await live.hydrate();
-            navigate('inbox');
+            navigate('home');
           } catch (err) {
             setBusy(false);
             alertBox.querySelector('span').textContent = err.message;
@@ -146,34 +145,29 @@ export default {
           if (user) s.currentUserId = user.id;
           s.session.loggedIn = true;
         });
-        navigate('inbox');
+        navigate('home');
       }, FAKE_LATENCY_MS);
     });
 
+    // Composição sóbria (prancha da marca): logo, nome espaçado, um fio dourado e o formulário. Sem texto de venda.
     el.append(
       h(
         'div',
         { class: 'login' },
         h('div', { class: 'login__top' }, themeToggle()),
         h(
-          'section',
-          { class: 'login-hero', 'aria-label': 'Apresentação' },
-          h('span', { class: 'login-hero__wm', 'aria-hidden': 'true' }, techtieMark(420)),
+          'main',
+          { class: 'login-stage' },
           h(
-            'div',
-            { class: 'login-hero__brand' },
-            techtieMark(76),
-            h('div', { class: 'login-hero__wordmark' }, 'TECHTIE'),
-            h('div', { class: 'login-hero__flow' }, 'FLOW'),
-            h('div', { class: 'login-hero__tag' }, 'TECHNOLOGY DRIVES BUSINESS')
+            'header',
+            { class: 'login-brand' },
+            techtieMark(88),
+            h('div', { class: 'login-brand__name' }, 'TECHTIE'),
+            h('div', { class: 'login-brand__tag' }, 'TECHNOLOGY DRIVES BUSINESS')
           ),
-          h('div', { class: 'login-hero__rule', 'aria-hidden': 'true' }),
-          h('div', { class: 'login-hero__eyebrow' }, 'CRM + CONTACT CENTER'),
-          h('h1', { class: 'login-hero__title' }, h('span', { class: 'login-hero__strong' }, 'Atenda, venda e automatize'), h('span', { class: 'login-hero__light' }, 'tudo no mesmo lugar.')),
-          h('p', { class: 'login-hero__lead' }, 'WhatsApp, funil de vendas, agente de IA e BI em uma plataforma só — sem depender de outro CRM.'),
-          h('ul', { class: 'login-hero__keys', 'aria-label': 'Pilares' }, ['Automatize', 'Conecte', 'Escale', 'Fature'].map((k) => h('li', null, k)))
-        ),
-        h('section', { class: 'login-panel' }, h('div', { class: 'login-panel__inner' }, form))
+          h('div', { class: 'login-rule', 'aria-hidden': 'true' }),
+          form
+        )
       )
     );
 

@@ -534,7 +534,7 @@ export default {
             s.tenant.onboarded = true;
             s.session.loggedIn = true;
           });
-          navigate('inbox');
+          navigate('home');
         }, FINISH_LATENCY_MS);
       }
 
