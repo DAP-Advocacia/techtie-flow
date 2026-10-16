@@ -15,6 +15,9 @@ import { applySavedAccent } from './screens/settings/accent.js';
 import { canAccess, visible } from './access.js';
 import * as live from './live.js';
 import { MARK_SRC } from './screens/auth/logo.js';
+import * as pwa from './pwa.js';
+
+pwa.register();
 
 // shell:false = tela cheia, sem sidebar (login/onboarding).
 // require = [entidade, ação] que o motor de permissões exige para abrir a rota
@@ -92,6 +95,7 @@ function renderSidebar(active) {
     admin.length ? h('div', { class: 'sidebar__group sidebar__group--spaced' }, 'ADMINISTRAÇÃO') : null,
     ...admin,
     h('div', { class: 'sidebar__spacer' }),
+    pwa.shouldOffer() ? h('button', { class: 'sidebar__btn sidebar__install', type: 'button', onclick: () => pwa.install() }, 'Instalar app no celular') : null,
     h('button', { class: 'sidebar__btn', type: 'button', onclick: () => store.setTheme(s.theme === 'dark' ? 'light' : 'dark') }, s.theme === 'dark' ? 'Modo claro' : 'Modo escuro'),
     live.enabled
       ? h('button', { class: 'sidebar__btn sidebar__btn--dashed', type: 'button', onclick: () => live.logout() }, 'Sair')
@@ -152,11 +156,28 @@ async function render() {
   let unsubSidebar = null;
 
   if (route.shell) {
-    const sidebarHost = h('div', { style: 'display:contents' });
+    const sidebarHost = h('div', { class: 'sidebar-host' });
     const draw = () => replaceChildren(sidebarHost, renderSidebar(route.id));
     draw();
-    unsubSidebar = store.subscribe(draw);
-    replaceChildren(root, h('div', { class: 'app' }, sidebarHost, h('main', { class: 'app__main' }, screenEl)));
+    const unsubStore = store.subscribe(draw);
+    const unsubPwa = pwa.onChange(draw);
+    unsubSidebar = () => (unsubStore(), unsubPwa());
+    // Celular: a barra lateral vira um menu que abre por cima (botão ☰); fechar ao escolher uma tela,
+    // tocar fora ou apertar Esc. Em tela larga estes dois elementos ficam escondidos (CSS).
+    const app = h('div', { class: 'app' });
+    const setNav = (open) => app.classList.toggle('is-nav-open', open);
+    const mobilebar = h(
+      'header',
+      { class: 'mobilebar' },
+      h('button', { class: 'mobilebar__btn', type: 'button', 'aria-label': 'Abrir menu', onclick: () => setNav(!app.classList.contains('is-nav-open')) }, icon('M4 6h16M4 12h16M4 18h16', 22)),
+      h('img', { class: 'mobilebar__logo', src: MARK_SRC.small, alt: '' }),
+      h('span', { class: 'mobilebar__title' }, route.label)
+    );
+    const backdrop = h('div', { class: 'nav-backdrop', onclick: () => setNav(false) });
+    sidebarHost.addEventListener('click', (e) => e.target.closest('.nav-item') && setNav(false));
+    app.addEventListener('keydown', (e) => e.key === 'Escape' && setNav(false));
+    app.append(mobilebar, backdrop, sidebarHost, h('main', { class: 'app__main' }, screenEl));
+    replaceChildren(root, app);
   } else {
     replaceChildren(root, h('div', { class: 'app' }, h('main', { class: 'app__main' }, screenEl)));
   }

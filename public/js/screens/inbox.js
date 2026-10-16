@@ -115,6 +115,7 @@ export default {
         toast(res.ok ? 'Conversa reaberta' : res.msg);
       },
       onUseReply: (text) => composer.fill(text),
+      onBack: () => setView('list'),
       onFollowUp(insightId) {
         const conv = currentConv();
         if (!conv) return;
@@ -125,7 +126,10 @@ export default {
 
     const list = createList({
       store,
-      onSelect: (id) => select(id, { focusComposer: true }),
+      onSelect: (id) => {
+        setView('thread'); // celular: abre a conversa (a lista some); em tela larga o atributo não muda nada
+        select(id, { focusComposer: !isMobile() }); // no celular não abre o teclado sozinho
+      },
       onTab(id) {
         tab = id;
         renderAll();
@@ -138,7 +142,10 @@ export default {
 
     const panel = createPanel({ store, navigate });
 
-    const root = h('div', { class: 'inbox' }, list.el, thread.el, panel.el);
+    // Celular: uma coluna por vez ('list' | 'thread'); o painel de detalhes fica só no desktop.
+    const isMobile = () => matchMedia('(max-width: 820px)').matches;
+    const root = h('div', { class: 'inbox', 'data-mview': 'list' }, list.el, thread.el, panel.el);
+    const setView = (v) => (root.dataset.mview = v);
     el.append(root);
 
     function simulateLead(convId) {

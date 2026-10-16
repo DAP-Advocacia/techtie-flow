@@ -2,7 +2,7 @@
 // Cabeçalho e mensagens só são redesenhados quando o que mostram muda (chave
 // JSON), então o menu aberto e o scroll sobrevivem a atualizações do store.
 // Botões de ação ficam DESABILITADOS (não somem) com o motivo do motor no title.
-import { h, avatar, fmtTime, replaceChildren } from '../../ui.js';
+import { h, avatar, fmtTime, icon, replaceChildren } from '../../ui.js';
 import { firstName, messagesOf } from './actions.js';
 import { HIDDEN, isHidden, maskedContact, staysVisibleInQueue, transferTargets } from './perm.js';
 
@@ -20,7 +20,7 @@ function dayLabel(ts, now = Date.now()) {
   return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export function createThread({ store, onTransfer, onResolve, onReopen, onUseReply, onFollowUp, footer }) {
+export function createThread({ store, onTransfer, onResolve, onReopen, onUseReply, onFollowUp, onBack, footer }) {
   let menuOpen = false;
   let headerKey = '';
   let msgsKey = '';
@@ -158,7 +158,12 @@ export function createThread({ store, onTransfer, onResolve, onReopen, onUseRepl
       : h('button', { class: 'btn btn--primary', type: 'button', onclick: onResolve, ...gated('Resolver', access.resolve) }, 'Resolver');
     replaceChildren(
       header,
-      h('div', { class: 'inbox-thread__id' }, avatar(name), h('div', { class: 'inbox-thread__who' }, h('span', { class: 'inbox-thread__name truncate' }, name), h('span', { class: 'inbox-thread__status truncate' }, status))),
+      h(
+        'div',
+        { class: 'inbox-thread__id' },
+        // só aparece no celular (CSS): volta da conversa para a lista
+        onBack ? h('button', { class: 'inbox-back', type: 'button', 'aria-label': 'Voltar para as conversas', onclick: onBack }, icon('M15 5l-7 7 7 7', 22)) : null,
+        avatar(name), h('div', { class: 'inbox-thread__who' }, h('span', { class: 'inbox-thread__name truncate' }, name), h('span', { class: 'inbox-thread__status truncate' }, status))),
       h(
         'div',
         { class: 'inbox-thread__actions' },
