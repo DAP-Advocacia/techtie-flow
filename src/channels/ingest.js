@@ -75,15 +75,21 @@ async function ingestMessage(deps, m) {
               last_message    = CASE WHEN last_message_at IS NULL OR last_message_at < $2 THEN $3 ELSE last_message END,
               unread_count    = unread_count + $4,
               -- mensagem NOVA do cliente reabre conversa resolvida (histórico antigo não)
-              status          = CASE WHEN status = 'resolved' AND $5 THEN (CASE WHEN assignee_id IS NULL THEN 'queue' ELSE 'open' END) ELSE status END
+              status          = CASE WHEN status = 'resolved' AND $5 THEN (CASE WHEN assignee_id IS NULL THEN 'queue' ELSE 'open' END) ELSE status END,
+              -- alguém respondeu pelo próprio celular: o Agente de IA para de responder esta conversa
+              ai_paused       = CASE WHEN $6 THEN true ELSE ai_paused END
         WHERE id = $1
         RETURNING id, instance_id, contact_id, assignee_id, team_id, status, phone, unread_count, last_message, last_message_at`,
-      [conv.id, when, preview, bumpsUnread ? 1 : 0, bumpsUnread]
+      [conv.id, when, preview, bumpsUnread ? 1 : 0, bumpsUnread, direction === 'out' && !m.isHistory]
     );
     return { conversation: updated.rows[0], message: { id: ins.rows[0].id, conversationId: conv.id, kind, direction, body, mediaUrl: msg.mediaUrl || null, at: when.getTime(), waId: msg.id || null } };
   });
 
-  if (out && !out.duplicate && !m.isHistory) deps.notify?.('message', { tenantId: m.tenantId, ...out });
+  if (out && !out.duplicate && !m.isHistory) {
+    deps.notify?.('message', { tenantId: m.tenantId, ...out });
+    // mensagem NOVA do cliente: o Agente de IA decide se responde (ver src/ai/runtime.js)
+    if (direction === 'in') deps.ai?.onInbound({ tenantId: m.tenantId, conversationId: out.conversation.id });
+  }
   return out;
 }
 

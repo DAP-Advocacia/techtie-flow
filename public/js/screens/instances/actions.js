@@ -4,6 +4,8 @@ import { store } from '../../store.js';
 import { generatePhone } from './channels.js';
 import { audit } from '../../access.js';
 import { check, checkCreateInstance } from '../_ops/perm.js';
+import { toast } from '../../ui.js';
+import * as live from '../../live.js';
 
 let seeded = false;
 
@@ -47,7 +49,7 @@ export const findInstance = (id) => store.state.instances.find((i) => i.id === i
  * `entity`/`action`: permissão exigida (padrão instance.update). `event`/`detail`: auditoria.
  * Devolve false (sem gravar, sem lançar) se o motor negar ou a instância não existir.
  */
-export function updateInstance(id, fn, { entity = 'instance', action = 'update', event, detail } = {}) {
+export function updateInstance(id, fn, { entity = 'instance', action = 'update', event, detail, sync } = {}) {
   if (!check(entity, action, entity === 'instance' ? findInstance(id) : undefined).ok) return false;
   let found = false;
   store.update((s) => {
@@ -58,6 +60,13 @@ export function updateInstance(id, fn, { entity = 'instance', action = 'update',
     }
   });
   if (found && event) audit(event, id, detail);
+  // Em operação, grava no servidor (renomear, ligar a IA…); se ele recusar, avisa e volta ao estado real.
+  if (found && sync && live.enabled) {
+    live.patchInstance(id, sync).catch((e) => {
+      toast(e.message || 'Não foi possível salvar a alteração.');
+      live.hydrate({ keepMessages: true }).catch(() => {});
+    });
+  }
   return found;
 }
 

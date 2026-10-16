@@ -27,7 +27,7 @@ export function openRename(inst, { returnFocus, onDone } = {}) {
       (i) => {
         i.name = name;
       },
-      { event: 'instance.update', detail: `Instância "${old}" renomeada para "${name}"` }
+      { event: 'instance.update', detail: `Instância "${old}" renomeada para "${name}"`, sync: { name } }
     );
     if (!done) return blocked(check('instance', 'update', inst)) || m.close();
     toast(`Instância renomeada para ${name}`);
@@ -51,7 +51,14 @@ export function openRename(inst, { returnFocus, onDone } = {}) {
 export function openAssign(inst, { returnFocus, onDone } = {}) {
   if (blocked(check('instance', 'update', inst))) return null;
   const m = openModal({ title: 'Vincular responsável', eyebrow: inst.name, size: 'sm', returnFocus });
-  const select = h('select', { class: 'select' }, ownerOptions(store.state, inst.ownerName).map((n) => h('option', { value: n, selected: n === inst.ownerName }, n)));
+  const select = live.enabled
+    ? h(
+        'select',
+        { class: 'select' },
+        h('option', { value: '', selected: !inst.ownerId }, 'Número da empresa (sem responsável)'),
+        ...store.state.users.filter((u) => !u.isBot && u.status === 'active').map((u) => h('option', { value: u.id, selected: u.id === inst.ownerId }, u.name))
+      )
+    : h('select', { class: 'select' }, ownerOptions(store.state, inst.ownerName).map((n) => h('option', { value: n, selected: n === inst.ownerName }, n)));
   replaceChildren(
     m.body,
     h(
@@ -59,9 +66,21 @@ export function openAssign(inst, { returnFocus, onDone } = {}) {
       {
         id: 'instances-assign-form',
         class: 'instances-form',
-        onsubmit: (e) => {
+        onsubmit: async (e) => {
           e.preventDefault();
           const owner = select.value;
+          if (live.enabled) {
+            // o servidor decide (só quem pode ter o número no resultado final) e devolve o nome do responsável
+            try {
+              const saved = await live.patchInstance(inst.id, { ownerId: owner || null });
+              toast(saved.ownerId ? `${inst.name} agora é de ${saved.ownerName}` : `${inst.name} agora é um número da empresa`);
+              m.close();
+              onDone?.();
+            } catch (err) {
+              toast(err.message || 'Não foi possível alterar o responsável.');
+            }
+            return;
+          }
           const done = updateInstance(
             inst.id,
             (i) => {
@@ -135,7 +154,7 @@ export function openManage(inst, { returnFocus, onRename, onAssign, onDisconnect
   const aiSwitch = toggle(
     !!inst.aiActive,
     (v) => {
-      const done = !blocked(check('ai_agent', 'update')) && updateInstance(inst.id, (i) => (i.aiActive = v), { entity: 'ai_agent', action: 'update', event: 'ai_agent.update', detail: `Agente de IA ${v ? 'ativado' : 'desativado'} na instância "${inst.name}"` });
+      const done = !blocked(check('ai_agent', 'update')) && updateInstance(inst.id, (i) => (i.aiActive = v), { entity: 'ai_agent', action: 'update', sync: { aiActive: v }, event: 'ai_agent.update', detail: `Agente de IA ${v ? 'ativado' : 'desativado'} na instância "${inst.name}"` });
       if (!done) aiSwitch.setAttribute('aria-checked', String(!!store.instance(inst.id)?.aiActive)); // desfaz a troca visual
     },
     `Agente de IA ativo em ${inst.name}`

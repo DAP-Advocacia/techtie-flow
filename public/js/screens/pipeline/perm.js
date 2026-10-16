@@ -166,6 +166,9 @@ export function createStageDecision(pipeline, stage, ownerId) {
 
 export const deleteDecision = (deal) => decide('deal', 'delete', deal);
 
+/** Pode editar título/valor do negócio? (botão "Editar" do painel) */
+export const canEditDeal = (deal) => decide('deal', 'update', deal).effect === 'allow';
+
 /** Quem pode compartilhar: `transfer` ou `update` do negócio. */
 export function shareDecision(deal) {
   const t = decide('deal', 'transfer', deal);

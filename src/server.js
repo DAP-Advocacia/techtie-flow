@@ -46,8 +46,12 @@ if (config.apiEnabled) {
   const { createHub } = require('./api/ws');
   const { createApp } = require('./api/app');
   hub = createHub({ pool, config });
-  if (config.whatsappEnabled) channel = require('./channels/baileys').createBaileysChannel({ pool, config, notify: hub.notify });
-  api = createApp({ pool, config, hub, channel });
+  // Agente de IA (OpenAI): a chave vem do ambiente do servidor; sem ela a IA fica desligada (o resto funciona igual)
+  const openai = require('./ai/openai').createOpenAI({ apiKey: config.openaiKey, model: config.openaiModel });
+  const ai = require('./ai/runtime').createAiRuntime({ pool, getChannel: () => channel, notify: hub.notify, openai, config });
+  if (config.whatsappEnabled) channel = require('./channels/baileys').createBaileysChannel({ pool, config, notify: hub.notify, ai });
+  api = createApp({ pool, config, hub, channel, openai });
+  console.log(`[techtie-flow] Agente de IA: ${openai.configured ? `OpenAI configurada (${openai.model})` : 'sem OPENAI_API_KEY (IA desligada)'}`);
 }
 
 const server = http.createServer(async (req, res) => {

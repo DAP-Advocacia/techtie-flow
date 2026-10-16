@@ -242,6 +242,58 @@ export const createDeal = (local, newContact) =>
     store.update((s) => replaceById(s.deals, local.id, r.deal));
   });
 
+// ---- negócios: proposta, compartilhar, excluir (o servidor é a fonte do valor: preço vem do catálogo) ----
+export const updateDeal = (dealId, body) => sync(() => request(`/api/deals/${dealId}`, { method: 'PATCH', body }).then((r) => store.update((s) => replaceById(s.deals, dealId, r.deal))));
+/** Grava os itens da proposta (só produto + quantidade; nome, preço e total o servidor calcula). */
+export const saveItems = (dealId, items) => updateDeal(dealId, { items: items.map((i) => ({ productId: i.productId, qty: i.qty })) });
+export const deleteDeal = (dealId) => sync(() => request(`/api/deals/${dealId}`, { method: 'DELETE' }));
+const setShared = (dealId, sharedWith) => store.update((s) => { const d = s.deals.find((x) => x.id === dealId); if (d) d.sharedWith = sharedWith; });
+export const shareDeal = (dealId, target) => sync(() => request(`/api/deals/${dealId}/shares`, { method: 'POST', body: target }).then((r) => setShared(dealId, r.sharedWith)));
+export const unshareDeal = (dealId, { type, id }) => sync(() => request(`/api/deals/${dealId}/shares/${type}/${id}`, { method: 'DELETE' }).then((r) => setShared(dealId, r.sharedWith)));
+/** Envia a proposta por WhatsApp (servidor monta o texto e posta na conversa do contato). Devolve { result, … } ou null. */
+export const sendProposal = (dealId) =>
+  sync(async () => {
+    const r = await request(`/api/deals/${dealId}/proposal/send`, { method: 'POST' });
+    store.update((s) => {
+      replaceById(s.deals, dealId, r.deal);
+      if (r.conversation) mergeConversation(s, r.conversation);
+      if (r.message && r.conversation) appendMessage(s, r.conversation.id, r.message);
+    });
+    return r;
+  });
+
+/** Números reais do Dashboard (calculados no banco, dentro do que o perfil pode ver). */
+export async function loadDashboard() {
+  const r = await request('/api/dashboard');
+  store.update((s) => {
+    s.dashboardApi = r.periods;
+    s.dashboard = { ...(s.dashboard || {}), periods: Object.fromEntries(Object.entries(r.periods).map(([k, p]) => [k, { label: p.label }])) };
+  });
+}
+
+// ---- Agente de IA (a chave da OpenAI fica só no servidor) ----
+export const saveAgent = ({ prompt, handoffRules }) => request('/api/ai-agent', { method: 'PUT', body: { prompt, handoffRules } });
+export const uploadAgentDoc = (name, base64) => request('/api/ai-agent/docs', { method: 'POST', body: { name, base64 } }).then((r) => r.doc);
+export const deleteAgentDoc = (id) => request(`/api/ai-agent/docs/${id}`, { method: 'DELETE' });
+/** Chat de teste: devolve { kind: 'ai' | 'handoff', text, source?, rule?, reason? } (OpenAI de verdade, sem enviar ao WhatsApp). */
+export const testAgent = (messages) => request('/api/ai-agent/test', { method: 'POST', body: { messages } });
+
+// ---- contatos (esperam o servidor: não há ID provisório) ----
+export const createContact = (body) =>
+  request('/api/contacts', { method: 'POST', body }).then((r) => {
+    store.update((s) => { if (!s.contacts.some((c) => c.id === r.contact.id)) s.contacts.push(r.contact); });
+    return r.contact;
+  });
+export const updateContact = (id, body) => request(`/api/contacts/${id}`, { method: 'PATCH', body }).then((r) => (store.update((s) => replaceById(s.contacts, id, r.contact)), r.contact));
+export const deleteContact = (id) => request(`/api/contacts/${id}`, { method: 'DELETE' }).then(() => store.update((s) => { s.contacts = s.contacts.filter((c) => c.id !== id); }));
+
+// ---- produtos (catálogo das propostas) ----
+export const createProduct = (body) => request('/api/products', { method: 'POST', body }).then((r) => (store.update((s) => { (s.products ||= []).push(r.product); }), r.product));
+export const archiveProduct = (id) => request(`/api/products/${id}`, { method: 'PATCH', body: { active: false } }).then(() => store.update((s) => { s.products = (s.products || []).filter((p) => p.id !== id); }));
+
+// ---- números: renomear, trocar responsável, ligar a IA ----
+export const patchInstance = (id, body) => request(`/api/instances/${id}`, { method: 'PATCH', body }).then((r) => (store.update((s) => upsertInstance(s, r.instance)), r.instance));
+
 export const invite = (form) => request('/api/users/invite', { method: 'POST', body: form }).then(async (r) => (await hydrate({ keepMessages: true }), r));
 export const setUserRoles = (userId, roleIds) => request(`/api/users/${userId}/roles`, { method: 'POST', body: { roleIds } }).then(() => hydrate({ keepMessages: true }));
 export const setUserTeams = (userId, teamIds) => request(`/api/users/${userId}/teams`, { method: 'POST', body: { teamIds } }).then(() => hydrate({ keepMessages: true }));

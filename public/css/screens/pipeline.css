@@ -259,6 +259,12 @@
   flex-direction: column;
   gap: 16px;
 }
+.pipeline-panel__titlerow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
 .pipeline-panel__title {
   font-weight: 600;
   font-size: 21px;
@@ -851,4 +857,22 @@
     border-radius: 18px 18px 0 0;
     padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
   }
+}
+
+/* cadastro rápido de produto dentro do diálogo da proposta */
+.pipeline-newprod {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-input);
+  padding: 10px 12px;
+}
+.pipeline-newprod > summary {
+  cursor: pointer;
+  color: var(--acc);
+  font-size: 13.5px;
+}
+.pipeline-newprod__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
 }

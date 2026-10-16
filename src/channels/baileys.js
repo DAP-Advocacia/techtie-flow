@@ -17,8 +17,8 @@ const sessionId = (i) => `${i.tenantId}_${i.id}`;
 // estados do gateway → estados do banco/tela
 const DB_STATUS = { queued: 'queued', connecting: 'connecting', online: 'connected', offline: 'disconnected' };
 
-function createBaileysChannel({ pool, config, notify }) {
-  const deps = { pool, notify };
+function createBaileysChannel({ pool, config, notify, ai }) {
+  const deps = { pool, notify, ai };
   const qrs = new Map(); // sessionId → último QR (data URL)
   const attached = new Set();
   const historyLane = new Map(); // sessionId → cadeia de promessas (histórico processado em série)

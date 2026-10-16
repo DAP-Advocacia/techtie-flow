@@ -12,6 +12,9 @@ export function applyBootstrap(s, d, { keepMessages = false } = {}) {
   s.pipelines = d.pipelines;
   s.contacts = d.contacts;
   s.deals = d.deals;
+  s.products = d.products || [];
+  // Agente de IA: configuração salva no servidor (o que é só da tela — instância escolhida, chat de teste — fica)
+  if (d.agent) s.agent = { ...(s.agent || {}), ...d.agent };
   s.conversations = d.conversations;
   s.instances = d.instances.map((i) => ({ ownerName: '', conversations: 0, messagesToday: 0, aiActive: false, ...i }));
   if (!keepMessages) {

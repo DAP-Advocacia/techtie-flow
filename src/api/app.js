@@ -28,9 +28,9 @@ const ms = (d) => (d ? new Date(d).getTime() : null);
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 // --------------------------------------------------------------------- mapeamentos DB → API
-const apiContact = (r) => ({ id: r.id, name: r.name, company: '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null });
-const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], lastMessage: '' });
-const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null, ownerId: r.owner_id || null, teamId: r.team_id || null, ownerName: r.owner_name || '' });
+const apiContact = (r) => ({ id: r.id, name: r.name, company: r.company || '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null });
+const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], proposalSentAt: ms(r.proposal_sent_at), lastMessage: '' });
+const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null, ownerId: r.owner_id || null, teamId: r.team_id || null, ownerName: r.owner_name || '', aiActive: !!r.ai_active });
 const apiMessage = (r) => ({
   id: r.id,
   type: r.kind === 'note' ? 'note' : r.kind === 'system' ? 'system' : r.direction === 'in' ? 'in' : 'out',
@@ -40,6 +40,7 @@ const apiMessage = (r) => ({
   mime: r.media_mime || null,
   at: ms(r.created_at),
   authorId: r.author_id || null,
+  byAi: !!r.by_ai,
   status: r.status,
 });
 // linhas no formato que o MOTOR espera (atributos do catálogo)
@@ -64,11 +65,11 @@ async function readJson(req, limit = 1_000_000) {
   }
 }
 
-function createApp({ pool, config, hub, channel }) {
+function createApp({ pool, config, hub, channel, openai }) {
   /** IP do cliente: com TRUST_PROXY, o primeiro de X-Forwarded-For; senão o do socket. */
   const ipOf = (req) => (config.trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
   const routes = [];
-  const route = (method, p, handler, { auth = true } = {}) => routes.push({ method, auth, handler, re: new RegExp('^' + p.replace(/:([a-zA-Z]+)/g, '(?<$1>[^/]+)') + '/?$') });
+  const route = (method, p, handler, { auth = true, limit } = {}) => routes.push({ method, auth, limit, handler, re: new RegExp('^' + p.replace(/:([a-zA-Z]+)/g, '(?<$1>[^/]+)') + '/?$') });
   // 10 tentativas por (IP + e-mail) e um teto bem mais alto por IP: um escritório inteiro atrás do
   // mesmo IP (NAT) não pode ficar bloqueado por causa de poucos erros de digitação.
   const loginLimiter = makeLimiter(10, 10 * 60 * 1000);
@@ -217,8 +218,13 @@ function createApp({ pool, config, hub, channel }) {
           : canAccess(access, 'deal', 'read') ? (await c.query('SELECT id, name FROM pipelines ORDER BY name')).rows : [];
         const stages = pipelines.length ? (await c.query('SELECT id, pipeline_id, name, kind FROM pipeline_stages WHERE pipeline_id = ANY($1::uuid[]) ORDER BY pipeline_id, position', [pipelines.map((p) => p.id)])).rows : [];
         const iw = listWhere(access, 'instance', 'read');
-        const instances = canAccess(access, 'instance', 'read') ? (await c.query(`SELECT t.id, t.name, t.channel, t.status, t.phone, t.attention_reason, t.owner_id, t.team_id, (SELECT u.name FROM users u WHERE u.id = t.owner_id) AS owner_name FROM instances t WHERE ${iw.sql} ORDER BY t.name`, iw.params)).rows : [];
+        const instances = canAccess(access, 'instance', 'read') ? (await c.query(`SELECT t.id, t.name, t.channel, t.status, t.phone, t.attention_reason, t.owner_id, t.team_id, t.ai_active, (SELECT u.name FROM users u WHERE u.id = t.owner_id) AS owner_name FROM instances t WHERE ${iw.sql} ORDER BY t.name`, iw.params)).rows : [];
         const teams = (await c.query('SELECT id, name, parent_id FROM teams ORDER BY name')).rows;
+
+        // com quem cada negócio visível está compartilhado (a tela mostra e edita)
+        const shareRows = deals.rows.length ? (await c.query("SELECT resource_id, subject_type AS type, subject_id AS id, level FROM resource_shares WHERE entity = 'deal' AND resource_id = ANY($1::uuid[])", [deals.rows.map((d) => d.id)])).rows : [];
+        const sharedOf = (dealId) => shareRows.filter((x) => x.resource_id === dealId).map(({ type, id, level }) => ({ type, id, level }));
+        const products = canAccess(access, 'product', 'read') ? (await c.query('SELECT id, name, unit, price FROM products WHERE active ORDER BY name')).rows : [];
 
         const dealByContact = new Map();
         for (const d of deals.rows) if (d.contact_id && !dealByContact.has(d.contact_id)) dealByContact.set(d.contact_id, d.id);
@@ -249,7 +255,9 @@ function createApp({ pool, config, hub, channel }) {
           pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, teamId: null, stages: stages.filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name, kind: s.kind, accent: s.kind === 'won' ? 'var(--green)' : s.kind === 'lost' ? 'var(--red)' : 'var(--acc)' })) })),
           // maskRow: campos que o perfil não pode ver (telefone, valor…) NEM saem do servidor
           contacts: [...contacts.rows, ...viaConversation].map((r) => apiContact(E.maskRow(access.ctx, 'contact', r))),
-          deals: deals.rows.map((r) => apiDeal(E.maskRow(access.ctx, 'deal', r))),
+          deals: deals.rows.map((r) => ({ ...apiDeal(E.maskRow(access.ctx, 'deal', r)), sharedWith: sharedOf(r.id) })),
+          agent: canAccess(access, 'ai_agent', 'read') ? await aiH.loadAgent(c) : undefined,
+          products: products.map((r) => ({ id: r.id, name: r.name, unit: r.unit, price: Number(r.price) })),
           conversations: convs.rows.map((r) => ({ ...toApiConversation(r), dealId: dealByContact.get(r.contact_id) || null })),
           // "qr"/"conectando"/"fila" só valem se a sessão existe de fato agora; se o servidor reiniciou ou a
           // sessão caiu, o que está gravado é passado: informa "desconectada" (e a tela oferece reconectar).
@@ -286,45 +294,9 @@ function createApp({ pool, config, hub, channel }) {
     const result = await tx(pool, access, async (c) => {
       const conv = await visibleConversation(c, access, id);
       must(access, 'conversation', kind === 'note' ? 'note' : 'send_message', convRow(conv));
-      let waId = null;
-      if (kind === 'text') {
-        const inst = (await c.query('SELECT id, name, channel, status FROM instances WHERE id = $1', [conv.instance_id])).rows[0];
-        if (!channel) throw new HttpError(503, 'Canal de WhatsApp indisponível.');
-        // O que está gravado pode estar velho (servidor reiniciado, sessão caída): vale a sessão VIVA.
-        if (!inst || inst.status !== 'connected' || (channel.has && !channel.has({ id: inst.id, tenantId: access.tenantId }))) {
-          throw new HttpError(409, 'O WhatsApp desta conversa está desconectado. Vá em Instâncias e reconecte o número.');
-        }
-        try {
-          const sent = await channel.sendText({ id: inst.id, tenantId: access.tenantId }, conv.phone, text);
-          waId = sent?.id || null;
-        } catch (e) {
-          throw new HttpError(e.status === 409 ? 409 : 502, e.status === 409 ? e.message : `Não foi possível enviar pelo WhatsApp agora (${String(e.message).slice(0, 120)}). Tente de novo.`);
-        }
-      }
-      const msg = (
-        await c.query(
-          `INSERT INTO messages (tenant_id, conversation_id, wa_message_id, direction, kind, body, author_id, status)
-           VALUES ($1, $2, $3, 'out', $4, $5, $6, 'sent') RETURNING *`,
-          [access.tenantId, id, waId, kind, text, access.userId]
-        )
-      ).rows[0];
-      // responder uma conversa da fila a atribui a quem respondeu (só se o motor permitir a transferência)
-      let assign = conv.assignee_id === null && kind === 'text' && access.E.decide(access.ctx, 'conversation', 'transfer', convRow(conv)).effect === 'allow';
-      const upd = (
-        await c.query(
-          `UPDATE conversations SET
-              last_message_at = CASE WHEN $2 THEN now() ELSE last_message_at END,
-              last_message    = CASE WHEN $2 THEN left($3, 300) ELSE last_message END,
-              assignee_id     = CASE WHEN $4 THEN $5::uuid ELSE assignee_id END,
-              team_id         = CASE WHEN $4 THEN $6::uuid ELSE team_id END,
-              status          = CASE WHEN $4 OR status = 'resolved' THEN 'open' ELSE status END
-            WHERE id = $1 RETURNING *`,
-          [id, kind === 'text', text, assign, access.userId, primaryTeam(access)]
-        )
-      ).rows[0];
-      return { message: apiMessage(msg), conversation: toApiConversation(upd) };
+      return postOut(c, access, conv, kind, text);
     });
-    hub?.emit(access.tenantId, { type: 'message', conversation: result.conversation, message: result.message }, { entity: 'conversation', row: { id, tenantId: access.tenantId, assigneeId: result.conversation.assigneeId, instanceId: result.conversation.instanceId, status: result.conversation.status } }).catch(() => {});
+    announce(access, result);
     return result;
   });
 
@@ -377,18 +349,73 @@ function createApp({ pool, config, hub, channel }) {
     return { conversation: conv };
   });
 
+
+  /** Avisa em tempo real (só quem pode ler a conversa) que há mensagem nova. */
+  const announce = (access, result) =>
+    hub
+      ?.emit(access.tenantId, { type: 'message', conversation: result.conversation, message: result.message }, { entity: 'conversation', row: { id: result.conversation.id, tenantId: access.tenantId, assigneeId: result.conversation.assigneeId, instanceId: result.conversation.instanceId, status: result.conversation.status } })
+      .catch(() => {});
+
+  /**
+   * Grava (e, se for texto, ENVIA pelo WhatsApp) uma mensagem de saída numa conversa já liberada pelo motor.
+   * Usada pela caixa de entrada e pelo envio de proposta. `id` da conversa vem de `conv.id`.
+   */
+  async function postOut(c, access, conv, kind, text) {
+    const id = conv.id;
+    let waId = null;
+    if (kind === 'text') {
+      const inst = (await c.query('SELECT id, name, channel, status FROM instances WHERE id = $1', [conv.instance_id])).rows[0];
+      if (!channel) throw new HttpError(503, 'Canal de WhatsApp indisponível.');
+      // O que está gravado pode estar velho (servidor reiniciado, sessão caída): vale a sessão VIVA.
+      if (!inst || inst.status !== 'connected' || (channel.has && !channel.has({ id: inst.id, tenantId: access.tenantId }))) {
+        throw new HttpError(409, 'O WhatsApp desta conversa está desconectado. Vá em Instâncias e reconecte o número.');
+      }
+      try {
+        const sent = await channel.sendText({ id: inst.id, tenantId: access.tenantId }, conv.phone, text);
+        waId = sent?.id || null;
+      } catch (e) {
+        throw new HttpError(e.status === 409 ? 409 : 502, e.status === 409 ? e.message : `Não foi possível enviar pelo WhatsApp agora (${String(e.message).slice(0, 120)}). Tente de novo.`);
+      }
+    }
+    const msg = (
+      await c.query(
+        `INSERT INTO messages (tenant_id, conversation_id, wa_message_id, direction, kind, body, author_id, status)
+         VALUES ($1, $2, $3, 'out', $4, $5, $6, 'sent') RETURNING *`,
+        [access.tenantId, id, waId, kind, text, access.userId]
+      )
+    ).rows[0];
+    // responder uma conversa da fila a atribui a quem respondeu (só se o motor permitir a transferência)
+    let assign = conv.assignee_id === null && kind === 'text' && access.E.decide(access.ctx, 'conversation', 'transfer', convRow(conv)).effect === 'allow';
+    const upd = (
+      await c.query(
+        `UPDATE conversations SET
+            last_message_at = CASE WHEN $2 THEN now() ELSE last_message_at END,
+            last_message    = CASE WHEN $2 THEN left($3, 300) ELSE last_message END,
+            assignee_id     = CASE WHEN $4 THEN $5::uuid ELSE assignee_id END,
+            team_id         = CASE WHEN $4 THEN $6::uuid ELSE team_id END,
+            status          = CASE WHEN $4 OR status = 'resolved' THEN 'open' ELSE status END,
+      -- um humano respondeu: o Agente de IA para de responder esta conversa
+      ai_paused       = CASE WHEN $2 THEN true ELSE ai_paused END
+          WHERE id = $1 RETURNING *`,
+        [id, kind === 'text', text, assign, access.userId, primaryTeam(access)]
+      )
+    ).rows[0];
+    return { message: apiMessage(msg), conversation: toApiConversation(upd) };
+  }
+
   // ===================================================================== CONTATOS E NEGÓCIOS
   route('POST', '/api/contacts', async ({ access, body }) => {
     const name = String(body.name || '').trim();
     const phone = String(body.phone || '').replace(/\D/g, '');
     const email = body.email ? String(body.email).trim().toLowerCase() : null;
+    const company = body.company ? String(body.company).trim().slice(0, 200) || null : null;
     if (!name || name.length > 200) throw bad('Informe o nome (até 200 caracteres).');
     if (phone && !/^[0-9]{8,15}$/.test(phone)) throw bad('Telefone inválido (8 a 15 dígitos).');
     if (email && !EMAIL.test(email)) throw bad('E-mail inválido.');
     const row = { id: crypto.randomUUID(), tenantId: access.tenantId, ownerId: access.userId, teamId: primaryTeam(access) };
     must(access, 'contact', 'create', row);
     try {
-      const r = await tx(pool, access, (c) => c.query('INSERT INTO contacts (id, tenant_id, owner_id, team_id, name, phone, email, source) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [row.id, row.tenantId, row.ownerId, row.teamId, name, phone || null, email, 'manual']));
+      const r = await tx(pool, access, (c) => c.query('INSERT INTO contacts (id, tenant_id, owner_id, team_id, name, phone, email, source, company) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *', [row.id, row.tenantId, row.ownerId, row.teamId, name, phone || null, email, 'manual', company]));
       return { contact: apiContact(r.rows[0]) };
     } catch (e) {
       if (e.code === '23505') throw new HttpError(409, 'Já existe um contato com este telefone.');
@@ -437,11 +464,31 @@ function createApp({ pool, config, hub, channel }) {
         patch.title = t;
         set('title', t);
       }
-      if (body.value !== undefined) {
+      if (body.value !== undefined && body.items === undefined) {
         const v = Number(body.value);
         if (!Number.isFinite(v) || v < 0 || v > 1e12) throw bad('Valor inválido.');
         patch.value = v;
         set('value', v);
+      }
+      if (body.items !== undefined) {
+        if (!Array.isArray(body.items) || body.items.length > 50) throw bad('Itens da proposta inválidos.');
+        const ids = body.items.map((i) => uuidOr400(i?.productId, 'Produto'));
+        const prods = ids.length ? (await c.query('SELECT id, name, unit, price FROM products WHERE id = ANY($1::uuid[]) AND active', [ids])).rows : [];
+        const items = body.items.map((i) => {
+          const pr = prods.find((x) => x.id === String(i.productId).toLowerCase());
+          if (!pr) throw bad('Produto inexistente ou arquivado.');
+          const qty = Math.floor(Number(i.qty));
+          if (!(qty >= 1 && qty <= 100000)) throw bad('Quantidade inválida.');
+          const unitPrice = Number(pr.price);
+          return { productId: pr.id, name: pr.name, qty, unitPrice, note: qty > 1 ? `${qty} × ${pr.unit}` : pr.unit, total: Math.round(qty * unitPrice * 100) / 100 };
+        });
+        patch.items = items;
+        set('items', JSON.stringify(items));
+        if (items.length) {
+          // o valor do negócio acompanha a proposta (sem itens, mantém o valor estimado)
+          patch.value = Math.round(items.reduce((n, i) => n + i.total, 0) * 100) / 100;
+          set('value', patch.value);
+        }
       }
       if (body.stageId !== undefined) {
         const to = uuidOr400(body.stageId, 'Etapa');
@@ -544,6 +591,11 @@ function createApp({ pool, config, hub, channel }) {
     if (channel) await channel.disconnect({ id, tenantId: access.tenantId }).catch(() => {});
     return { ok: true };
   });
+
+  require('./dashboard')({ pool, route, must, tx, listWhere, canAccess, ttlMs: config.dashboardCacheMs });
+  const aiH = { pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, openai };
+  require('./ai-routes')(aiH);
+  require('./routes-crm')({ pool, route, must, bad, forbidden, notFound, HttpError, uuidOr400, tx, listWhere, getAccess, audit, withShares, visibleDeal, convRow, dealRow, apiContact, apiDeal, apiInstance, postOut, announce, EMAIL });
 
   // ===================================================================== USUÁRIOS
   route('POST', '/api/users/invite', async ({ req, access, body }) => {
@@ -781,7 +833,7 @@ function createApp({ pool, config, hub, channel }) {
         access = await getAccess(pool, { userId: claims.sub, tenantId: claims.tid });
         if (!access || access.user.status !== 'active') throw new HttpError(401, 'Sessão inválida.');
       }
-      const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readJson(req);
+      const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readJson(req, r.limit);
       const out = await r.handler({ req, res, params, query: url.searchParams, body, access });
       if (out !== undefined) sendJson(res, 200, out);
     } catch (e) {

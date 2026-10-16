@@ -8,6 +8,7 @@ import { h, icon, replaceChildren, toggle, toast } from '../ui.js';
 import { store } from '../store.js';
 import { simulateReply } from './agent/reply.js';
 import { audit } from '../access.js';
+import * as api from '../live.js';
 import { check, blocked, createHints, banner } from './_ops/perm.js';
 
 const MAX_PROMPT = 2000;
@@ -83,6 +84,19 @@ export default {
     let confirmDocId = null;
     let confirmTimer = null;
 
+    // ---------------- sincronização com o servidor (modo operação) ----------------
+    // A tela grava local primeiro (resposta imediata); se o servidor recusar, avisa e volta ao estado real.
+    const syncFail = (e) => {
+      toast(e.message || 'Não foi possível salvar no servidor.');
+      api.hydrate({ keepMessages: true }).catch(() => {});
+    };
+    const syncInstanceAi = (instanceId, active) => {
+      if (api.enabled && instanceId) api.patchInstance(instanceId, { aiActive: !!active }).catch(syncFail);
+    };
+    const persistAgent = () => {
+      if (api.enabled) api.saveAgent({ prompt: A().prompt, handoffRules: A().handoffRules }).catch(syncFail);
+    };
+
     // ---------------- cabeçalho ----------------
     const statusEl = h('span', { class: 'agent-pill__status' });
     const warnEl = h('span', { class: 'agent-pill__warn' });
@@ -98,6 +112,7 @@ export default {
         if (inst) inst.aiActive = v;
       });
       audit('ai_agent.update', A().instanceId, v ? 'Agente de IA ativado' : 'Agente de IA desativado');
+      syncInstanceAi(A().instanceId, v);
       toast(v ? 'Agente ativado' : 'Agente desativado');
     }, 'Ativar agente de IA');
     const instanceSelect = h(
@@ -111,6 +126,7 @@ export default {
             return;
           }
           const was = isActive();
+          const prevId = A().instanceId;
           st.update((s) => {
             const prev = s.instances.find((i) => i.id === s.agent.instanceId);
             if (prev) prev.aiActive = false;
@@ -120,6 +136,8 @@ export default {
             if (next) next.aiActive = was;
           });
           audit('ai_agent.update', e.target.value, `Agente de IA vinculado à instância ${st.instance(e.target.value)?.name ?? e.target.value}`);
+          if (prevId && prevId !== e.target.value) syncInstanceAi(prevId, false);
+          syncInstanceAi(e.target.value, was);
         },
       },
       st.state.instances.map((i) => h('option', { value: i.id }, i.name))
@@ -142,7 +160,7 @@ export default {
       bannerEl.hidden = c.ok;
       statusEl.textContent = !inst ? '● Nenhuma instância conectada' : on ? `● Ativo na instância ${inst.name}` : '● Desativado';
       statusEl.classList.toggle('is-off', !on);
-      warnEl.textContent = on && inst && inst.status !== 'connected' ? 'Instância desconectada' : '';
+      warnEl.textContent = api.enabled && A().configured === false ? 'Sem chave da OpenAI no servidor: o agente não responde' : on && inst && inst.status !== 'connected' ? 'Instância desconectada' : '';
     }
 
     const header = h(
@@ -230,6 +248,7 @@ export default {
         s.agent.prompt = value;
       });
       audit('ai_agent.update', A().instanceId, 'Personalidade e regras do agente atualizadas');
+      persistAgent();
       textarea.value = value;
       promptDraft = null;
       syncPrompt();
@@ -278,6 +297,10 @@ export default {
           continue;
         }
         const id = `k_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+        if (api.enabled) {
+          uploadReal(f, id);
+          continue;
+        }
         // Nº de trechos simulado a partir do tamanho do arquivo.
         const chunks = Math.min(120, Math.max(4, Math.round(f.size / 1800)));
         st.update((s) => {
@@ -286,6 +309,38 @@ export default {
         audit('ai_agent.update', id, `Documento "${f.name}" enviado à base de conhecimento`);
         scheduleReady(id);
       }
+    }
+    /** Modo operação: envia o arquivo; o servidor extrai o texto e conta os trechos. */
+    function uploadReal(f, tempId) {
+      if (f.size > 6 * 1024 * 1024) {
+        toast(`"${f.name}" passa de 6 MB.`);
+        return;
+      }
+      st.update((s) => {
+        s.agent.knowledgeDocs.push({ id: tempId, name: f.name, chunks: null, status: 'processing' });
+      });
+      const reader = new FileReader();
+      reader.onerror = () => {
+        st.update((s) => (s.agent.knowledgeDocs = s.agent.knowledgeDocs.filter((x) => x.id !== tempId)));
+        toast(`Não consegui ler "${f.name}".`);
+      };
+      reader.onload = () => {
+        const base64 = String(reader.result).split(',')[1] || '';
+        api
+          .uploadAgentDoc(f.name, base64)
+          .then((doc) => {
+            st.update((s) => {
+              const d = s.agent.knowledgeDocs.find((x) => x.id === tempId);
+              if (d) Object.assign(d, { id: doc.id, status: 'ready', chunks: doc.chunks });
+            });
+            toast(`"${f.name}" entrou na base (${doc.chunks} ${doc.chunks === 1 ? 'trecho' : 'trechos'})`);
+          })
+          .catch((e) => {
+            st.update((s) => (s.agent.knowledgeDocs = s.agent.knowledgeDocs.filter((x) => x.id !== tempId)));
+            toast(e.message || `Não foi possível enviar "${f.name}".`);
+          });
+      };
+      reader.readAsDataURL(f);
     }
     function finishDoc(id) {
       st.update((s) => {
@@ -312,6 +367,7 @@ export default {
         s.agent.knowledgeDocs = s.agent.knowledgeDocs.filter((x) => x.id !== id);
       });
       if (d) audit('ai_agent.update', id, `Documento "${d.name}" removido da base de conhecimento`);
+      if (d && api.enabled && !String(id).startsWith('k_')) api.deleteAgentDoc(id).catch(syncFail);
       confirmDocId = null;
       renderKb();
       if (d) toast(`"${d.name}" removido da base`);
@@ -405,6 +461,7 @@ export default {
       }
       st.update((s) => s.agent.handoffRules.push(text));
       audit('ai_agent.update', A().instanceId, `Regra de transbordo adicionada: ${text}`);
+      persistAgent();
       ruleInput.value = '';
       renderRules();
       ruleInput.focus();
@@ -414,6 +471,7 @@ export default {
       const old = A().handoffRules[i];
       st.update((s) => s.agent.handoffRules.splice(i, 1));
       audit('ai_agent.update', A().instanceId, `Regra de transbordo removida: ${old}`);
+      persistAgent();
       renderRules();
     }
     // Enquanto true, o subscribe não redesenha as regras: o input editado já
@@ -446,6 +504,7 @@ export default {
       }
       input.value = text;
       audit('ai_agent.update', A().instanceId, `Regra de transbordo editada: ${text}`);
+      persistAgent();
       delBtn.setAttribute('aria-label', `Remover regra: ${text}`);
     }
     function renderRules() {
@@ -565,6 +624,26 @@ export default {
       st.update((s) => s.agent.testChat.push({ from: 'lead', text }));
       typing = true;
       renderChat();
+      if (api.enabled) {
+        // modo operação: OpenAI de verdade, com a configuração e a base já SALVAS (nada vai para o WhatsApp)
+        const history = A().testChat.filter((m) => m.from === 'lead' || m.from === 'ai').map((m) => ({ from: m.from, text: m.text }));
+        api
+          .testAgent(history)
+          .then((r) => {
+            typing = false;
+            st.update((s) => {
+              if (r.kind === 'handoff') s.agent.testChat.push({ from: 'handoff', text: r.text, rule: r.rule || r.reason || '' });
+              else s.agent.testChat.push({ from: 'ai', text: r.text, source: r.source || undefined });
+            });
+          })
+          .catch((e) => {
+            typing = false;
+            toast(e.message || 'Não foi possível testar o agente agora.');
+            renderChat();
+          })
+          .finally(() => chatInput.focus());
+        return;
+      }
       pendingText = text;
       later(() => {
         finishReply();

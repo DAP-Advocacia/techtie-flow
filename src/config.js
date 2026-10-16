@@ -26,6 +26,10 @@ const config = {
   // Atrás de proxy reverso (EasyPanel, Nginx, Cloudflare) o IP real vem em X-Forwarded-For.
   // Só ligue se HÁ proxy: sem ele, qualquer cliente forjaria o cabeçalho e burlaria os limites.
   trustProxy: env.TRUST_PROXY === 'true',
+  // Agente de IA (OpenAI). A chave fica só aqui, no servidor; sem ela a IA simplesmente não responde.
+  openaiKey: env.OPENAI_API_KEY || '',
+  openaiModel: env.OPENAI_MODEL || 'gpt-4o-mini',
+  aiDailyTokenCap: Number(env.AI_DAILY_TOKEN_CAP || 300000),
 };
 
 /** Falha cedo, com mensagem clara, se o ambiente do modo API estiver incompleto/inseguro. */

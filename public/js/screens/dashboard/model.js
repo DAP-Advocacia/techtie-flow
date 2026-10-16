@@ -175,8 +175,30 @@ export function describeDelta(value, unit, compare) {
   return { sign, text, aria };
 }
 
+/** Visão a partir dos números REAIS do servidor (modo operação): só formata, não inventa nada. */
+export function viewFromApi(a) {
+  const k = a.kpis;
+  const d = a.deltas || {};
+  const mk = (id, label, value, title, delta, unit) => ({ id, label, value, title, delta, unit });
+  return {
+    key: a.key,
+    label: a.label,
+    compare: COMPARE[a.key] || 'vs. período anterior',
+    kpis: [
+      mk('leads', 'NOVOS LEADS', fmtInt(k.leads), null, d.leads, '%'),
+      mk('active', 'CONVERSAS ATIVAS', fmtInt(k.active), null, d.active, '%'),
+      mk('conversion', 'TAXA DE CONVERSÃO', `${k.conversion.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`, null, d.conversion, ' p.p.'),
+      mk('revenue', 'RECEITA GANHA', fmtMoneyShort(k.revenue), fmtBRL(k.revenue), d.revenue, '%'),
+    ],
+    bars: a.bars,
+    funnel: a.funnel,
+    team: a.team,
+  };
+}
+
 /** Visão completa de um período, ou null se o período não existir. */
 export function buildView(state, key) {
+  if (state.dashboardApi) return state.dashboardApi[key] ? viewFromApi(state.dashboardApi[key]) : null; // operação: dado real
   const periods = state.dashboard?.periods || {};
   const p = periods[key];
   if (!p) return null;

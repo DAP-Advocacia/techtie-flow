@@ -100,6 +100,7 @@ export function addItem(dealId, product, qty) {
     }
     d.value = sumItems(d);
   });
+  if (live.enabled) live.saveItems(dealId, itemsOf(store.deal(dealId)));
   return allowed(decision);
 }
 
@@ -114,6 +115,7 @@ export function removeItem(dealId, index) {
     d.items.splice(index, 1);
     if (d.items.length) d.value = sumItems(d);
   });
+  if (live.enabled) live.saveItems(dealId, itemsOf(store.deal(dealId)));
   return allowed(decision);
 }
 
@@ -146,6 +148,52 @@ export function createDeal({ title, contactId, newContact, value, ownerId, pipel
   return { ok: true, decision, deal };
 }
 
+/** Edita título e/ou valor do negócio. Título exige `deal.update`; valor também exige o campo `value` editável. */
+export function editDeal(dealId, { title, value }) {
+  const deal = store.deal(dealId);
+  const decision = deal ? decide('deal', 'update', deal) : { effect: 'deny', reason: 'no_grant', matched: [] };
+  if (decision.effect !== 'allow') return denied(decision);
+  const next = String(title ?? deal.title).trim();
+  if (!next || next.length > 200) return { ok: false, error: 'Informe o título (até 200 caracteres).' };
+  const changes = {};
+  if (next !== deal.title) changes.title = next;
+  if (value !== undefined && Number(value) !== Number(deal.value)) {
+    if (P.fieldLevels().value !== 'write') return denied({ effect: 'deny', reason: 'field_readonly', matched: [] });
+    if (!(Number(value) >= 0 && Number(value) <= MAX_DEAL_VALUE)) return { ok: false, error: 'Informe um valor válido.' };
+    changes.value = Number(value);
+  }
+  if (!Object.keys(changes).length) return allowed(decision);
+  store.update((s) => Object.assign(s.deals.find((x) => x.id === dealId) || {}, changes));
+  audit('deal.update', dealId, `Negócio "${deal.title}" alterado`);
+  if (live.enabled) live.updateDeal(dealId, changes);
+  return allowed(decision);
+}
+
+/** Cadastra um produto no catálogo das propostas. Em operação espera o servidor (o ID é dele). */
+export async function createProduct({ name, unit, price }) {
+  const decision = decide('product', 'create');
+  if (decision.effect !== 'allow') return denied(decision);
+  const n = String(name || '').trim();
+  const u = String(unit || 'un').trim();
+  const p = parseMoney(price);
+  if (!n || n.length > 200) return { ok: false, error: 'Informe o nome do produto (até 200 caracteres).' };
+  if (!u || u.length > 40) return { ok: false, error: 'Unidade inválida (até 40 caracteres).' };
+  if (Number.isNaN(p) || p > MAX_DEAL_VALUE) return { ok: false, error: 'Informe um preço válido, como 1.500,00.' };
+  if (live.enabled) {
+    try {
+      return { ok: true, decision, product: await live.createProduct({ name: n, unit: u, price: p }) };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  }
+  const product = { id: uid('p'), name: n, unit: u, price: p };
+  store.update((s) => {
+    (s.products ||= []).push(product);
+  });
+  audit('product.create', product.id, `Produto "${n}" cadastrado`);
+  return { ok: true, decision, product };
+}
+
 export function deleteDeal(dealId) {
   const deal = store.deal(dealId);
   const decision = deal ? P.deleteDecision(deal) : { effect: 'deny', reason: 'no_grant', matched: [] };
@@ -156,6 +204,7 @@ export function deleteDeal(dealId) {
     if (i !== -1) s.deals.splice(i, 1);
   });
   audit('deal.delete', dealId, `Negócio "${title}" excluído`);
+  if (live.enabled) live.deleteDeal(dealId);
   return allowed(decision);
 }
 
@@ -174,6 +223,7 @@ export function shareDeal(dealId, { type, id, level }) {
     d.sharedWith = list;
   });
   audit('deal.share', dealId, `Negócio "${deal.title}" compartilhado com ${type === 'user' ? '' : 'a equipe '}${target.name} (${level === 'edit' ? 'edição' : 'leitura'})`);
+  if (live.enabled) live.shareDeal(dealId, { type, id, level });
   return allowed(decision);
 }
 
@@ -187,6 +237,7 @@ export function unshareDeal(dealId, { type, id }) {
     d.sharedWith = (Array.isArray(d.sharedWith) ? d.sharedWith : []).filter((g) => !(g.type === type && g.id === id));
   });
   audit('deal.unshare', dealId, `Compartilhamento do negócio "${deal.title}" removido de ${type === 'user' ? '' : 'a equipe '}${target?.name || id}`);
+  if (live.enabled) live.unshareDeal(dealId, { type, id });
   return allowed(decision);
 }
 

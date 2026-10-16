@@ -18,10 +18,21 @@ const { WebSocket } = require('ws');
 
 const env = await detectEnv();
 const skip = env.skip || false;
-const config = { authSecret: 'segredo-de-teste-'.repeat(4), tokenTtlSeconds: 3600, corsOrigins: [], appUrl: 'http://app.test' };
+const config = { authSecret: 'segredo-de-teste-'.repeat(4), tokenTtlSeconds: 3600, corsOrigins: [], appUrl: 'http://app.test', dashboardCacheMs: 0 };
 const PASSWORD = 'senha-de-teste-bem-longa';
 let h, server, base, hub, tenantA, tenantB, instanceId;
 const sent = [];
+// OpenAI SIMULADA: registra as chamadas e devolve o que o teste mandar (`next`). Nenhum teste chama a internet.
+const fakeAi = {
+  configured: true,
+  model: 'fake-model',
+  calls: [],
+  next: null,
+  async chat(req) {
+    this.calls.push(req);
+    return this.next ? this.next(req) : { text: JSON.stringify({ reply: 'Resposta de teste', handoff: false, reason: '' }), usage: { prompt: 100, completion: 20 }, model: 'fake-model' };
+  },
+};
 const channel = { async sendText(inst, phone, text) { sent.push({ inst, phone, text }); return { id: `WA-${sent.length}` }; }, async connect() {}, async disconnect() {}, state: () => ({ status: 'connected', qr: null }) };
 
 async function call(pathname, { method = 'GET', token, body } = {}) {
@@ -48,13 +59,13 @@ before(async () => {
   if (skip) return;
   h = await startPostgres(env.pg, 'api');
   const c = await h.admin.connect();
-  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); } finally { c.release(); }
+  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); } finally { c.release(); }
   seed('empresa-a', 'admin@a.com.br');
   seed('empresa-b', 'admin@b.com.br');
   tenantA = (await h.admin.query("SELECT id FROM tenants WHERE slug='empresa-a'")).rows[0].id;
   tenantB = (await h.admin.query("SELECT id FROM tenants WHERE slug='empresa-b'")).rows[0].id;
   hub = createHub({ pool: h.app, config });
-  const app = createApp({ pool: h.app, config, hub, channel });
+  const app = createApp({ pool: h.app, config, hub, channel, openai: fakeAi });
   server = http.createServer(async (req, res) => { if (!(await app.handle(req, res))) { res.writeHead(404); res.end(); } });
   hub.attach(server);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -359,4 +370,251 @@ test('remover número: o dono remove o dele; conversas só com confirmação; ni
   assert.equal(await exists(anaInst), false);
   assert.equal((await h.admin.query('SELECT count(*)::int n FROM conversations WHERE instance_id = $1', [anaInst])).rows[0].n, 0, 'conversas saíram junto');
   assert.ok((await h.admin.query("SELECT 1 FROM audit_log WHERE action = 'instance.delete'")).rowCount >= 2, 'auditado');
+});
+
+test('CRM de verdade: contatos, produtos, proposta, compartilhar, excluir negócio e ajustes de número', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const bia = await login('bia@a.com.br');
+  const boot = await call('/api/bootstrap', { token: admin });
+  const pipe = boot.pipelines[0];
+  const stage = pipe.stages[0].id;
+  const anaId = (await call('/api/bootstrap', { token: ana })).users.find((u) => u.email === 'ana@a.com.br').id;
+  const biaId = (await call('/api/bootstrap', { token: bia })).users.find((u) => u.email === 'bia@a.com.br').id;
+
+  // ---- produtos: Admin cria; Atendente só lê
+  assert.equal((await call('/api/products', { method: 'POST', token: ana, body: { name: 'Plano X', unit: 'mês', price: 100 } })).status, 403);
+  const p1 = (await call('/api/products', { method: 'POST', token: admin, body: { name: 'Plano Pro', unit: 'mês', price: 250.5 } })).product;
+  const p2 = (await call('/api/products', { method: 'POST', token: admin, body: { name: 'Setup', unit: 'un', price: 1000 } })).product;
+  assert.equal((await call('/api/products', { method: 'POST', token: admin, body: { name: '', price: 1 } })).status, 400);
+  assert.equal((await call('/api/products', { method: 'POST', token: admin, body: { name: 'Neg', price: -1 } })).status, 400);
+  assert.ok((await call('/api/bootstrap', { token: ana })).products.some((p) => p.id === p1.id), 'o Atendente vê o catálogo');
+
+  // ---- contato: criar com empresa, editar, telefone duplicado
+  const ct = (await call('/api/contacts', { method: 'POST', token: ana, body: { name: 'Carla Souza', phone: '+55 11 95555-0001', company: 'Souza Ltda' } })).contact;
+  assert.equal(ct.company, 'Souza Ltda');
+  const ct2 = (await call('/api/contacts', { method: 'POST', token: ana, body: { name: 'Outro', phone: '5511955550002' } })).contact;
+  const upd = await call(`/api/contacts/${ct.id}`, { method: 'PATCH', token: ana, body: { name: 'Carla S. Souza', email: 'CARLA@souza.com.br', company: 'Souza & Cia' } });
+  assert.equal(upd.contact.name, 'Carla S. Souza');
+  assert.equal(upd.contact.email, 'carla@souza.com.br');
+  assert.equal(upd.contact.company, 'Souza & Cia');
+  assert.equal((await call(`/api/contacts/${ct.id}`, { method: 'PATCH', token: ana, body: { phone: '5511955550002' } })).status, 409, 'telefone já existe');
+  assert.equal((await call(`/api/contacts/${ct.id}`, { method: 'PATCH', token: ana, body: { email: 'inválido' } })).status, 400);
+  assert.equal((await call(`/api/contacts/${ct.id}`, { method: 'PATCH', token: bia, body: { name: 'Invasor' } })).status, 404, 'contato de outra pessoa nem aparece');
+
+  // ---- negócio: criar, proposta com itens (preço vem do CATÁLOGO), valor acompanha
+  const deal = (await call('/api/deals', { method: 'POST', token: ana, body: { title: 'Proposta Carla', contactId: ct.id, pipelineId: pipe.id, stageId: stage, value: 10 } })).deal;
+  const withItems = await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { items: [{ productId: p1.id, qty: 2 }, { productId: p2.id, qty: 1 }] } });
+  assert.equal(withItems.deal.value, 1501, '2 × 250,50 + 1.000 = 1.501 (calculado no servidor)');
+  assert.equal(withItems.deal.items.length, 2);
+  assert.equal(withItems.deal.items[0].unitPrice, 250.5);
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { items: [{ productId: p1.id, qty: 0 }] } })).status, 400, 'quantidade inválida');
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { items: [{ productId: '00000000-0000-4000-8000-000000000000', qty: 1 }] } })).status, 400, 'produto inexistente');
+  const retitled = await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { title: 'Proposta Carla v2', value: 2000 } });
+  assert.equal(retitled.deal.title, 'Proposta Carla v2');
+  assert.equal(retitled.deal.value, 2000);
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: bia, body: { title: 'x' } })).status, 404, 'negócio de outra pessoa não aparece');
+
+  // ---- enviar proposta: sem conversa registra e avisa; sem itens é recusado
+  const sent = await call(`/api/deals/${deal.id}/proposal/send`, { method: 'POST', token: ana });
+  assert.equal(sent.result, 'no-chat');
+  assert.ok(sent.deal.proposalSentAt, 'envio registrado');
+  const empty = (await call('/api/deals', { method: 'POST', token: ana, body: { title: 'Sem itens', contactId: ct2.id, pipelineId: pipe.id, stageId: stage } })).deal;
+  assert.equal((await call(`/api/deals/${empty.id}/proposal/send`, { method: 'POST', token: ana })).status, 400);
+
+  // ---- compartilhar: dono compartilha com a Bia; ela passa a ver; remover tira
+  assert.equal((await call(`/api/deals/${deal.id}/shares`, { method: 'POST', token: bia, body: { type: 'user', id: anaId, level: 'read' } })).status, 404);
+  const shared = await call(`/api/deals/${deal.id}/shares`, { method: 'POST', token: ana, body: { type: 'user', id: biaId, level: 'read' } });
+  assert.deepEqual(shared.sharedWith, [{ type: 'user', id: biaId, level: 'read' }]);
+  assert.ok((await call('/api/bootstrap', { token: bia })).deals.some((d) => d.id === deal.id), 'a Bia vê o negócio compartilhado');
+  assert.deepEqual((await call('/api/bootstrap', { token: ana })).deals.find((d) => d.id === deal.id).sharedWith, [{ type: 'user', id: biaId, level: 'read' }]);
+  assert.equal((await call(`/api/deals/${deal.id}/shares/user/${biaId}`, { method: 'DELETE', token: ana })).sharedWith.length, 0);
+  assert.ok(!(await call('/api/bootstrap', { token: bia })).deals.some((d) => d.id === deal.id), 'descompartilhado: some');
+
+  // ---- excluir: Atendente não exclui negócio (nem contato); Admin exclui; contato com negócio não
+  assert.equal((await call(`/api/deals/${empty.id}`, { method: 'DELETE', token: ana })).status, 403);
+  assert.equal((await call(`/api/contacts/${ct2.id}`, { method: 'DELETE', token: ana })).status, 403);
+  assert.equal((await call(`/api/contacts/${ct2.id}`, { method: 'DELETE', token: admin })).status, 409, 'ainda tem negócio');
+  assert.equal((await call(`/api/deals/${empty.id}`, { method: 'DELETE', token: admin })).ok, true);
+  assert.equal((await call(`/api/contacts/${ct2.id}`, { method: 'DELETE', token: admin })).ok, true);
+
+  // ---- número: renomear, trocar responsável (só quem pode), ligar a IA
+  const mine = (await call('/api/instances', { method: 'POST', token: ana, body: { name: 'Ana · vendas' } })).instance;
+  const ren = await call(`/api/instances/${mine.id}`, { method: 'PATCH', token: ana, body: { name: 'Ana · renomeado' } });
+  assert.equal(ren.instance.name, 'Ana · renomeado');
+  assert.equal((await call(`/api/instances/${mine.id}`, { method: 'PATCH', token: bia, body: { name: 'sequestro' } })).status, 403, 'Bia não renomeia o número da Ana');
+  assert.equal((await call(`/api/instances/${mine.id}`, { method: 'PATCH', token: ana, body: { ownerId: biaId } })).status, 403, 'Atendente não passa o número para outra pessoa');
+  const given = await call(`/api/instances/${mine.id}`, { method: 'PATCH', token: admin, body: { ownerId: biaId } });
+  assert.equal(given.instance.ownerId, biaId);
+  assert.equal(given.instance.ownerName.length > 0, true);
+  assert.equal((await call(`/api/instances/${mine.id}`, { method: 'PATCH', token: ana, body: { aiActive: true } })).status, 403, 'ligar a IA exige permissão do Agente de IA');
+  assert.equal((await call(`/api/instances/${mine.id}`, { method: 'PATCH', token: admin, body: { aiActive: true } })).instance.aiActive, true);
+  assert.equal((await call(`/api/instances/${mine.id}`, { method: 'PATCH', token: admin, body: { ownerId: null } })).instance.ownerId, null, 'vira número da empresa');
+});
+
+test('dashboard real: números do banco por período, com as permissões de quem pede', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  assert.equal((await call('/api/dashboard', { token: ana })).status, 403, 'Atendente não tem report.read');
+  assert.equal((await call('/api/dashboard')).status, 401);
+
+  const d = await call('/api/dashboard', { token: admin });
+  assert.deepEqual(Object.keys(d.periods), ['today', 'week', 'month']);
+  for (const [key, p] of Object.entries(d.periods)) {
+    assert.equal(p.key, key);
+    for (const k of ['leads', 'active', 'conversion', 'revenue']) assert.equal(typeof p.kpis[k], 'number', `${key}.${k}`);
+    for (const k of ['leads', 'active', 'conversion', 'revenue']) assert.equal(typeof p.deltas[k], 'number', `delta ${key}.${k}`);
+    assert.ok(p.kpis.conversion >= 0 && p.kpis.conversion <= 100);
+    assert.ok(Array.isArray(p.funnel) && Array.isArray(p.team));
+    for (const b of p.bars.items) assert.ok(Number.isInteger(b.value) && b.value >= 0 && b.label && b.full);
+  }
+  assert.equal(d.periods.today.bars.items.length, 12);
+  assert.equal(d.periods.week.bars.items.length, 7);
+  assert.equal(d.periods.month.bars.items.length, 10);
+  assert.ok(d.periods.month.kpis.leads >= 1, 'os testes anteriores receberam mensagens de clientes (conversas novas)');
+  assert.ok(d.periods.month.kpis.active >= 1, 'há conversas não resolvidas');
+  assert.ok(d.periods.month.team.every((r) => r.name && typeof r.conversations === 'number' && typeof r.won === 'number'));
+  // o funil nunca cresce da esquerda para a direita
+  for (const p of Object.values(d.periods)) for (let i = 1; i < p.funnel.length; i++) assert.ok(p.funnel[i].n <= p.funnel[i - 1].n);
+  // receita ganha: um negócio ganho agora entra nos três períodos
+  const boot = await call('/api/bootstrap', { token: admin });
+  const pipe = boot.pipelines[0];
+  const won = pipe.stages.find((s) => s.kind === 'won');
+  if (won) {
+    const before = d.periods.today.kpis.revenue;
+    const deal = (await call('/api/deals', { method: 'POST', token: admin, body: { title: 'Ganho para o dashboard', pipelineId: pipe.id, stageId: pipe.stages[0].id, value: 777 } })).deal;
+    const mv = await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: admin, body: { stageId: won.id } });
+    assert.ok(mv.deal, JSON.stringify(mv));
+    const after = (await call('/api/dashboard', { token: admin })).periods;
+    assert.equal(after.today.kpis.revenue, before + 777);
+    assert.ok(after.week.kpis.revenue >= 777 && after.month.kpis.revenue >= 777);
+  }
+});
+
+test('Agente de IA: configuração, base de conhecimento, teste e resposta real (OpenAI simulada)', { skip }, async () => {
+  const { createAiRuntime } = require('../../src/ai/runtime.js');
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const reply = (o) => () => ({ text: JSON.stringify({ reply: 'Resposta de teste', handoff: false, reason: '', ...o }), usage: { prompt: 100, completion: 20 }, model: 'fake-model' });
+  fakeAi.next = reply();
+  fakeAi.calls.length = 0;
+
+  // ---- permissões e validação da configuração
+  assert.equal((await call('/api/ai-agent', { token: ana })).status, 403, 'Atendente não lê a configuração do agente');
+  assert.equal((await call('/api/ai-agent', { method: 'PUT', token: ana, body: { prompt: 'x' } })).status, 403);
+  assert.equal((await call('/api/ai-agent', { method: 'PUT', token: admin, body: { prompt: 'ok', handoffRules: ['x'.repeat(141)] } })).status, 400);
+  assert.equal((await call('/api/ai-agent', { method: 'PUT', token: admin, body: { prompt: 'x'.repeat(2001) } })).status, 400);
+  const saved = await call('/api/ai-agent', { method: 'PUT', token: admin, body: { prompt: 'Você é a Duda, atendente da Empresa A. Seja breve.', handoffRules: ['cliente pede para falar com uma pessoa', 'reclamação'], maxReplies: 5 } });
+  assert.equal(saved.agent.prompt.startsWith('Você é a Duda'), true);
+  assert.deepEqual(saved.agent.handoffRules, ['cliente pede para falar com uma pessoa', 'reclamação']);
+  assert.equal(saved.agent.maxReplies, 5);
+  assert.equal(saved.agent.configured, true);
+  assert.equal((await call('/api/bootstrap', { token: admin })).agent.prompt.startsWith('Você é a Duda'), true, 'o bootstrap traz a configuração salva');
+  assert.equal((await call('/api/bootstrap', { token: ana })).agent, undefined, 'quem não lê o agente não recebe a configuração');
+
+  // ---- base de conhecimento: texto, arquivo (base64), PDF, duplicado, inválidos
+  const doc = await call('/api/ai-agent/docs', { method: 'POST', token: admin, body: { name: 'precos.txt', text: 'O Plano Pro custa R$ 250,50 por mês e inclui suporte por WhatsApp e treinamento da equipe.' } });
+  assert.equal(doc.doc.name, 'precos.txt');
+  assert.equal((await call('/api/ai-agent/docs', { method: 'POST', token: admin, body: { name: 'PRECOS.txt', text: 'Texto longo o bastante para ser aceito pelo servidor.' } })).status, 409, 'nome repetido');
+  assert.equal((await call('/api/ai-agent/docs', { method: 'POST', token: admin, body: { name: 'curto.txt', text: 'oi' } })).status, 400);
+  assert.equal((await call('/api/ai-agent/docs', { method: 'POST', token: admin, body: { name: 'virus.exe', base64: Buffer.from('MZ....conteudo qualquer aqui').toString('base64') } })).status, 400);
+  assert.equal((await call('/api/ai-agent/docs', { method: 'POST', token: ana, body: { name: 'x.txt', text: 'Texto longo o bastante para ser aceito pelo servidor.' } })).status, 403);
+  const faq = await call('/api/ai-agent/docs', { method: 'POST', token: admin, body: { name: 'faq.md', base64: Buffer.from('# Entrega\n\nEntregamos em todo o Brasil em até 5 dias úteis.\n\n# Troca\n\nA troca pode ser feita em 7 dias corridos.').toString('base64') } });
+  assert.equal(faq.doc.chunks >= 1, true);
+  const pdfSrc = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 400 144]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 78>>stream\nBT /F1 14 Tf 20 100 Td (Garantia de trinta dias para qualquer produto) Tj ET\nendstream endobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+  const pdf = await call('/api/ai-agent/docs', { method: 'POST', token: admin, body: { name: 'garantia.pdf', base64: Buffer.from(pdfSrc).toString('base64') } });
+  assert.ok(pdf.doc || pdf.status === 400, 'PDF lido ou recusado com mensagem (nunca erro interno)');
+  assert.equal((await call('/api/ai-agent/docs', { method: 'POST', token: admin, body: { name: 'quebrado.pdf', base64: Buffer.from('isto não é um pdf de verdade').toString('base64') } })).status, 400);
+  const listed = (await call('/api/ai-agent', { token: admin })).agent.knowledgeDocs.map((d) => d.name);
+  assert.ok(listed.includes('precos.txt') && listed.includes('faq.md'));
+
+  // ---- chat de teste: usa a configuração e a base de verdade (a OpenAI aqui é simulada)
+  const t1 = await call('/api/ai-agent/test', { method: 'POST', token: admin, body: { messages: [{ from: 'lead', text: 'Quanto custa o Plano Pro?' }] } });
+  assert.equal(t1.kind, 'ai');
+  assert.equal(t1.text, 'Resposta de teste');
+  const sys = fakeAi.calls.at(-1).messages[0].content;
+  assert.match(sys, /Você é a Duda/, 'a personalidade vai no prompt');
+  assert.match(sys, /Plano Pro custa R\$ 250,50/, 'o trecho certo da base foi recuperado');
+  assert.match(sys, /cliente pede para falar com uma pessoa/, 'as regras de transbordo vão no prompt');
+  assert.ok(!/Entregamos em todo o Brasil/.test(sys), 'trecho irrelevante não entra');
+  fakeAi.next = reply({ handoff: true, reply: 'Vou chamar alguém.', reason: 'reclamação' });
+  assert.equal((await call('/api/ai-agent/test', { method: 'POST', token: admin, body: { messages: [{ from: 'lead', text: 'Estou muito insatisfeito' }] } })).kind, 'handoff');
+  fakeAi.next = reply();
+  assert.equal((await call('/api/ai-agent/test', { method: 'POST', token: admin, body: { messages: [{ from: 'lead', text: 'oi' }, { from: 'ai', text: 'olá' }] } })).status, 400, 'a última fala precisa ser do cliente');
+  assert.equal((await call('/api/ai-agent/test', { method: 'POST', token: ana, body: { messages: [{ from: 'lead', text: 'oi' }] } })).status, 403);
+
+  // ---- resposta real a um cliente (WhatsApp falso): só em número com a IA ligada e conversa sem atendente
+  const company = (await call('/api/instances', { method: 'POST', token: admin, body: { name: 'IA Comercial', companyNumber: true } })).instance;
+  await setInstanceStatus({ pool: h.app }, { tenantId: tenantA, instanceId: company.id, status: 'connected', phone: '5511900000009' });
+  const notified = [];
+  const rt = createAiRuntime({ pool: h.app, getChannel: () => channel, notify: (t, p) => notified.push([t, p]), openai: fakeAi, config: {}, debounceMs: 0, typingMs: () => 0, log: { error() {} } });
+  const inbound = async (instId, phone, text, id) => (await ingestMessage({ pool: h.app, notify: hub.notify }, { tenantId: tenantA, instanceId: instId, phone, pushName: 'Cliente IA', message: { id, type: 'text', text, direction: 'in', createdAt: Date.now() } })).conversation.id;
+  const convOf = async (id) => (await h.admin.query('SELECT status, assignee_id, ai_paused, ai_replies, unread_count FROM conversations WHERE id = $1', [id])).rows[0];
+
+  const off = await inbound(company.id, '5511933330001', 'Quanto custa o plano Pro?', 'IA-1');
+  assert.deepEqual(await rt.handle({ tenantId: tenantA, conversationId: off }), { skipped: 'IA desligada neste número' });
+  assert.equal((await call(`/api/instances/${company.id}`, { method: 'PATCH', token: admin, body: { aiActive: true } })).instance.aiActive, true);
+
+  const before = sent.length;
+  const c1 = await inbound(company.id, '5511933330002', 'Quanto custa o plano Pro?', 'IA-2');
+  const r1 = await rt.handle({ tenantId: tenantA, conversationId: c1 });
+  assert.equal(r1.replied, true);
+  assert.equal(r1.handoff, false);
+  assert.equal(sent.length, before + 1, 'a resposta saiu pelo WhatsApp');
+  assert.equal(sent.at(-1).phone, '5511933330002');
+  assert.equal(sent.at(-1).text, 'Resposta de teste');
+  const saved1 = (await h.admin.query("SELECT body, by_ai, direction FROM messages WHERE conversation_id = $1 AND direction = 'out'", [c1])).rows;
+  assert.deepEqual(saved1, [{ body: 'Resposta de teste', by_ai: true, direction: 'out' }]);
+  assert.deepEqual(await convOf(c1), { status: 'queue', assignee_id: null, ai_paused: false, ai_replies: 1, unread_count: 0 });
+  assert.equal(notified.at(-1)[1].message.byAi, true, 'o tempo real avisa que foi a IA');
+  assert.equal((await h.admin.query('SELECT count(*)::int n FROM ai_usage WHERE conversation_id = $1', [c1])).rows[0].n, 1, 'uso registrado (controle de custo)');
+
+  // a história vai para o modelo (cliente = user, IA = assistant)
+  await inbound(company.id, '5511933330002', 'E tem desconto à vista?', 'IA-3');
+  await rt.handle({ tenantId: tenantA, conversationId: c1 });
+  const roles = fakeAi.calls.at(-1).messages.slice(1).map((m) => m.role);
+  assert.deepEqual(roles, ['user', 'assistant', 'user']);
+
+  // a IA transfere: manda a despedida, pausa, volta para a fila com a mensagem sem ler e deixa nota de sistema
+  fakeAi.next = reply({ handoff: true, reply: 'Vou chamar alguém da equipe.', reason: 'cliente pediu uma pessoa' });
+  const c2 = await inbound(company.id, '5511933330003', 'Quero falar com uma pessoa', 'IA-4');
+  const r2 = await rt.handle({ tenantId: tenantA, conversationId: c2 });
+  assert.equal(r2.handoff, true);
+  const st2 = await convOf(c2);
+  assert.equal(st2.ai_paused, true);
+  assert.equal(st2.status, 'queue');
+  assert.equal(st2.unread_count, 1, 'transferida: continua não lida para a equipe');
+  assert.ok((await h.admin.query("SELECT 1 FROM messages WHERE conversation_id = $1 AND kind = 'system' AND body LIKE '%passou para atendimento humano: cliente pediu uma pessoa%'", [c2])).rowCount, 'nota de sistema com o motivo');
+  fakeAi.next = reply();
+  await inbound(company.id, '5511933330003', 'Alô?', 'IA-5');
+  assert.deepEqual(await rt.handle({ tenantId: tenantA, conversationId: c2 }), { skipped: 'um humano assumiu ou a IA já transferiu' }, 'pausada: não responde mais');
+
+  // um humano responde pela caixa de entrada → a IA para nessa conversa
+  const c3 = await inbound(company.id, '5511933330004', 'Boa tarde', 'IA-6');
+  assert.equal((await call(`/api/conversations/${c3}/messages`, { method: 'POST', token: admin, body: { text: 'Oi, aqui é o João!' } })).message.type, 'out');
+  assert.equal((await convOf(c3)).ai_paused, true);
+  await inbound(company.id, '5511933330004', 'Preciso de ajuda', 'IA-7');
+  assert.equal((await rt.handle({ tenantId: tenantA, conversationId: c3 })).skipped !== undefined, true);
+
+  // limites: respostas por conversa e teto diário de tokens
+  await call('/api/ai-agent', { method: 'PUT', token: admin, body: { prompt: 'Você é a Duda.', handoffRules: [], maxReplies: 1 } });
+  assert.deepEqual(await rt.handle({ tenantId: tenantA, conversationId: c1 }), { skipped: 'a última mensagem não é do cliente' });
+  await inbound(company.id, '5511933330002', 'Mais uma dúvida', 'IA-8');
+  assert.deepEqual(await rt.handle({ tenantId: tenantA, conversationId: c1 }), { skipped: 'limite de respostas da IA nesta conversa' });
+  const rtCap = createAiRuntime({ pool: h.app, getChannel: () => channel, notify() {}, openai: fakeAi, config: { aiDailyTokenCap: 1 }, debounceMs: 0, typingMs: () => 0, log: { error() {} } });
+  await call('/api/ai-agent', { method: 'PUT', token: admin, body: { prompt: 'Você é a Duda.', handoffRules: [], maxReplies: 50 } });
+  const c5 = await inbound(company.id, '5511933330005', 'Olá', 'IA-9');
+  assert.deepEqual(await rtCap.handle({ tenantId: tenantA, conversationId: c5 }), { skipped: 'teto diário de uso da IA atingido' });
+
+  // sem chave da OpenAI: nada acontece (e o teste do painel avisa)
+  const rtNoKey = createAiRuntime({ pool: h.app, getChannel: () => channel, notify() {}, openai: { configured: false }, config: {}, debounceMs: 0, typingMs: () => 0, log: { error() {} } });
+  assert.deepEqual(await rtNoKey.handle({ tenantId: tenantA, conversationId: c5 }), { skipped: 'sem chave da OpenAI' });
+
+  // o painel passa a mostrar a IA na tabela de desempenho
+  const dash = await call('/api/dashboard', { token: admin });
+  assert.ok(dash.periods.month.team.some((r) => r.name === 'Agente de IA' && r.isBot && r.conversations >= 1), 'linha do Agente de IA no dashboard');
+
+  // remover documento
+  assert.equal((await call(`/api/ai-agent/docs/${doc.doc.id}`, { method: 'DELETE', token: admin })).ok, true);
+  assert.equal((await call(`/api/ai-agent/docs/${doc.doc.id}`, { method: 'DELETE', token: admin })).status, 404);
 });

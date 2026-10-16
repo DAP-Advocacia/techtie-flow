@@ -8,6 +8,8 @@ import { renderBoard, clearDrag, autoScroll } from './pipeline/board.js';
 import { renderPanel, renderPanelEmpty } from './pipeline/panel.js';
 import { openNewDeal } from './pipeline/new-deal.js';
 import { openAddProduct } from './pipeline/add-product.js';
+import { openEditDeal } from './pipeline/edit-deal.js';
+import * as live from '../live.js';
 import { openConfirmMove } from './pipeline/confirm-move.js';
 import { openConfirmDelete } from './pipeline/confirm-delete.js';
 import { openMoveMenu, closeMoveMenu } from './pipeline/move-menu.js';
@@ -200,6 +202,7 @@ export default {
           deal,
           sending: !!deal && view.sending.has(deal.id),
           emptyMessage: deals.some((d) => d.pipelineId === pipeline.id) ? null : 'Você não tem negócios visíveis neste pipeline.',
+          onEdit: () => editDeal(deal),
           onAddProduct: () => addProduct(deal),
           onRemoveItem: (i) => removeItem(deal, i),
           onSend: () => send(deal),
@@ -285,6 +288,19 @@ export default {
       });
     }
 
+    function editDeal(deal) {
+      openEditDeal({
+        deal,
+        restoreFocus: () => el.querySelector('[data-focus="edit"]'),
+        onSave: (patch) => {
+          const r = A.editDeal(deal.id, patch);
+          if (r.ok) toast('Negócio atualizado');
+          else if (!r.error) toast(P.reasonOf(r.decision, 'editar este negócio'));
+          return r;
+        },
+      });
+    }
+
     function addProduct(deal) {
       const dec = P.editDecision(deal);
       if (dec.effect === 'deny') {
@@ -294,6 +310,10 @@ export default {
       openAddProduct({
         deal,
         onAdded: (p) => toast(`${p.name} adicionado à proposta`),
+        onProductCreated: (p) => {
+          toast(`${p.name} cadastrado no catálogo`);
+          addProduct(store.deal(deal.id) || deal); // reabre com o catálogo atualizado
+        },
         onBlocked: (d) => toast(d.effect === 'approval' ? 'Esta alteração precisa da aprovação de um gestor (o fluxo de aprovação ainda não existe). Nada foi alterado.' : P.reasonOf(d, 'editar a proposta')),
       });
     }
@@ -314,6 +334,20 @@ export default {
       view.sending.add(deal.id);
       view.pendingFocus = 'send';
       render();
+      const SENT_MSG = {
+        sent: 'Proposta enviada pelo WhatsApp',
+        'no-chat': 'Proposta registrada (este contato ainda não tem conversa no WhatsApp)',
+        'no-access': 'Proposta registrada, mas você não pode escrever na conversa deste contato',
+      };
+      if (live.enabled) {
+        // Modo operação: o servidor monta o texto, envia pelo WhatsApp e registra (erros aparecem como aviso).
+        live.sendProposal(deal.id).then((r) => {
+          view.sending.delete(deal.id);
+          liveRender?.();
+          if (r) toast(SENT_MSG[r.result] || 'Proposta registrada');
+        });
+        return;
+      }
       // Envio simulado. Se o usuário sair da tela, o envio termina mesmo assim (só mexe no store);
       // por isso este timer não é cancelado na limpeza.
       setTimeout(() => {

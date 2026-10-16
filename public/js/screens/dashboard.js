@@ -2,6 +2,7 @@
 // desempenho da equipe. Dados derivados em dashboard/model.js.
 import { h, replaceChildren } from '../ui.js';
 import { buildView, describeDelta } from './dashboard/model.js';
+import * as api from '../live.js';
 import { renderBars } from './dashboard/bars.js';
 import { renderFunnel } from './dashboard/funnel.js';
 import { renderTeam, defaultDir } from './dashboard/team.js';
@@ -40,7 +41,27 @@ function card(title, hint, ...content) {
 }
 
 export default {
-  mount(el, { store }) {
+  // Em operação os números vêm do servidor (banco real); no protótipo, dos dados de exemplo.
+  async mount(el, ctx) {
+    if (api.enabled) {
+      try {
+        await api.loadDashboard();
+      } catch (e) {
+        replaceChildren(el, h('div', { class: 'page' }, h('div', { class: 'empty card' }, h('div', { class: 'section-title gold' }, 'Dashboard indisponível'), h('div', null, e.message || 'Não foi possível carregar os números agora.'))));
+        return;
+      }
+    }
+    const cleanup = mountBody(el, ctx);
+    // atualiza os números a cada minuto enquanto a tela está aberta
+    const refresh = api.enabled ? setInterval(() => api.loadDashboard().catch(() => {}), 60_000) : null;
+    return () => {
+      clearInterval(refresh);
+      cleanup?.();
+    };
+  },
+};
+
+function mountBody(el, { store }) {
     const periods = () => store.state.dashboard?.periods || {};
     let periodKey = periods().month ? 'month' : Object.keys(periods())[0];
     let sort = null; // { key, dir } ou null = ordem original
@@ -171,5 +192,4 @@ export default {
       unsub();
       clearTimeout(timer);
     };
-  },
-};
+}

@@ -28,7 +28,7 @@ export function renderPanelEmpty(host, message) {
   );
 }
 
-export function renderPanel(host, { deal, sending, onAddProduct, onRemoveItem, onSend, onOpenChat, onFinish, onDelete, onShare, onUnshare, emptyMessage }) {
+export function renderPanel(host, { deal, sending, onEdit, onAddProduct, onRemoveItem, onSend, onOpenChat, onFinish, onDelete, onShare, onUnshare, emptyMessage }) {
   if (!deal) return renderPanelEmpty(host, emptyMessage);
   shown = new Set();
 
@@ -127,7 +127,7 @@ export function renderPanel(host, { deal, sending, onAddProduct, onRemoveItem, o
 
   replaceChildren(
     host,
-    h('div', null, h('div', { class: 'label' }, 'Proposta'), h('div', { class: 'pipeline-panel__title' }, deal.title), h('div', { class: 'muted' }, `${contact?.company || 'Sem empresa'} · ${stage?.name || '—'}`)),
+    h('div', null, h('div', { class: 'label' }, 'Proposta'), h('div', { class: 'pipeline-panel__titlerow' }, h('div', { class: 'pipeline-panel__title' }, deal.title), P.canEditDeal(deal) ? h('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-focus': 'edit', onclick: onEdit }, 'Editar') : null), h('div', { class: 'muted' }, `${contact?.company || 'Sem empresa'} · ${stage?.name || '—'}`)),
     itemsBox,
     h('button', { class: 'pipeline-add', type: 'button', disabled: sending || editBlocked || itemsHidden, title: editBlocked ? P.reasonOf(edit, 'editar a proposta') : null, 'data-focus': 'add', onclick: onAddProduct }, '+ Adicionar produto'),
     hint(addHint, editApproval ? 'warn' : null),
