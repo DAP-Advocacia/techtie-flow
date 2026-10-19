@@ -618,3 +618,14 @@ test('Agente de IA: configuração, base de conhecimento, teste e resposta real 
   assert.equal((await call(`/api/ai-agent/docs/${doc.doc.id}`, { method: 'DELETE', token: admin })).ok, true);
   assert.equal((await call(`/api/ai-agent/docs/${doc.doc.id}`, { method: 'DELETE', token: admin })).status, 404);
 });
+
+test('convite: o link usa o endereço do próprio site (APP_URL velho não quebra) e ignora origem estranha', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const invite = async (email, origin) => {
+    const res = await fetch(`${base}/api/users/invite`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${admin}`, ...(origin ? { origin } : {}) }, body: JSON.stringify({ email, name: 'Teste Link', roleId: 'role_agent' }) });
+    return (await res.json()).inviteUrl;
+  };
+  assert.match(await invite('link1@a.com.br'), /^http:\/\/app\.test\/#\/accept\?token=/, 'sem Origin: vale o APP_URL');
+  assert.match(await invite('link2@a.com.br', base), new RegExp(`^${base.replace(/[.]/g, '\\.')}/#/accept\\?token=`), 'Origin do próprio site: vale o endereço em uso');
+  assert.match(await invite('link3@a.com.br', 'https://site-malicioso.example'), /^http:\/\/app\.test\/#\/accept\?token=/, 'Origin estranha é ignorada');
+});

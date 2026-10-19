@@ -116,6 +116,21 @@ function createApp({ pool, config, hub, channel, openai }) {
     return r.rows[0];
   }
   const primaryTeam = (access) => access.teamIds[0] || null;
+  /**
+   * Endereço público para links (convites). Se o pedido veio do PRÓPRIO site (Origin = mesmo host que atendeu),
+   * vale o endereço que a pessoa está usando agora — assim um APP_URL velho (ex.: domínio antigo do Coolify) não
+   * gera link quebrado. Qualquer outra origem é ignorada e vale o APP_URL configurado.
+   */
+  const publicBase = (req) => {
+    const origin = String(req.headers.origin || '');
+    const host = String((config.trustProxy && req.headers['x-forwarded-host']) || req.headers.host || '').split(',')[0].trim().toLowerCase();
+    try {
+      if (origin && host && new URL(origin).host.toLowerCase() === host) return origin.replace(/\/$/, '');
+    } catch {
+      /* Origin inválida: cai no APP_URL */
+    }
+    return config.appUrl || '';
+  };
   /** Definição do perfil (de fábrica ou do tenant). Lê do BANCO: o cache de acesso não conhece perfil recém-criado. */
   async function roleDefinition(c, access, rid) {
     const sys = access.E.SYSTEM_ROLES.find((r) => r.id === rid);
@@ -630,7 +645,7 @@ function createApp({ pool, config, hub, channel, openai }) {
       if (e.code === '23503') throw bad('Equipe inexistente.');
       throw e;
     }
-    const base = config.appUrl || req.headers.origin || '';
+    const base = publicBase(req);
     return { userId, inviteUrl: `${base}/#/accept?token=${invite.token}`, expiresInDays: 7 };
   });
 
