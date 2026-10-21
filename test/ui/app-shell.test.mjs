@@ -2,10 +2,9 @@
 // breadcrumb, menu recolhido (preferência guardada) e o atalho global Ctrl+K.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { installDom, fire, tick, $, $$, text } from './dom-env.mjs';
+import { installDom, fire, tick, waitFor, $, $$, text } from './dom-env.mjs';
 
 installDom();
-const settle = () => tick(60);
 let store;
 
 before(async () => {
@@ -15,13 +14,18 @@ before(async () => {
   store.state.currentUserId = store.state.users.find((u) => (u.roleIds || []).includes('role_admin')).id;
   location.hash = '#/home';
   await import('../../public/js/app.js'); // sobe o app (monta a rota atual)
-  await settle();
+  await waitFor(() => $(document, '.screen') && $(document, '.screen').children.length > 0);
 });
 
+// navega e ESPERA a tela certa montar (o roteador importa o módulo da tela de forma assíncrona)
 const go = async (hash) => {
   location.hash = hash;
   fire(window, 'hashchange');
-  await settle();
+  const id = hash.replace(/^#\/?/, '').split(/[/?]/)[0];
+  await waitFor(() => {
+    const sc = $(document, '.screen');
+    return sc && sc.dataset.screen === id && sc.children.length > 0;
+  });
 };
 
 test('casca: menu lateral, barra superior e abas do celular estão na tela do Início', async () => {

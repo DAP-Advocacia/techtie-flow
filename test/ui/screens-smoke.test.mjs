@@ -38,7 +38,7 @@ for (const id of SCREENS) {
     await tick(30);
     assert.ok(host.children.length > 0, 'continua desenhada depois da mudança');
     if (typeof cleanup === 'function') cleanup();
-    await tick(10);
+    await tick(30);
   });
 }
 

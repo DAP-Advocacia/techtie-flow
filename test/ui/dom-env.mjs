@@ -68,3 +68,19 @@ export const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 export const $ = (root, sel) => root.querySelector(sel);
 export const $$ = (root, sel) => [...root.querySelectorAll(sel)];
 export const text = (el) => (el?.textContent || '').replace(/\s+/g, ' ').trim();
+
+/** Espera (até `timeout` ms) a condição ficar verdadeira — telas montam de forma assíncrona e a máquina pode estar carregada. */
+export async function waitFor(fn, timeout = 4000, step = 10) {
+  const t0 = Date.now();
+  for (;;) {
+    let v;
+    try {
+      v = fn();
+    } catch {
+      v = null;
+    }
+    if (v) return v;
+    if (Date.now() - t0 > timeout) throw new Error(`waitFor: a condição não ficou verdadeira em ${timeout} ms: ${fn}`);
+    await tick(step);
+  }
+}

@@ -54,7 +54,7 @@ test('criar rápido: "ligar para a Carla amanhã 10h !alta" vira tarefa com praz
   assert.match(preview, /Amanhã 10:00/);
   assert.match(preview, /alta/);
   fire(input, 'keydown', { key: 'Enter', isComposing: false });
-  await tick(20);
+  await tick(40);
   assert.equal(store.state.tasks.length, 1);
   const t = store.state.tasks[0];
   assert.equal(t.title, 'Ligar para a Carla');
@@ -70,7 +70,7 @@ test('criar rápido: "ligar para a Carla amanhã 10h !alta" vira tarefa com praz
   // título vazio / só espaços não cria
   input.value = '   ';
   fire(input, 'keydown', { key: 'Enter' });
-  await tick(10);
+  await tick(30);
   assert.equal(store.state.tasks.length, 1);
   cleanup();
 });
@@ -78,15 +78,15 @@ test('criar rápido: "ligar para a Carla amanhã 10h !alta" vira tarefa com praz
 test('concluir na lista: marca como feita, vai para "Concluídas" (recolhido) e pode reabrir', async () => {
   const { host, cleanup } = await mount(tasksScreen);
   $(host, '.tasks-check-btn').click();
-  await tick(10);
+  await tick(30);
   assert.equal(store.state.tasks[0].status, 'done');
   assert.ok(store.state.tasks[0].completedAt);
   assert.equal($$(host, '.tasks-row').length, 0, 'concluídas ficam recolhidas');
   $(host, '.tasks-group--done .tasks-group__head').click();
-  await tick(10);
+  await tick(30);
   assert.equal($$(host, '.tasks-row.is-done').length, 1);
   $(host, '.tasks-row.is-done .tasks-check-btn').click();
-  await tick(10);
+  await tick(30);
   assert.equal(store.state.tasks[0].status, 'todo');
   assert.equal(store.state.tasks[0].completedAt, null);
   cleanup();
@@ -130,7 +130,7 @@ test('painel: abre pela lista, edita título, prioridade, prazo (atalho), descri
   assert.match(text($(panelEl(), '.tasks-check__bar')) + $(panelEl(), '.tasks-check__bar').getAttribute('aria-label'), /1 de 2/);
   closePanel();
   assert.equal(panelEl(), null, 'fechou');
-  await tick(20);
+  await tick(40);
   assert.match(text($(host, '.tasks-row')), /1\/2/, 'a lista mostra o progresso do checklist');
   cleanup();
 });
@@ -143,7 +143,7 @@ test('painel: delegar para outra pessoa, comentar e ver o histórico', async () 
   assert.equal(owner.disabled, false, 'este perfil pode delegar');
   owner.value = other.id;
   fire(owner, 'change');
-  await tick(20);
+  await tick(40);
   assert.equal(store.state.tasks[0].ownerId, other.id);
   assert.ok((store.state.taskComments[store.state.tasks[0].id] || []).some((c) => c.kind === 'event' && /delegou/.test(c.text)), 'o histórico registra a delegação');
   const box = $(panelEl(), 'textarea[aria-label="Comentário"]');
@@ -164,13 +164,13 @@ test('criar pelo painel já vinculado a um negócio (e o contato do negócio vem
   assert.equal($(p, 'select[aria-label="Negócio vinculado"]').value, deal.id);
   const create = $$(p, 'button').find((b) => /Criar tarefa/.test(b.textContent));
   create.click();
-  await tick(10);
+  await tick(30);
   assert.equal(store.state.tasks.length, 1, 'sem título não cria');
   assert.ok(panelEl(), 'o painel continua aberto');
   const title = $(panelEl(), '.tasks-title');
   title.value = 'Enviar contrato revisado';
   create.click();
-  await tick(20);
+  await tick(40);
   const t = store.state.tasks.find((x) => x.title === 'Enviar contrato revisado');
   assert.ok(t);
   assert.equal(t.dealId, deal.id);
@@ -181,7 +181,7 @@ test('criar pelo painel já vinculado a um negócio (e o contato do negócio vem
 test('quadro: arrastar o cartão para outra coluna muda o status', async () => {
   const { host, cleanup } = await mount(tasksScreen);
   $(host, '.tasks-mode--board').click();
-  await tick(10);
+  await tick(30);
   assert.equal($$(host, '.tasks-col').length, 4);
   const card = $$(host, '.tasks-card').find((c) => /Enviar contrato revisado/.test(c.textContent));
   assert.ok(card);
@@ -190,10 +190,10 @@ test('quadro: arrastar o cartão para outra coluna muda o status', async () => {
   const target = $(host, '.tasks-col--waiting');
   fire(target, 'dragover', { dataTransfer: dt });
   fire(target, 'drop', { dataTransfer: dt });
-  await tick(10);
+  await tick(30);
   assert.equal(store.state.tasks.find((x) => x.title === 'Enviar contrato revisado').status, 'waiting');
   $(host, '.tasks-mode[data-mode="list"]').click();
-  await tick(10);
+  await tick(30);
   assert.equal($$(host, '.tasks-col').length, 0);
   cleanup();
 });
@@ -205,17 +205,17 @@ test('visões: a tarefa delegada some de "Minhas" e aparece em "Delegadas por mi
   assert.ok(tabLabels.some((t) => /Delegadas por mim/.test(t)), 'há tarefa que eu criei e passei adiante');
   assert.ok(!$$(host, '.tasks-row__title').some((e) => /Ligar para a Carla/.test(e.textContent)), 'a delegada não está em Minhas');
   $$(host, '.tasks-tab').find((b) => /Delegadas por mim/.test(b.textContent)).click();
-  await tick(10);
+  await tick(30);
   assert.ok($$(host, '.tasks-row__title').some((e) => /Ligar para a Carla/.test(e.textContent)));
   $$(host, '.tasks-tab').find((b) => /Minhas/.test(b.textContent)).click();
   const search = $(host, '.tasks-search');
   search.value = 'contrato';
   fire(search, 'input');
-  await tick(10);
+  await tick(30);
   assert.deepEqual($$(host, '.tasks-row__title').map((e) => e.textContent), ['Enviar contrato revisado']);
   search.value = 'zzz';
   fire(search, 'input');
-  await tick(10);
+  await tick(30);
   assert.match(text($(host, '.tasks-empty')), /Nada nesta visão|Nenhuma tarefa/);
   cleanup();
 });
@@ -236,7 +236,7 @@ test('Início: mostra as tarefas de hoje/atrasadas e o atalho para Tarefas', asy
   assert.ok($$(host, 'a.home-tile').some((a) => a.getAttribute('href') === '#/tasks'));
   // concluir direto pelo Início
   $(host, '.tasks-mini .tasks-check-btn').click();
-  await tick(10);
+  await tick(30);
   assert.equal(store.state.tasks.find((x) => x.title === 'Enviar contrato revisado').status, 'done');
   cleanup();
 });
@@ -246,7 +246,7 @@ test('Contatos: a ficha mostra as tarefas do contato e o botão de criar uma nov
   store.update((s) => s.tasks.push({ id: 't_c', title: 'Retornar para o contato', status: 'todo', priority: 'normal', dueAt: null, dueHasTime: false, ownerId: me.id, teamId: null, createdBy: me.id, dealId: null, contactId: contact.id, checklist: [], completedAt: null, createdAt: 1, updatedAt: 1, sharedWith: [] }));
   const { host, cleanup } = await mount(contactsScreen);
   $$(host, '.contacts-item').find((b) => b.textContent.includes(contact.name)).click();
-  await tick(10);
+  await tick(30);
   const block = $(host, '.tasks-mini');
   assert.ok(block, 'bloco de tarefas na ficha');
   assert.match(text(block), /Retornar para o contato/);
