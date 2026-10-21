@@ -17,6 +17,10 @@ import * as live from './live.js';
 import { MARK_SRC } from './screens/auth/logo.js';
 import * as pwa from './pwa.js';
 import { isMobile } from './mobile.js';
+import { renderTopbar } from './shell/topbar.js';
+import { openPalette } from './search/palette.js';
+import { openMenu } from './shell/menu.js';
+import { newActions } from './shell/new.js';
 
 pwa.register();
 
@@ -181,29 +185,54 @@ async function render() {
   if (route.shell) {
     const sidebarHost = h('div', { class: 'sidebar-host' });
     const tabHost = h('div', { class: 'sidebar-host' });
-    const draw = () => {
-      replaceChildren(sidebarHost, renderSidebar(route.id));
-      replaceChildren(tabHost, renderTabbar(route.id));
+    const topHost = h('div', { class: 'sidebar-host' });
+    const parent = route.parent ? ROUTES.find((r) => r.id === route.parent) : null;
+    const crumbs = parent ? [{ label: parent.label, href: `#/${parent.id}` }, { label: route.label }] : [{ label: route.label }];
+    // menu lateral recolhido (só ícones) — a escolha fica guardada neste navegador
+    const COLLAPSE_KEY = 'ttf:sidebar';
+    const toggleSidebar = () => {
+      const on = app.classList.toggle('is-collapsed');
+      try {
+        localStorage.setItem(COLLAPSE_KEY, on ? 'collapsed' : 'open');
+      } catch {
+        /* sem armazenamento: só não lembra */
+      }
     };
-    draw();
+    const draw = () => {
+      replaceChildren(sidebarHost, renderSidebar(route.parent || route.id));
+      replaceChildren(tabHost, renderTabbar(route.parent || route.id));
+      replaceChildren(topHost, renderTopbar({ crumbs, onToggleSidebar: toggleSidebar, navigate }));
+    };
     const unsubStore = store.subscribe(draw);
     const unsubPwa = pwa.onChange(draw);
     unsubSidebar = () => (unsubStore(), unsubPwa());
     // Celular: a barra lateral vira um menu que abre por cima (botão ☰); fechar ao escolher uma tela,
     // tocar fora ou apertar Esc. Em tela larga estes dois elementos ficam escondidos (CSS).
     const app = h('div', { class: 'app' });
+    try {
+      if (localStorage.getItem(COLLAPSE_KEY) === 'collapsed') app.classList.add('is-collapsed');
+    } catch {
+      /* sem armazenamento */
+    }
+    draw();
     const setNav = (open) => app.classList.toggle('is-nav-open', open);
     const mobilebar = h(
       'header',
       { class: 'mobilebar' },
       h('button', { class: 'mobilebar__btn', type: 'button', 'aria-label': 'Abrir menu', onclick: () => setNav(!app.classList.contains('is-nav-open')) }, icon('M4 6h16M4 12h16M4 18h16', 22)),
       h('img', { class: 'mobilebar__logo', src: MARK_SRC.small, alt: '' }),
-      h('span', { class: 'mobilebar__title' }, route.label)
+      h('span', { class: 'mobilebar__title' }, route.label),
+      h('button', { class: 'mobilebar__btn mobilebar__search', type: 'button', 'aria-label': 'Buscar', onclick: () => openPalette() }, icon('M21 21l-4.3-4.3M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z', 22)),
+      (() => {
+        const plus = h('button', { class: 'mobilebar__btn', type: 'button', 'aria-label': 'Criar novo', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, icon('M12 5v14M5 12h14', 22));
+        plus.addEventListener('click', () => openMenu(plus, newActions().map((a) => ({ label: a.label, hint: a.hint, disabled: a.disabled, reason: a.reason, onSelect: a.run })), { align: 'right' }));
+        return plus;
+      })()
     );
     const backdrop = h('div', { class: 'nav-backdrop', onclick: () => setNav(false) });
     sidebarHost.addEventListener('click', (e) => e.target.closest('.nav-item') && setNav(false));
     app.addEventListener('keydown', (e) => e.key === 'Escape' && setNav(false));
-    app.append(mobilebar, backdrop, sidebarHost, h('main', { class: 'app__main' }, screenEl), tabHost);
+    app.append(mobilebar, backdrop, sidebarHost, h('main', { class: 'app__main' }, topHost, screenEl), tabHost);
     replaceChildren(root, app);
   } else {
     replaceChildren(root, h('div', { class: 'app' }, h('main', { class: 'app__main' }, screenEl)));
@@ -254,6 +283,19 @@ async function render() {
 }
 
 window.addEventListener('hashchange', render);
+
+// Atalho global da busca: Ctrl+K / ⌘K (e "/" fora de campos de texto). Só nas telas com menu (não no login).
+document.addEventListener('keydown', (e) => {
+  if (!currentRoute().shell) return;
+  const typing = /^(input|textarea|select)$/i.test(e.target?.tagName || '') || e.target?.isContentEditable;
+  if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') {
+    e.preventDefault();
+    openPalette();
+  } else if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    openPalette();
+  }
+});
 store.subscribe(() => applyTheme());
 // Cor de destaque escolhida em Configurações precisa valer em qualquer tela
 // depois de recarregar, não só quando aquela tela é aberta.

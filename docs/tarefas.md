@@ -29,7 +29,8 @@ para ser mais leve que o do Bitrix (um responsável, poucos campos) e responder 
 | Admin | tudo |
 | Gestor | ler/criar/editar/excluir/delegar/compartilhar da equipe e subequipes (+ vê as que delegou) |
 | Atendente, SDR | as próprias: ler/criar/editar/excluir/delegar/compartilhar (+ vê as que delegou) |
-| Financeiro, Somente leitura | sem tarefas |
+| Somente leitura | lê todas as tarefas (não cria nem edita) |
+| Financeiro | sem tarefas |
 
 ## API (tudo decidido pelo motor no servidor)
 `POST /api/tasks` · `PATCH /api/tasks/:id` · `POST /api/tasks/:id/delegate` · `POST|DELETE /api/tasks/:id/shares[/:type/:id]` ·
