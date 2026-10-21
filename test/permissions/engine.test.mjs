@@ -354,9 +354,9 @@ describe('compartilhamento por registro', () => {
     assert.equal(eff(filha, 'deal', 'read', deal({ sharedWith: [shareTeam('read', 'T1')] })), 'deny');
   });
 
-  test('só entidades "shareable": tarefa não aceita share; contato e empresa aceitam', () => {
+  test('só entidades "shareable": conversa não aceita share; contato, empresa e tarefa aceitam', () => {
     const ctx = semPerfil();
-    assert.equal(eff(ctx, 'task', 'read', { id: 't', tenantId: 'A', sharedWith: [shareUser('edit')] }), 'deny');
+    assert.equal(eff(ctx, 'task', 'read', { id: 't', tenantId: 'A', sharedWith: [shareUser('edit')] }), 'allow');
     assert.equal(eff(ctx, 'contact', 'read', { id: 'c', tenantId: 'A', sharedWith: [shareUser('read')] }), 'allow');
     assert.equal(eff(ctx, 'company', 'update', { id: 'c', tenantId: 'A', sharedWith: [shareUser('edit')] }), 'allow');
     assert.equal(eff(ctx, 'conversation', 'read', conv({ sharedWith: [shareUser('edit')] })), 'deny');

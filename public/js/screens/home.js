@@ -6,11 +6,15 @@ import { canAccess, visible, fieldLevel } from '../access.js';
 import { pointInboxTo } from './pipeline/actions.js';
 import { greeting, summarizeHome, replyNow } from './home/model.js';
 import { isMobile } from '../mobile.js';
+import { tasksBlock } from './tasks/mini.js';
+import { allTasks } from './tasks/actions.js';
+import { todaySummary } from './tasks/model.js';
 
 const SHORTCUTS = [
   { id: 'inbox', label: 'Inbox', hint: 'Atender no WhatsApp', require: ['conversation', 'read'] },
   { id: 'pipeline', label: 'Negócios', hint: 'Funil de vendas', require: ['deal', 'read'] },
   { id: 'contacts', label: 'Contatos', hint: 'Buscar e abrir conversa', require: ['contact', 'read'] },
+  { id: 'tasks', label: 'Tarefas', hint: 'Seu dia, por prazo', require: ['task', 'read'] },
   { id: 'dashboard', label: 'Dashboard', hint: 'Números do time', require: ['report', 'read'] },
   { id: 'agent', label: 'Agente de IA', hint: 'Respostas automáticas', require: ['ai_agent', 'read'] },
   { id: 'instances', label: 'Números', hint: 'WhatsApp conectados', require: ['instance', 'read'] },
@@ -42,6 +46,7 @@ export default {
       const contacts = canContacts ? visible('contact', s.contacts) : [];
       const sum = summarizeHome({ conversations: convs, deals, stageKind: (id) => store.stage(id)?.kind, meId: s.currentUserId, valueHidden: fieldLevel('deal', 'value') === 'hidden' });
 
+      const tsum = canAccess('task', 'read') ? todaySummary(visible('task', allTasks()), s.currentUserId) : null;
       const first = (me?.name || '').split(' ')[0] || 'bem-vindo';
       const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -50,6 +55,7 @@ export default {
         canChat ? stat('#/inbox', fmtInt(sum.queue), sum.queue === 1 ? 'conversa na fila' : 'conversas na fila') : null,
         canDeals ? stat('#/pipeline', fmtInt(sum.openDeals), sum.openValue == null ? 'negócios abertos' : `negócios abertos · ${fmtBRL(sum.openValue)}`) : null,
         canContacts ? stat('#/contacts', fmtInt(contacts.length), contacts.length === 1 ? 'contato' : 'contatos') : null,
+        tsum ? stat('#/tasks', fmtInt(tsum.total), tsum.overdue ? `tarefas para hoje · ${tsum.overdue} atrasada${tsum.overdue > 1 ? 's' : ''}` : 'tarefas para hoje', tsum.overdue ? 'hot' : '') : null,
       ].filter(Boolean);
 
       const shortcuts = SHORTCUTS.filter(ok).map((r) =>
@@ -72,6 +78,7 @@ export default {
           h('h2', { class: 'home-section__title' }, 'Atalhos'),
           shortcuts.length ? h('div', { class: 'home-tiles' }, ...shortcuts) : h('p', { class: 'muted' }, 'Seu perfil ainda não tem telas liberadas. Fale com o administrador.')
         ),
+        tsum ? h('section', { class: 'home-section' }, tasksBlock({ tasks: tsum.list, title: 'Para hoje', limit: 6, empty: 'Nenhuma tarefa para hoje.' })) : null,
         canChat
           ? h(
               'section',

@@ -31,7 +31,7 @@ const V = {
   company: { status: ['prospect', 'customer', 'churned'] },
   conversation: { status: ['open', 'pending', 'resolved', 'bot'] },
   proposal: { status: ['draft', 'sent', 'accepted', 'rejected'] },
-  task: { status: ['todo', 'doing', 'done'] },
+  task: { status: ['todo', 'doing', 'waiting', 'done'], priority: ['normal', 'high', 'urgent'] },
   call: { direction: ['inbound', 'outbound'] },
 };
 const RECORD_ENTITIES = ['contact', 'company', 'deal', 'conversation', 'proposal', 'task', 'call'];
@@ -110,7 +110,8 @@ function buildWorld(seed) {
     for (let i = 0; i < 300; i++) {
       rows.companies.push({ ...base(), name: 'co' + i, status: nullable(0.2, pick(V.company.status)) });
       rows.proposals.push({ ...base(), status: nullable(0.1, pick(V.proposal.status)), discountPct: nullable(0.3, half(30)) });
-      rows.tasks.push({ ...base(), status: nullable(0.1, pick(V.task.status)) });
+      // status/título/prioridade são NOT NULL no banco; `createdBy` (quem delegou) é nulo em parte das tarefas
+      rows.tasks.push({ ...base(), title: 't' + i, status: pick(V.task.status), priority: pick(V.task.priority), createdBy: nullable(0.3, uid()) });
       rows.calls.push({ ...base(), instanceId: nullable(0.1, pick(T.instances).id), direction: nullable(0.1, pick(V.call.direction)) });
     }
     for (const u of T.users) rows.users.push({ id: u.id, tenantId: T.id, sharedWith: [] });
@@ -140,7 +141,8 @@ function buildWorld(seed) {
   const attrDomain = (T, entName, field, tableRows) => {
     const ent = ENTITIES[entName];
     switch (field) {
-      case 'ownerId': case 'assigneeId': return () => (chance(0.1) ? newId() : pick(T.users).id);
+      case 'ownerId': case 'assigneeId': case 'createdBy': return () => (chance(0.1) ? newId() : pick(T.users).id);
+      case 'dealId': case 'contactId': return () => newId(); // vínculos da tarefa: o mundo gerado não os preenche (nulos)
       case 'teamId': return () => (chance(0.1) ? newId() : pick(T.teams).id);
       case 'pipelineId': return () => (chance(0.1) ? newId() : pick(T.pipelines).id);
       case 'stageId': return () => (chance(0.1) ? newId() : pick(T.stages).id);
@@ -250,7 +252,7 @@ async function bulk(c, table, cols, jsRows, map) {
     await c.query(`INSERT INTO ${table} (${list}) SELECT ${list} FROM jsonb_to_recordset($1::jsonb) AS x(${defs})`, [JSON.stringify(data.slice(i, i + 1000))]);
   }
 }
-const col = (...names) => names.map((n) => [n, n === 'value' || n === 'discount_pct' ? 'numeric' : n === 'system_role_id' ? 'text' : n.endsWith('_id') || n === 'id' ? 'uuid' : 'text']);
+const col = (...names) => names.map((n) => [n, n === 'value' || n === 'discount_pct' ? 'numeric' : n === 'system_role_id' ? 'text' : n.endsWith('_id') || n === 'id' || n === 'created_by' ? 'uuid' : 'text']);
 
 async function loadWorld(h, world) {
   const { rows } = world;
@@ -274,7 +276,7 @@ async function loadWorld(h, world) {
       await bulk(c, 'deals', col('id', 'tenant_id', 'owner_id', 'team_id', 'title', 'pipeline_id', 'stage_id', 'value', 'status'), mine('deals'), (r) => ({ ...common(r), title: r.title, pipeline_id: r.pipelineId, stage_id: r.stageId, value: r.value, status: r.status }));
       await bulk(c, 'conversations', col('id', 'tenant_id', 'owner_id', 'team_id', 'assignee_id', 'instance_id', 'status'), mine('conversations'), (r) => ({ ...common(r), assignee_id: r.assigneeId, instance_id: r.instanceId, status: r.status }));
       await bulk(c, 'proposals', col('id', 'tenant_id', 'owner_id', 'team_id', 'status', 'discount_pct'), mine('proposals'), (r) => ({ ...common(r), status: r.status, discount_pct: r.discountPct }));
-      await bulk(c, 'tasks', col('id', 'tenant_id', 'owner_id', 'team_id', 'status'), mine('tasks'), (r) => ({ ...common(r), status: r.status }));
+      await bulk(c, 'tasks', col('id', 'tenant_id', 'owner_id', 'team_id', 'title', 'status', 'priority', 'created_by'), mine('tasks'), (r) => ({ ...common(r), title: r.title, status: r.status, priority: r.priority, created_by: r.createdBy }));
       await bulk(c, 'calls', col('id', 'tenant_id', 'owner_id', 'team_id', 'instance_id', 'direction'), mine('calls'), (r) => ({ ...common(r), instance_id: r.instanceId, direction: r.direction }));
       await bulk(c, 'audit_log', col('id', 'tenant_id', 'action'), mine('audit_log'), (r) => ({ id: r.id, tenant_id: T.id, action: 'seed.diff' }));
       await bulk(c, 'resource_shares', col('tenant_id', 'entity', 'resource_id', 'subject_type', 'subject_id', 'level'), T.shares, (s) => ({ tenant_id: T.id, entity: s.entity, resource_id: s.resourceId, subject_type: s.subjectType, subject_id: s.subjectId, level: s.level }));

@@ -215,7 +215,7 @@ describe('esquema, closure, camada 2 e withTenant (Postgres real)', { skip: env.
       for (const [sql, params, code] of [
         [`INSERT INTO resource_shares (tenant_id, entity, resource_id, subject_type, subject_id, level) VALUES ($1,'deal',$2,'user',$3,'read')`, [A, deal, U.a2], '23505'],
         [`INSERT INTO resource_shares (tenant_id, entity, resource_id, subject_type, subject_id, level) VALUES ($1,'deal',$2,'user',$3,'owner')`, [A, deal, U.a3], '23514'],
-        [`INSERT INTO resource_shares (tenant_id, entity, resource_id, subject_type, subject_id, level) VALUES ($1,'task',$2,'user',$3,'read')`, [A, deal, U.a3], '23514'],
+        [`INSERT INTO resource_shares (tenant_id, entity, resource_id, subject_type, subject_id, level) VALUES ($1,'conversation',$2,'user',$3,'read')`, [A, deal, U.a3], '23514'],
         [`INSERT INTO resource_shares (tenant_id, entity, resource_id, subject_type, subject_id, level) VALUES ($1,'deal',$2,'group',$3,'read')`, [A, deal, U.a3], '23514'],
         [`INSERT INTO resource_shares (tenant_id, entity, resource_id, subject_type, subject_id, level) VALUES ($1,'deal',$2,'user',$3,'read')`, [A, nu(), U.a3], '23503'], // recurso inexistente
         [`INSERT INTO resource_shares (tenant_id, entity, resource_id, subject_type, subject_id, level) VALUES ($1,'deal',$2,'team',$3,'read')`, [A, deal, U.a3], '23503'], // user_id usado como team

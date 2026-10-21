@@ -59,7 +59,7 @@ before(async () => {
   if (skip) return;
   h = await startPostgres(env.pg, 'api');
   const c = await h.admin.connect();
-  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); } finally { c.release(); }
+  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); } finally { c.release(); }
   seed('empresa-a', 'admin@a.com.br');
   seed('empresa-b', 'admin@b.com.br');
   tenantA = (await h.admin.query("SELECT id FROM tenants WHERE slug='empresa-a'")).rows[0].id;
@@ -628,4 +628,122 @@ test('convite: o link usa o endereço do próprio site (APP_URL velho não quebr
   assert.match(await invite('link1@a.com.br'), /^http:\/\/app\.test\/#\/accept\?token=/, 'sem Origin: vale o APP_URL');
   assert.match(await invite('link2@a.com.br', base), new RegExp(`^${base.replace(/[.]/g, '\\.')}/#/accept\\?token=`), 'Origin do próprio site: vale o endereço em uso');
   assert.match(await invite('link3@a.com.br', 'https://site-malicioso.example'), /^http:\/\/app\.test\/#\/accept\?token=/, 'Origin estranha é ignorada');
+});
+
+test('tarefas: criar, vincular, concluir, delegar, compartilhar, comentar e excluir (cada um só vê o que pode)', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const bia = await login('bia@a.com.br');
+  const biaId = (await call('/api/bootstrap', { token: bia })).users.find((u) => u.email === 'bia@a.com.br').id;
+  const anaId = (await call('/api/bootstrap', { token: ana })).users.find((u) => u.email === 'ana@a.com.br').id;
+  const tasksOf = async (token) => (await call('/api/bootstrap', { token })).tasks;
+  const boot = await call('/api/bootstrap', { token: admin });
+  const pipe = boot.pipelines[0];
+  const anaPost = (body) => call('/api/tasks', { method: 'POST', token: ana, body });
+
+  // ---- validação
+  assert.equal((await anaPost({ title: '  ' })).status, 400);
+  assert.equal((await anaPost({ title: 'x', priority: 'altíssima' })).status, 400);
+  assert.equal((await anaPost({ title: 'x', status: 'quase' })).status, 400);
+  assert.equal((await anaPost({ title: 'x', dueAt: 'ontem à noite' })).status, 400);
+  assert.equal((await anaPost({ title: 'x', checklist: [{ text: '' }] })).status, 400);
+  assert.equal((await call('/api/tasks', { method: 'POST', body: { title: 'x' } })).status, 401);
+
+  // ---- avulsa: só a dona vê; defaults
+  const due = Date.now() + 3 * 86400000;
+  const solta = (await anaPost({ title: 'Ligar para o fornecedor', description: 'Pedir prazo', priority: 'high', dueAt: due, dueHasTime: true, checklist: [{ text: 'Levantar CNPJ' }, { text: 'Anotar proposta', done: true }] })).task;
+  assert.equal(solta.status, 'todo');
+  assert.equal(solta.ownerId, anaId);
+  assert.equal(solta.createdBy, anaId);
+  assert.equal(solta.priority, 'high');
+  assert.equal(solta.dueHasTime, true);
+  assert.equal(Math.abs(solta.dueAt - due) < 1000, true);
+  assert.deepEqual(solta.checklist.map((i) => [i.text, i.done]), [['Levantar CNPJ', false], ['Anotar proposta', true]]);
+  assert.ok((await tasksOf(ana)).some((t) => t.id === solta.id));
+  assert.ok(!(await tasksOf(bia)).some((t) => t.id === solta.id), 'a tarefa de outra pessoa não aparece');
+  assert.ok((await tasksOf(admin)).some((t) => t.id === solta.id), 'o admin vê todas');
+
+  // ---- vínculo com negócio (só se puder ler) e o contato vem junto
+  const ct = (await call('/api/contacts', { method: 'POST', token: ana, body: { name: 'Cliente da tarefa', phone: '5511955560001' } })).contact;
+  const deal = (await call('/api/deals', { method: 'POST', token: ana, body: { title: 'Negócio da tarefa', contactId: ct.id, pipelineId: pipe.id, stageId: pipe.stages[0].id } })).deal;
+  const ligada = (await anaPost({ title: 'Enviar contrato', dealId: deal.id })).task;
+  assert.equal(ligada.dealId, deal.id);
+  assert.equal(ligada.contactId, ct.id, 'o contato do negócio vem junto');
+  const biaDeal = (await call('/api/deals', { method: 'POST', token: bia, body: { title: 'Negócio da Bia', pipelineId: pipe.id, stageId: pipe.stages[0].id } })).deal;
+  assert.equal((await anaPost({ title: 'Invasão', dealId: biaDeal.id })).status, 400, 'não vincula a negócio que não pode ler');
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: ana, body: { dealId: biaDeal.id } })).status, 400);
+  const unlinked = await call(`/api/tasks/${ligada.id}`, { method: 'PATCH', token: ana, body: { dealId: null } });
+  assert.equal(unlinked.task.dealId, null);
+
+  // ---- editar e concluir (completedAt) e reabrir
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: bia, body: { title: 'sequestro' } })).status, 404);
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: ana, body: {} })).status, 400);
+  const edited = await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: ana, body: { title: 'Ligar para o fornecedor X', status: 'waiting', priority: 'urgent' } });
+  assert.equal(edited.task.title, 'Ligar para o fornecedor X');
+  assert.equal(edited.task.status, 'waiting');
+  assert.equal(edited.task.completedAt, null);
+  const done = await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: ana, body: { status: 'done' } });
+  assert.ok(done.task.completedAt, 'concluída: data de conclusão');
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: ana, body: { status: 'doing' } })).task.completedAt, null, 'reaberta: sem data de conclusão');
+  const nodue = await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: ana, body: { dueAt: null } });
+  assert.equal(nodue.task.dueAt, null);
+
+  // ---- delegar: quem recebe passa a ver; quem delegou continua vendo (só leitura) e não delega de novo
+  const delegated = await call(`/api/tasks/${ligada.id}/delegate`, { method: 'POST', token: ana, body: { ownerId: biaId } });
+  assert.equal(delegated.task.ownerId, biaId);
+  assert.equal(delegated.task.createdBy, anaId);
+  assert.ok((await tasksOf(bia)).some((t) => t.id === ligada.id), 'a Bia recebeu a tarefa');
+  assert.ok((await tasksOf(ana)).some((t) => t.id === ligada.id), 'a Ana continua vendo o que delegou');
+  assert.equal((await call(`/api/tasks/${ligada.id}`, { method: 'PATCH', token: ana, body: { title: 'não é mais minha' } })).status, 403, 'só leitura para quem delegou');
+  assert.equal((await call(`/api/tasks/${ligada.id}/delegate`, { method: 'POST', token: ana, body: { ownerId: anaId } })).status, 403, 'quem só enxerga não retoma sozinho');
+  assert.equal((await call(`/api/tasks/${ligada.id}/delegate`, { method: 'POST', token: bia, body: { ownerId: biaId } })).status, 400, 'já é dela');
+  assert.equal((await call(`/api/tasks/${ligada.id}/delegate`, { method: 'POST', token: bia, body: { ownerId: '00000000-0000-4000-8000-000000000000' } })).status, 400, 'responsável inexistente');
+  assert.equal((await call(`/api/tasks/${ligada.id}`, { method: 'PATCH', token: bia, body: { status: 'doing' } })).task.status, 'doing', 'a nova responsável edita');
+
+  // ---- criar já delegando
+  const forBia = (await anaPost({ title: 'Conferir estoque', ownerId: biaId })).task;
+  assert.equal(forBia.ownerId, biaId);
+  assert.equal(forBia.createdBy, anaId);
+  assert.ok((await tasksOf(bia)).some((t) => t.id === forBia.id));
+
+  // ---- comentários e histórico (quem enxerga, comenta; quem não enxerga, não)
+  const posted = await call(`/api/tasks/${ligada.id}/comments`, { method: 'POST', token: bia, body: { text: 'Contrato enviado, aguardando assinatura' } });
+  assert.equal(posted.comment.kind, 'comment');
+  assert.equal(posted.comment.authorId, biaId);
+  assert.equal((await call(`/api/tasks/${ligada.id}/comments`, { method: 'POST', token: bia, body: { text: ' ' } })).status, 400);
+  const thread = (await call(`/api/tasks/${ligada.id}/comments`, { token: ana })).comments;
+  assert.ok(thread.some((c) => c.kind === 'event' && /delegou a tarefa para/.test(c.text)), 'o histórico registra a delegação');
+  assert.ok(thread.some((c) => c.kind === 'comment' && /aguardando assinatura/.test(c.text)));
+  assert.equal((await call(`/api/tasks/${solta.id}/comments`, { token: bia })).status, 404, 'não lê a conversa de tarefa que não vê');
+  assert.ok((await call(`/api/tasks/${solta.id}/comments`, { token: ana })).comments.some((c) => c.kind === 'event' && /marcou como feita/.test(c.text)));
+
+  // ---- compartilhar: leitura não edita; edição edita; remover tira
+  const sharedWith = await call(`/api/tasks/${solta.id}/shares`, { method: 'POST', token: ana, body: { type: 'user', id: biaId, level: 'read' } });
+  assert.deepEqual(sharedWith.sharedWith, [{ type: 'user', id: biaId, level: 'read' }]);
+  assert.ok((await tasksOf(bia)).some((t) => t.id === solta.id), 'a Bia vê a tarefa compartilhada');
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: bia, body: { title: 'x' } })).status, 403, 'leitura não edita');
+  assert.equal((await call(`/api/tasks/${solta.id}/shares`, { method: 'POST', token: bia, body: { type: 'user', id: anaId, level: 'edit' } })).status, 403, 'quem só lê não compartilha');
+  await call(`/api/tasks/${solta.id}/shares`, { method: 'POST', token: ana, body: { type: 'user', id: biaId, level: 'edit' } });
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'PATCH', token: bia, body: { priority: 'normal' } })).task.priority, 'normal', 'edição edita');
+  assert.deepEqual((await call(`/api/tasks/${solta.id}/shares/user/${biaId}`, { method: 'DELETE', token: ana })).sharedWith, []);
+  assert.ok(!(await tasksOf(bia)).some((t) => t.id === solta.id), 'descompartilhada: some');
+  assert.equal((await call(`/api/tasks/${solta.id}/shares`, { method: 'POST', token: ana, body: { type: 'team', id: '00000000-0000-4000-8000-000000000000', level: 'read' } })).status, 400);
+
+  // ---- tempo real: quem recebe uma tarefa é avisado
+  const ws = await wsOpen((await call('/api/ws-ticket', { method: 'POST', token: bia })).ticket);
+  const another = (await anaPost({ title: 'Aviso em tempo real', ownerId: biaId })).task;
+  await settle(500);
+  assert.ok(ws.events.some((e) => e.type === 'tasks' && e.taskId === another.id), 'a Bia recebeu o aviso de tarefa nova');
+  ws.close();
+
+  // ---- excluir: dona exclui a dela; outra pessoa nem enxerga; admin exclui qualquer
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'DELETE', token: bia })).status, 404);
+  assert.equal((await call(`/api/tasks/${solta.id}`, { method: 'DELETE', token: ana })).ok, true);
+  assert.ok(!(await tasksOf(ana)).some((t) => t.id === solta.id));
+  assert.equal((await call(`/api/tasks/${ligada.id}`, { method: 'DELETE', token: ana })).status, 403, 'quem só enxerga não exclui');
+  assert.equal((await call(`/api/tasks/${ligada.id}`, { method: 'DELETE', token: admin })).ok, true);
+  // apagar o negócio não apaga a tarefa (só desfaz o vínculo)
+  const keep = (await anaPost({ title: 'Sobrevive ao negócio', dealId: deal.id })).task;
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'DELETE', token: admin })).ok, true);
+  assert.equal((await tasksOf(ana)).find((t) => t.id === keep.id).dealId, null);
 });

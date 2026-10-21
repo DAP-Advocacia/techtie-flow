@@ -116,10 +116,13 @@ export const ENTITIES = dict({
     attrs: { status: 'text', discountPct: 'numeric' },
     fields: ['discount'],
   }),
+  // Tarefa: individual (responsável = dono), compartilhável e delegável (`transfer`); avulsa ou ligada a negócio/contato.
+  // `createdBy` = quem criou/delegou: continua enxergando a tarefa que passou adiante (ver regras de fábrica).
   task: record({
     table: 'tasks',
-    actions: ['read', 'create', 'update', 'delete'],
-    attrs: { status: 'text' },
+    actions: ['read', 'create', 'update', 'delete', 'transfer', 'share'],
+    shareable: true,
+    attrs: { status: 'text', priority: 'text', dealId: 'uuid', contactId: 'uuid', createdBy: 'uuid' },
   }),
   call: record({
     table: 'calls',

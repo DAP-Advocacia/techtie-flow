@@ -14,6 +14,7 @@ export const repoRoot = path.resolve(here, '..', '..');
 export const MIGRATION = path.join(repoRoot, 'db', 'migrations', '0001_permissions.sql');
 export const MIGRATION_PERSONAL = path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql');
 export const MIGRATION_CRM_AI = path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql');
+export const MIGRATION_TASKS = path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql');
 export const IMAGE = 'postgres:16-alpine';
 const ADMIN_PW = 'ttf-admin-pw';
 export const APP_PW = 'ttf-app-pw';
@@ -128,7 +129,8 @@ export async function startPostgres(pg, tag, { migrate = true } = {}) {
     const applyMigration = async () => {
       // 0001 (permissões) + 0003 (dono/equipe do número): o catálogo trata `instance` como registro com dono
       // 0001 + 0003: `instance` tem dono. O 0002 (login/mensagens) e o 0004 (produtos/IA) entram só nos testes de API.
-      const sql = fs.readFileSync(MIGRATION, 'utf8') + '\n' + fs.readFileSync(MIGRATION_PERSONAL, 'utf8');
+      // + 0005: a tarefa ganhou colunas (prioridade, vínculos, criador) e o compartilhamento passou a valer para ela
+      const sql = [MIGRATION, MIGRATION_PERSONAL, MIGRATION_TASKS].map((f) => fs.readFileSync(f, 'utf8')).join('\n');
       const c = await admin.connect();
       let failed = false;
       try {

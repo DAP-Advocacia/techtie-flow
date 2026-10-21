@@ -195,7 +195,7 @@ describe('isolamento de tenant (Postgres real)', { skip: env.skip || false }, ()
         [`INSERT INTO contacts (tenant_id, name) VALUES ($1, 'x')`, [B]],
         [`INSERT INTO deals (tenant_id, title) VALUES ($1, 'x')`, [B]],
         [`INSERT INTO conversations (tenant_id) VALUES ($1)`, [B]],
-        [`INSERT INTO tasks (tenant_id) VALUES ($1)`, [B]],
+        [`INSERT INTO tasks (tenant_id, title) VALUES ($1, 'x')`, [B]],
         [`INSERT INTO audit_log (tenant_id, action) VALUES ($1, 'x')`, [B]],
         [`INSERT INTO teams (tenant_id, name) VALUES ($1, 'x')`, [B]],
       ]) {

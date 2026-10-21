@@ -40,6 +40,8 @@ const ROWS = {
   cSub: base({ assigneeId: 'other', teamId: 'T1a' }),
   cOther: base({ assigneeId: 'other', teamId: 'T2' }),
   cForeign: base({ tenantId: 'B', assigneeId: null, teamId: null }),
+  // tarefa que EU criei/delegei, hoje de outra pessoa de outra equipe (quem delegou continua vendo)
+  tDelegated: base({ ownerId: 'other', teamId: 'T2', createdBy: ME }),
   cfg: base({}), // entidades de configuração (produto, usuário, faturamento…)
 };
 
@@ -160,7 +162,13 @@ const GOLDEN = [
   ['ler tarefa da equipe', 'task', 'read', 'team', undefined, 'aaddda'],
   ['criar tarefa própria', 'task', 'create', 'own', undefined, 'aaaadd'],
   ['atualizar tarefa da equipe', 'task', 'update', 'team', undefined, 'aadddd'],
-  ['apagar tarefa própria', 'task', 'delete', 'own', undefined, 'aadddd'],
+  ['apagar tarefa própria', 'task', 'delete', 'own', undefined, 'aaaadd'],
+  ['ler tarefa que criei e delegei a outra equipe', 'task', 'read', 'tDelegated', undefined, 'aaaada'],
+  ['editar tarefa que criei e delegei (só leitura)', 'task', 'update', 'tDelegated', undefined, 'addddd'],
+  ['delegar tarefa própria', 'task', 'transfer', 'own', undefined, 'aaaadd'],
+  ['delegar tarefa da equipe', 'task', 'transfer', 'team', undefined, 'aadddd'],
+  ['compartilhar tarefa própria', 'task', 'share', 'own', undefined, 'aaaadd'],
+  ['compartilhar tarefa de outra equipe', 'task', 'share', 'other', undefined, 'addddd'],
   ['ler chamada própria (Viewer não vê chamadas)', 'call', 'read', 'own', undefined, 'aaaddd'],
   ['ler chamada da equipe', 'call', 'read', 'team', undefined, 'aadddd'],
   ['criar chamada própria', 'call', 'create', 'own', undefined, 'aaaddd'],
@@ -299,7 +307,8 @@ const MATRIX = {
     rule('proposal', ['approve'], 'team_tree', { conditional: true, denied: true }),
     rule('contact', ['share'], 'team_tree'),
     rule('deal', ['share'], 'team_tree'),
-    rule('task', ['read', 'create', 'update', 'delete'], 'team_tree'),
+    rule('task', ['read', 'create', 'update', 'delete', 'transfer', 'share'], 'team_tree'),
+    rule('task', ['read'], 'tenant', { conditional: true }),
     rule('call', ['read', 'create', 'listen', 'export'], 'team_tree'),
     rule('conversation', ['supervise', 'export'], 'team_tree'),
     // fila: o maior escopo é "tenant", mas só com a condição assigneeId isNull
@@ -320,7 +329,8 @@ const MATRIX = {
     rule('proposal', ['read'], 'own'),
     // desconto > 5% exige aprovação em criar, enviar E alterar proposta
     rule('proposal', ['create', 'send', 'update'], 'own', { approval: true }),
-    rule('task', ['read', 'create', 'update'], 'own'),
+    rule('task', ['read', 'create', 'update', 'delete', 'transfer', 'share'], 'own'),
+    rule('task', ['read'], 'tenant', { conditional: true }),
     rule('call', ['read', 'create'], 'own'),
     rule('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'tenant', { conditional: true }),
     rule('product', ['read'], 'tenant'),
@@ -332,7 +342,8 @@ const MATRIX = {
     rule('company', ['read', 'create', 'update'], 'team'),
     rule('deal', ['read', 'create', 'update'], 'own'),
     rule('deal', ['move'], 'own', { denied: true }),
-    rule('task', ['read', 'create', 'update'], 'own'),
+    rule('task', ['read', 'create', 'update', 'delete', 'transfer', 'share'], 'own'),
+    rule('task', ['read'], 'tenant', { conditional: true }),
     rule('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'tenant', { conditional: true }),
     rule('product', ['read'], 'tenant'),
     rule('pipeline', ['read'], 'tenant'),
@@ -365,7 +376,7 @@ describe('matriz dourada: resumo por perfil (effectiveMatrix)', () => {
   test('o catálogo de entidades x ações não mudou (se mudar, revise as tabelas acima)', () => {
     const total = Object.values(ENTITIES).reduce((n, e) => n + e.actions.length, 0);
     assert.equal(Object.keys(ENTITIES).length, 19);
-    assert.equal(total, 89, 'número de pares entidade.ação do catálogo');
+    assert.equal(total, 91, 'número de pares entidade.ação do catálogo');
   });
 
   test('Admin: escopo tenant incondicional em TODA entidade.ação, sem negação', () => {
@@ -394,9 +405,9 @@ describe('matriz dourada: resumo por perfil (effectiveMatrix)', () => {
     });
   }
 
-  test('flag "shared" só aparece em read/update de entidades compartilháveis (contact, company, deal)', () => {
+  test('flag "shared" só aparece em read/update de entidades compartilháveis (contact, company, deal, task)', () => {
     const m = effectiveMatrix(ctxs.role_viewer);
-    for (const [entity, e] of Object.entries(ENTITIES)) for (const a of e.actions) assert.equal(m[entity][a].shared, ['contact', 'company', 'deal'].includes(entity) && (a === 'read' || a === 'update'), `${entity}.${a}`);
+    for (const [entity, e] of Object.entries(ENTITIES)) for (const a of e.actions) assert.equal(m[entity][a].shared, ['contact', 'company', 'deal', 'task'].includes(entity) && (a === 'read' || a === 'update'), `${entity}.${a}`);
   });
 });
 
@@ -419,9 +430,9 @@ describe('matriz dourada: estrutura dos perfis de sistema', () => {
     const counts = Object.fromEntries(SYSTEM_ROLES.map((r) => [r.id, [r.grants.length, r.denies.length, r.fields.length, Object.keys(r.partitions).length]]));
     assert.deepEqual(counts, {
       role_admin: [1, 0, 0, 0],
-      role_manager: [20, 1, 0, 0],
-      role_agent: [13, 0, 0, 0],
-      role_sdr: [9, 1, 0, 0],
+      role_manager: [21, 1, 0, 0],
+      role_agent: [14, 0, 0, 0],
+      role_sdr: [10, 1, 0, 0],
       role_finance: [7, 0, 1, 0],
       role_viewer: [8, 1, 0, 0],
     });
@@ -449,8 +460,8 @@ describe('matriz dourada: estrutura dos perfis de sistema', () => {
     }
     // apagar/exportar dados de cliente: só Admin (tenant) e Gestor (árvore de equipes); Financeiro só exporta deal
     for (const r of SYSTEM_ROLES.filter((x) => ['role_agent', 'role_sdr', 'role_viewer'].includes(x.id))) {
-      // o número de WhatsApp pessoal não é dado de cliente: o dono pode remover o dele
-      for (const g of r.grants.filter((x) => x.entity !== 'instance')) for (const a of ['delete', 'export', 'import']) assert.ok(!g.actions.includes(a), `${r.id} ${g.entity} ${a}`);
+      // número de WhatsApp pessoal e tarefa própria não são dados de cliente: o dono pode remover o que é dele
+      for (const g of r.grants.filter((x) => !['instance', 'task'].includes(x.entity))) for (const a of ['delete', 'export', 'import']) assert.ok(!g.actions.includes(a), `${r.id} ${g.entity} ${a}`);
     }
   });
 });

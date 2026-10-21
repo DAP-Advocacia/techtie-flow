@@ -31,6 +31,7 @@ const ROUTES = [
   { id: 'inbox', label: 'Inbox', shell: true, nav: true, require: ['conversation', 'read'] },
   { id: 'pipeline', label: 'Negócios', shell: true, nav: true, require: ['deal', 'read'] },
   { id: 'contacts', label: 'Contatos', shell: true, nav: true, require: ['contact', 'read'] },
+  { id: 'tasks', label: 'Tarefas', shell: true, nav: true, require: ['task', 'read'] },
   { id: 'agent', label: 'Agente de IA', shell: true, nav: true, require: ['ai_agent', 'read'] },
   // desktopOnly: no celular a tela é substituída por um aviso (são telas densas, feitas para o computador)
   { id: 'automations', label: 'Automações', shell: true, nav: true, desktopOnly: true, require: ['automation', 'read'] },
@@ -73,7 +74,7 @@ function unreadTotal() {
 /** Barra de abas do celular: o que mais se usa na rua. O resto fica no menu ☰. */
 function renderTabbar(active) {
   const unread = unreadTotal();
-  const tabs = ['home', 'inbox', 'pipeline', 'contacts', 'dashboard'].map((id) => ROUTES.find((r) => r.id === id)).filter((r) => r && allowedRoute(r));
+  const tabs = ['home', 'inbox', 'pipeline', 'contacts', 'tasks'].map((id) => ROUTES.find((r) => r.id === id)).filter((r) => r && allowedRoute(r));
   return h(
     'nav',
     { class: 'tabbar', 'aria-label': 'Principal' },

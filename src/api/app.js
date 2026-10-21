@@ -241,6 +241,12 @@ function createApp({ pool, config, hub, channel, openai }) {
         const sharedOf = (dealId) => shareRows.filter((x) => x.resource_id === dealId).map(({ type, id, level }) => ({ type, id, level }));
         const products = canAccess(access, 'product', 'read') ? (await c.query('SELECT id, name, unit, price FROM products WHERE active ORDER BY name')).rows : [];
 
+        const taskW = listWhere(access, 'task', 'read');
+        const taskRows = canAccess(access, 'task', 'read')
+          ? (await c.query(`SELECT t.* FROM tasks t WHERE (${taskW.sql}) AND (t.status <> 'done' OR t.completed_at > now() - interval '30 days') ORDER BY t.due_at NULLS LAST, t.created_at DESC LIMIT 2000`, taskW.params)).rows
+          : [];
+        const taskShares = taskRows.length ? (await c.query("SELECT resource_id, subject_type AS type, subject_id AS id, level FROM resource_shares WHERE entity = 'task' AND resource_id = ANY($1::uuid[])", [taskRows.map((t) => t.id)])).rows : [];
+
         const dealByContact = new Map();
         for (const d of deals.rows) if (d.contact_id && !dealByContact.has(d.contact_id)) dealByContact.set(d.contact_id, d.id);
         const readRoles = canAccess(access, 'role', 'read');
@@ -272,6 +278,7 @@ function createApp({ pool, config, hub, channel, openai }) {
           contacts: [...contacts.rows, ...viaConversation].map((r) => apiContact(E.maskRow(access.ctx, 'contact', r))),
           deals: deals.rows.map((r) => ({ ...apiDeal(E.maskRow(access.ctx, 'deal', r)), sharedWith: sharedOf(r.id) })),
           agent: canAccess(access, 'ai_agent', 'read') ? await aiH.loadAgent(c) : undefined,
+          tasks: taskRows.map((r) => taskH.apiTask(r, taskShares.filter((x) => x.resource_id === r.id).map(({ type, id, level }) => ({ type, id, level })))),
           products: products.map((r) => ({ id: r.id, name: r.name, unit: r.unit, price: Number(r.price) })),
           conversations: convs.rows.map((r) => ({ ...toApiConversation(r), dealId: dealByContact.get(r.contact_id) || null })),
           // "qr"/"conectando"/"fila" só valem se a sessão existe de fato agora; se o servidor reiniciou ou a
@@ -608,6 +615,8 @@ function createApp({ pool, config, hub, channel, openai }) {
   });
 
   require('./dashboard')({ pool, route, must, tx, listWhere, canAccess, ttlMs: config.dashboardCacheMs });
+  const taskH = { pool, route, must, bad, notFound, uuidOr400, tx, listWhere, getAccess, audit, withShares, primaryTeam, hub };
+  require('./routes-tasks')(taskH);
   const aiH = { pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, openai };
   require('./ai-routes')(aiH);
   require('./routes-crm')({ pool, route, must, bad, forbidden, notFound, HttpError, uuidOr400, tx, listWhere, getAccess, audit, withShares, visibleDeal, convRow, dealRow, apiContact, apiDeal, apiInstance, postOut, announce, EMAIL });

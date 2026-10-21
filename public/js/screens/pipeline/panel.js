@@ -5,6 +5,9 @@ import { store } from '../../store.js';
 import { h, icon, fmtBRL, fmtListTime, replaceChildren } from '../../ui.js';
 import { itemsOf, sumItems } from './actions.js';
 import * as P from './perm.js';
+import { visible } from '../../access.js';
+import { tasksBlock } from '../tasks/mini.js';
+import { tasksOfDeal } from '../tasks/actions.js';
 
 const DOC_ICON = 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h4';
 const CLOSE_ICON = 'M18 6L6 18M6 6l12 12';
@@ -143,6 +146,7 @@ export function renderPanel(host, { deal, sending, onEdit, onAddProduct, onRemov
     chat.conv && chat.decision.effect !== 'allow' ? hint(chatHint) : null,
     h('div', { class: 'pipeline-actions', role: 'group', 'aria-label': 'Ações do negócio' }, ...finishBtns, delBtn),
     hint(blockedReasons.filter((t) => !shown.has(t)).join(' ')),
+    tasksBlock({ tasks: visible('task', tasksOfDeal(deal.id)), defaults: { dealId: deal.id, contactId: deal.contactId } }),
     shareBlock(deal, share, { onShare, onUnshare })
   );
 }

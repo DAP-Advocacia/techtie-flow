@@ -4,6 +4,8 @@
 import { h, icon, replaceChildren, avatar, fmtBRL, fmtInt, timeAgo, toast } from '../ui.js';
 import { canAccess, visible, fieldLevel, mask, decide, audit } from '../access.js';
 import * as live from '../live.js';
+import { tasksBlock } from './tasks/mini.js';
+import { tasksOfContact } from './tasks/actions.js';
 import { pointInboxTo } from './pipeline/actions.js';
 
 const PAGE = 60;
@@ -195,6 +197,7 @@ export default {
       const owner = c.ownerId ? store.userById(c.ownerId) : null;
       const deals = canAccess('deal', 'read') ? visible('deal', s.deals).filter((d) => d.contactId === c.id) : [];
       const convs = canAccess('conversation', 'read') ? visible('conversation', s.conversations).filter((cv) => cv.contactId === c.id) : [];
+      const tasksSection = canAccess('task', 'read') ? tasksBlock({ tasks: visible('task', tasksOfContact(c.id)), defaults: { contactId: c.id } }) : null;
       const row = (label, value) => h('div', { class: 'contacts-kv' }, h('dt', { class: 'label' }, label), h('dd', null, value));
       const phone = phoneHidden ? HIDDEN : c.phone || '—';
 
@@ -233,6 +236,7 @@ export default {
                 )
               : h('p', { class: 'muted' }, 'Nenhum negócio visível para você.')
           ),
+          tasksSection,
           convs.length
             ? h(
                 'div',

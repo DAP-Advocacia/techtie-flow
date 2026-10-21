@@ -163,10 +163,12 @@ function onEvent(ev) {
       const isNew = mergeConversation(s, ev.conversation);
       if (isNew && !s.contacts.some((c) => c.id === ev.conversation.contactId)) needsRefresh = true; // contato novo
       // a mensagem que EU enviei já volta pela resposta do POST: não duplica
-      if (ev.message && ev.message.authorId !== s.currentUserId) appendMessage(s, ev.conversation.id, { id: ev.message.id, type: ev.message.direction === 'out' ? 'out' : 'in', kind: ev.message.kind, text: ev.message.body || '', mediaUrl: ev.message.mediaUrl, at: ev.message.at, status: 'delivered' });
+      if (ev.message && ev.message.authorId !== s.currentUserId) appendMessage(s, ev.conversation.id, { id: ev.message.id, type: ev.message.direction === 'out' ? 'out' : 'in', kind: ev.message.kind, byAi: !!ev.message.byAi, text: ev.message.body || '', mediaUrl: ev.message.mediaUrl, at: ev.message.at, status: 'delivered' });
     });
     if (needsRefresh) hydrateSoon();
     if (viewing === ev.conversation.id && ev.message?.direction === 'in') markRead(viewing);
+  } else if (ev.type === 'tasks') {
+    hydrateSoon(); // alguém criou, delegou ou compartilhou uma tarefa comigo
   } else if (ev.type === 'instance') {
     store.update((s) => upsertInstance(s, ev.instance));
     for (const fn of [...instanceListeners]) fn(ev);
@@ -277,6 +279,17 @@ export const uploadAgentDoc = (name, base64) => request('/api/ai-agent/docs', { 
 export const deleteAgentDoc = (id) => request(`/api/ai-agent/docs/${id}`, { method: 'DELETE' });
 /** Chat de teste: devolve { kind: 'ai' | 'handoff', text, source?, rule?, reason? } (OpenAI de verdade, sem enviar ao WhatsApp). */
 export const testAgent = (messages) => request('/api/ai-agent/test', { method: 'POST', body: { messages } });
+
+// ---- tarefas (criar espera o servidor; o resto é otimista com volta ao estado real se falhar) ----
+const putTask = (t) => store.update((s) => { const i = (s.tasks ||= []).findIndex((x) => x.id === t.id); if (i >= 0) s.tasks[i] = { ...s.tasks[i], ...t }; else s.tasks.push(t); });
+export const createTask = (body) => request('/api/tasks', { method: 'POST', body }).then((r) => (putTask(r.task), r.task));
+export const updateTask = (id, body) => sync(() => request(`/api/tasks/${id}`, { method: 'PATCH', body }).then((r) => putTask(r.task)));
+export const delegateTask = (id, ownerId) => request(`/api/tasks/${id}/delegate`, { method: 'POST', body: { ownerId } }).then((r) => (putTask(r.task), hydrate({ keepMessages: true }).catch(() => {}), r.task));
+export const deleteTask = (id) => sync(() => request(`/api/tasks/${id}`, { method: 'DELETE' }));
+export const shareTask = (id, target) => request(`/api/tasks/${id}/shares`, { method: 'POST', body: target }).then((r) => (store.update((s) => { const t = (s.tasks || []).find((x) => x.id === id); if (t) t.sharedWith = r.sharedWith; }), r.sharedWith));
+export const unshareTask = (id, { type, id: subjectId }) => request(`/api/tasks/${id}/shares/${type}/${subjectId}`, { method: 'DELETE' }).then((r) => (store.update((s) => { const t = (s.tasks || []).find((x) => x.id === id); if (t) t.sharedWith = r.sharedWith; }), r.sharedWith));
+export const loadTaskComments = (id) => request(`/api/tasks/${id}/comments`).then((r) => r.comments);
+export const addTaskComment = (id, text) => request(`/api/tasks/${id}/comments`, { method: 'POST', body: { text } }).then((r) => r.comment);
 
 // ---- contatos (esperam o servidor: não há ID provisório) ----
 export const createContact = (body) =>

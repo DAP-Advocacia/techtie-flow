@@ -3,7 +3,9 @@
 // Permissões: campos ocultos pelo perfil viram "••• oculto" (o valor real nem entra no
 // modelo de visualização); o negócio e a linha do tempo só aparecem se o motor deixa ler o negócio.
 import { h, fmtBRL, timeAgo } from '../../ui.js';
-import { canAccess } from '../../access.js';
+import { canAccess, visible } from '../../access.js';
+import { tasksBlock } from '../tasks/mini.js';
+import { allTasks } from '../tasks/actions.js';
 import { dealOf } from './actions.js';
 import { HIDDEN, HIDDEN_HINT, canReadDeal, isHidden, maskedContact } from './perm.js';
 
@@ -30,6 +32,10 @@ export function createPanel({ store, navigate }) {
       contact: contact || null,
       hidden: { phone: isHidden('contact', 'phone'), email: isHidden('contact', 'email'), value: isHidden('deal', 'value') },
       responsible: assignee ? assignee.name : 'Na fila · sem responsável',
+      // tarefas do contato (a chave de redesenho muda quando uma é criada, concluída ou muda de prazo)
+      tasks: canAccess('task', 'read') && conv.contactId ? visible('task', allTasks().filter((t) => t.contactId === conv.contactId)).map((t) => [t.id, t.status, t.dueAt, t.title]) : null,
+      contactId: conv.contactId,
+      dealId: deal?.id || null,
       dealState,
       canOpenPipeline: canAccess('deal', 'read'),
       deal: deal ? { title: deal.title, value: isHidden('deal', 'value') ? null : deal.value, pipeline: pipeline?.name || '—', stage: store.stage(deal.stageId)?.name || '—' } : null,
@@ -56,6 +62,7 @@ export function createPanel({ store, navigate }) {
     const hiddenValue = () => h('span', { class: 'inbox-hidden', title: HIDDEN_HINT, 'aria-label': 'Campo oculto pelo seu perfil' }, HIDDEN);
     const row = (label, value, { wrap = false, hidden = false } = {}) => [h('dt', { class: 'inbox-panel__k' }, label), h('dd', { class: 'inbox-panel__v' }, hidden ? hiddenValue() : wrap ? breakable(value) : value || '—')];
 
+    const tasksEl = vm.tasks ? tasksBlock({ tasks: vm.tasks.map(([id]) => allTasks().find((t) => t.id === id)).filter(Boolean), defaults: { contactId: vm.contactId, dealId: vm.dealId }, limit: 4 }) : null;
     el.replaceChildren(
       h('div', { class: 'inbox-panel__who' }, h('span', { class: 'label' }, 'Contato'), h('h2', { class: 'inbox-panel__name' }, c?.name || 'Contato removido'), h('span', { class: 'muted' }, c?.company || '')),
       h('dl', { class: 'inbox-panel__grid' }, row('Telefone', c?.phone, { hidden: vm.hidden.phone }), row('E-mail', c?.email, { wrap: true, hidden: vm.hidden.email }), row('Responsável', vm.responsible), row('Origem', c?.source)),
@@ -72,6 +79,7 @@ export function createPanel({ store, navigate }) {
         : vm.dealState === 'restricted'
           ? h('div', { class: 'card card--flat card--dashed inbox-deal inbox-deal--none' }, h('span', { class: 'label' }, 'Negócio'), h('span', { class: 'muted' }, 'Negócio e histórico indisponíveis para o seu perfil de acesso.'))
           : h('div', { class: 'card card--flat card--dashed inbox-deal inbox-deal--none' }, h('span', { class: 'label' }, 'Negócio'), h('span', { class: 'muted' }, 'Nenhum negócio vinculado a esta conversa.')),
+      tasksEl,
       vm.dealState === 'restricted'
         ? null
         : h(

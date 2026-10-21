@@ -13,6 +13,7 @@ export function applyBootstrap(s, d, { keepMessages = false } = {}) {
   s.contacts = d.contacts;
   s.deals = d.deals;
   s.products = d.products || [];
+  s.tasks = d.tasks || [];
   // Agente de IA: configuração salva no servidor (o que é só da tela — instância escolhida, chat de teste — fica)
   if (d.agent) s.agent = { ...(s.agent || {}), ...d.agent };
   s.conversations = d.conversations;

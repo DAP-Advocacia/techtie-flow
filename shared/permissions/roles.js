@@ -35,7 +35,9 @@ export const SYSTEM_ROLES = [
       g('deal', ['approve'], 'team_tree', { conditions: [{ field: 'ctx.discountPct', op: 'lte', value: 15 }] }),
       g('proposal', ['read', 'create', 'update', 'delete', 'send'], 'team_tree'),
       g('proposal', ['approve'], 'team_tree', { conditions: [{ field: 'ctx.discountPct', op: 'lte', value: 15 }] }),
-      g('task', ['read', 'create', 'update', 'delete'], 'team_tree'),
+      g('task', ['read', 'create', 'update', 'delete', 'transfer', 'share'], 'team_tree'),
+      // quem delegou continua vendo (só leitura) a tarefa que passou para fora da própria equipe
+      g('task', ['read'], 'tenant', { conditions: [{ field: 'createdBy', op: 'eq', ref: '$user.id' }] }),
       g('call', ['read', 'create', 'listen', 'export'], 'team_tree'),
       g('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve', 'supervise', 'export'], 'team_tree'),
       // fila: conversa SEM responsável E com status 'queue' é de todos que atendem. Só "sem responsável"
@@ -73,7 +75,9 @@ export const SYSTEM_ROLES = [
       g('proposal', ['create', 'send'], 'own', { approval: { when: [{ field: 'ctx.discountPct', op: 'gt', value: 5 }] } }),
       // desconto acima de 5% só com aprovação de um gestor
       g('proposal', ['update'], 'own', { approval: { when: [{ field: 'ctx.discountPct', op: 'gt', value: 5 }] } }),
-      g('task', ['read', 'create', 'update'], 'own'),
+      g('task', ['read', 'create', 'update', 'delete', 'transfer', 'share'], 'own'),
+      // quem delegou continua vendo (só leitura) a tarefa que passou adiante
+      g('task', ['read'], 'tenant', { conditions: [{ field: 'createdBy', op: 'eq', ref: '$user.id' }] }),
       g('call', ['read', 'create'], 'own'),
       g('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'own'),
       g('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'tenant', { conditions: [{ field: 'assigneeId', op: 'isNull' }, { field: 'status', op: 'eq', value: 'queue' }] }),
@@ -93,7 +97,9 @@ export const SYSTEM_ROLES = [
       g('contact', ['read', 'create', 'update'], 'team'),
       g('company', ['read', 'create', 'update'], 'team'),
       g('deal', ['read', 'create', 'update', 'move'], 'own'),
-      g('task', ['read', 'create', 'update'], 'own'),
+      g('task', ['read', 'create', 'update', 'delete', 'transfer', 'share'], 'own'),
+      // quem delegou continua vendo (só leitura) a tarefa que passou adiante
+      g('task', ['read'], 'tenant', { conditions: [{ field: 'createdBy', op: 'eq', ref: '$user.id' }] }),
       g('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'own'),
       g('conversation', ['read', 'send_message', 'note', 'transfer', 'resolve'], 'tenant', { conditions: [{ field: 'assigneeId', op: 'isNull' }, { field: 'status', op: 'eq', value: 'queue' }] }),
       g('product', ['read'], 'tenant'),
