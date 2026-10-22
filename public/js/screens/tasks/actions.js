@@ -4,6 +4,7 @@
 import { store } from '../../store.js';
 import { decide, audit } from '../../access.js';
 import * as live from '../../live.js';
+import { burst } from '../../fx.js';
 
 const uid = (p) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const me = () => store.state.currentUserId;
@@ -72,6 +73,7 @@ export function patchTask(id, patch) {
   if (!t) return { ok: false, error: 'Tarefa não encontrada.' };
   const dec = decide('task', 'update', t);
   if (dec.effect !== 'allow') return denied(dec);
+  const wasDone = t.status === 'done';
   if (patch.title !== undefined && !String(patch.title).trim()) return { ok: false, error: 'O título não pode ficar vazio.' };
   const now = Date.now();
   store.update((s) => {
@@ -81,6 +83,7 @@ export function patchTask(id, patch) {
     if (patch.status !== undefined) x.completedAt = patch.status === 'done' ? now : null;
     if (patch.dueAt === null) x.dueHasTime = false;
   });
+  if (patch.status === 'done' && !wasDone) burst(); // tarefa feita: brilho
   if (live.enabled) live.updateTask(id, patch);
   else audit('task.update', id, `Tarefa "${t.title}" alterada`);
   return { ok: true };

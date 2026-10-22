@@ -22,9 +22,11 @@ import { openPalette } from './search/palette.js';
 import { openMenu } from './shell/menu.js';
 import { newActions } from './shell/new.js';
 import { trackViewport } from './viewport.js';
+import { initFx } from './fx.js';
 
 pwa.register();
 trackViewport(); // teclado e barras do celular: modais medem a área visível de verdade
+initFx(); // ondinha ao clicar e brilhos nas conquistas
 
 // shell:false = tela cheia, sem sidebar (login/onboarding).
 // require = [entidade, ação] que o motor de permissões exige para abrir a rota

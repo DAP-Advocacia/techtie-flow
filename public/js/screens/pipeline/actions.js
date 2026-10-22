@@ -7,6 +7,7 @@ import { fmtBRL } from '../../ui.js';
 import { decide, audit, canPatch } from '../../access.js';
 import * as P from './perm.js';
 import * as live from '../../live.js';
+import { burst } from '../../fx.js';
 
 const uid = (prefix) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || '';
@@ -77,6 +78,7 @@ export function moveDeal(dealId, stageId, { reason = '' } = {}) {
     else delete d.lostReason;
     logTimeline(s, d.contactId, `Negócio movido para ${stage?.name || 'outra etapa'}`);
   });
+  if (stage?.kind === 'won') burst(); // negócio ganho: brilho
   if (live.enabled) live.moveDeal(dealId, stageId, stage?.kind === 'lost' ? String(reason).trim() : undefined);
   return allowed(decision);
 }

@@ -190,7 +190,7 @@ export function createThread({ store, onTransfer, onResolve, onReopen, onUseRepl
       case 'out':
         return h(
           'div',
-          { class: 'inbox-msg inbox-msg--out' },
+          { class: 'inbox-msg inbox-msg--out' + (m.byAi ? ' inbox-msg--ai' : '') },
           h('div', { class: 'inbox-msg__text' }, m.text),
           h('div', { class: 'inbox-msg__meta' }, m.byAi ? 'Agente de IA · ' : '', `${time} `, h('span', { class: 'inbox-msg__ticks', 'aria-label': m.status === 'sent' ? 'Enviada' : 'Entregue' }, m.status === 'sent' ? '✓' : '✓✓'))
         );

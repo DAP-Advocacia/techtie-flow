@@ -67,3 +67,7 @@ Contatos (**Lista | Tabela**) e Negócios (**Quadro | Lista**). No celular só e
   Medem a **área realmente visível** (`js/viewport.js` → `--vvh`/`--vvt`), então o teclado e as barras do navegador não escondem
   mais os botões de baixo (ex.: criar tarefa no celular). Botões de ação de formulários longos ficam fixos ao rolar. O campo que
   ganha foco dentro de um modal é trazido para o meio da tela. Teste estático em `test/ui/overlays.test.mjs` evita voltar a `100vh`.
+- **Brilhos e cliques** (`js/fx.js` + fim do `base.css`): ondinha dourada ao clicar em botões, pílulas, filtros e cartões; botão
+  principal ganha um brilho que cruza ao passar o mouse e "afunda" ao pressionar; o que é IA (menu do Agente, mensagens do agente)
+  pisca devagar como uma estrela; chuva curta de brilhos de 4 pontas ao **ganhar um negócio**, **concluir uma tarefa** e **bater a
+  meta do mês**. Só decora, em dourado da marca, e some com "reduzir movimento". Teste: `test/ui/fx.test.mjs`.

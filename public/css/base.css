@@ -454,3 +454,144 @@ p {
   padding: 32px;
   gap: 6px;
 }
+
+/* ---------- brilho e cliques (decoração; some com "reduzir movimento") ---------- */
+.btn,
+.pill,
+.contacts-chip,
+.stage-chip,
+.home-tile,
+.home-stat,
+.picker__btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn:active:not(:disabled),
+.pill:active,
+.contacts-chip:active,
+.stage-chip:active,
+.home-tile:active,
+.picker__btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.fx-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--acc) 55%, transparent) 0%, transparent 68%);
+  transform: scale(0);
+  opacity: 0.8;
+  animation: fx-ripple 0.6s ease-out forwards;
+}
+.btn--primary .fx-ripple {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, transparent 68%);
+}
+@keyframes fx-ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+/* brilho que cruza o botão principal ao passar o mouse */
+.btn--primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.38) 50%, transparent 70%);
+  transform: translateX(-120%);
+}
+.btn--primary:hover:not(:disabled)::after {
+  transform: translateX(120%);
+  transition: transform 0.75s ease;
+}
+.home-tile:hover,
+.home-stat:hover {
+  box-shadow: 0 0 0 1px var(--dim), 0 10px 30px color-mix(in srgb, var(--acc) 14%, transparent);
+}
+/* tudo que é "IA" pisca devagar, como uma estrela */
+.nav-item[href='#/agent'] svg,
+.home-tile[href='#/agent'] .home-tile__icon svg,
+.inbox-msg--ai::after {
+  animation: twinkle 3.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--acc) 60%, transparent));
+}
+.inbox-msg--ai {
+  position: relative;
+}
+.inbox-msg--ai::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  background: var(--acc2);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  filter: none;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.88) rotate(8deg);
+  }
+}
+.fx-burst {
+  position: fixed;
+  z-index: 2000;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.fx-spark {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  background: var(--acc);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  animation: fx-spark var(--t, 0.8s) cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.fx-spark--alt {
+  background: var(--acc2);
+}
+@keyframes fx-spark {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.2) rotate(0);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(var(--s, 1)) rotate(var(--r, 90deg));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-ripple,
+  .fx-burst,
+  .btn--primary::after {
+    display: none;
+  }
+  .nav-item[href='#/agent'] svg,
+  .home-tile[href='#/agent'] .home-tile__icon svg,
+  .inbox-msg--ai::after {
+    animation: none;
+  }
+  .btn:active:not(:disabled),
+  .pill:active,
+  .contacts-chip:active,
+  .stage-chip:active,
+  .home-tile:active {
+    transform: none;
+  }
+}

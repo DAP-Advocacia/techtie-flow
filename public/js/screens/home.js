@@ -8,6 +8,7 @@ import { pointInboxTo } from './pipeline/actions.js';
 import { greeting, summarizeHome, replyNow, closingThisMonth, monthGoal } from './home/model.js';
 import { canSetGoal, openGoalDialog } from './home/goal.js';
 import { isMobile } from '../mobile.js';
+import { burstOnce } from '../fx.js';
 import { tasksBlock } from './tasks/mini.js';
 import { allTasks } from './tasks/actions.js';
 import { todaySummary } from './tasks/model.js';
@@ -69,6 +70,7 @@ function closingCard(c, valueHidden) {
 /** Meta de receita do mês: o ganho do mês contra a meta, o que falta e o ritmo. */
 function goalCard(g) {
   const pct = g.pct == null ? null : Math.round(g.pct * 100);
+  if (g.goal && g.remaining === 0) burstOnce(`meta-${new Date().getFullYear()}-${new Date().getMonth()}`); // meta batida: brilho (uma vez por mês)
   const set = () => openGoalDialog();
   const edit = canSetGoal();
   return h(
