@@ -42,13 +42,13 @@ export function createMockData(now = Date.now()) {
 
   // status: 'active' | 'invited' | 'suspended'. mfa: autenticação em dois fatores ativa.
   const users = [
-    { id: 'u_marina', tenantId: 't_acme', name: 'Marina Alves', email: 'marina@acme.com.br', roleIds: ['role_admin'], teamIds: ['tm_comercial'], status: 'active', mfa: true },
-    { id: 'u_carla', tenantId: 't_acme', name: 'Carla Souza', email: 'carla@acme.com.br', roleIds: ['role_manager'], teamIds: ['tm_comercial'], status: 'active', mfa: true },
-    { id: 'u_rafael', tenantId: 't_acme', name: 'Rafael Lima', email: 'rafael@acme.com.br', roleIds: ['role_sdr'], teamIds: ['tm_sdr'], status: 'active', mfa: false },
-    { id: 'u_pedro', tenantId: 't_acme', name: 'Pedro Nunes', email: 'pedro@acme.com.br', roleIds: ['role_agent'], teamIds: ['tm_comercial'], status: 'active', mfa: false },
-    { id: 'u_julia', tenantId: 't_acme', name: 'Júlia Ramos', email: 'julia@acme.com.br', roleIds: ['role_finance'], teamIds: [], status: 'active', mfa: true },
-    { id: 'u_lucas', tenantId: 't_acme', name: 'Lucas Prado', email: 'lucas@acme.com.br', roleIds: ['role_viewer'], teamIds: ['tm_cs'], status: 'active', mfa: false },
-    { id: 'u_bia', tenantId: 't_acme', name: 'Bia Martins', email: 'bia@acme.com.br', roleIds: ['role_agent'], teamIds: ['tm_cs'], status: 'invited', mfa: false },
+    { id: 'u_marina', tenantId: 't_acme', jobTitle: 'Diretora comercial', phone: '', bio: '', name: 'Marina Alves', email: 'marina@acme.com.br', roleIds: ['role_admin'], teamIds: ['tm_comercial'], status: 'active', mfa: true },
+    { id: 'u_carla', tenantId: 't_acme', jobTitle: 'Gerente de vendas', phone: '', bio: '', name: 'Carla Souza', email: 'carla@acme.com.br', roleIds: ['role_manager'], teamIds: ['tm_comercial'], status: 'active', mfa: true },
+    { id: 'u_rafael', tenantId: 't_acme', jobTitle: 'SDR', phone: '', bio: '', name: 'Rafael Lima', email: 'rafael@acme.com.br', roleIds: ['role_sdr'], teamIds: ['tm_sdr'], status: 'active', mfa: false },
+    { id: 'u_pedro', tenantId: 't_acme', jobTitle: 'Executivo de contas', phone: '', bio: '', name: 'Pedro Nunes', email: 'pedro@acme.com.br', roleIds: ['role_agent'], teamIds: ['tm_comercial'], status: 'active', mfa: false },
+    { id: 'u_julia', tenantId: 't_acme', jobTitle: 'Financeiro', phone: '', bio: '', name: 'Júlia Ramos', email: 'julia@acme.com.br', roleIds: ['role_finance'], teamIds: [], status: 'active', mfa: true },
+    { id: 'u_lucas', tenantId: 't_acme', jobTitle: 'Analista de CS', phone: '', bio: '', name: 'Lucas Prado', email: 'lucas@acme.com.br', roleIds: ['role_viewer'], teamIds: ['tm_cs'], status: 'active', mfa: false },
+    { id: 'u_bia', tenantId: 't_acme', jobTitle: 'Atendimento', phone: '', bio: '', name: 'Bia Martins', email: 'bia@acme.com.br', roleIds: ['role_agent'], teamIds: ['tm_cs'], status: 'invited', mfa: false },
     { id: 'u_ia', tenantId: 't_acme', name: 'Agente de IA', email: null, roleIds: [], teamIds: [], status: 'active', isBot: true },
   ];
 
@@ -282,6 +282,27 @@ export function createMockData(now = Date.now()) {
     auditLog, tenant, roles, users, teams, pipelines, products, contacts, deals,
     // motivos de perda da empresa (vazio = o motivo ao perder um negócio é opcional)
     lossReasons: [],
+    // chat interno (protótipo): salas só aparecem para quem participa; `reads` = até quando cada pessoa já leu
+    chat: {
+      rooms: [
+        { id: 'cr1', kind: 'dm', name: null, members: ['u_marina', 'u_carla'], createdBy: 'u_carla', lastAt: ago(25 * MIN), lastBody: 'Consegue olhar a proposta do Grupo Aurora hoje?', lastAuthorId: 'u_carla', reads: { u_marina: ago(2 * HOUR), u_carla: ago(25 * MIN) } },
+        { id: 'cr2', kind: 'group', name: 'Time comercial', members: ['u_marina', 'u_carla', 'u_pedro', 'u_rafael'], createdBy: 'u_marina', lastAt: ago(3 * HOUR), lastBody: 'Reunião de pipeline amanhã às 9h', lastAuthorId: 'u_marina', reads: { u_marina: ago(3 * HOUR), u_carla: ago(3 * HOUR), u_pedro: ago(5 * HOUR), u_rafael: ago(5 * HOUR) } },
+        { id: 'cr3', kind: 'dm', name: null, members: ['u_pedro', 'u_rafael'], createdBy: 'u_pedro', lastAt: ago(1 * DAY), lastBody: 'Valeu pela dica do lead!', lastAuthorId: 'u_rafael', reads: { u_pedro: ago(1 * DAY), u_rafael: ago(1 * DAY) } },
+      ],
+      messages: {
+        cr1: [
+          { id: 'cm1', roomId: 'cr1', authorId: 'u_marina', body: 'Carla, fechamos o piloto da Aurora?', at: ago(3 * HOUR) },
+          { id: 'cm2', roomId: 'cr1', authorId: 'u_carla', body: 'Quase! Falta o ok do financeiro deles.', at: ago(2 * HOUR + 40 * MIN) },
+          { id: 'cm3', roomId: 'cr1', authorId: 'u_carla', body: 'Consegue olhar a proposta do Grupo Aurora hoje?', at: ago(25 * MIN) },
+        ],
+        cr2: [
+          { id: 'cm4', roomId: 'cr2', authorId: 'u_carla', body: 'Bom dia, time! Metas da semana no quadro.', at: ago(1 * DAY + 2 * HOUR) },
+          { id: 'cm5', roomId: 'cr2', authorId: 'u_pedro', body: 'Fechei a visita da Prado Seguros.', at: ago(1 * DAY) },
+          { id: 'cm6', roomId: 'cr2', authorId: 'u_marina', body: 'Reunião de pipeline amanhã às 9h', at: ago(3 * HOUR) },
+        ],
+        cr3: [{ id: 'cm7', roomId: 'cr3', authorId: 'u_rafael', body: 'Valeu pela dica do lead!', at: ago(1 * DAY) }],
+      },
+    },
     conversations, messages, timeline, instances, agent, automations, dashboard, messageTemplates,
     // usuário logado no protótipo
     currentUserId: 'u_marina',

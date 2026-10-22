@@ -23,6 +23,7 @@ import { openMenu } from './shell/menu.js';
 import { newActions } from './shell/new.js';
 import { trackViewport } from './viewport.js';
 import { initFx } from './fx.js';
+import { totalUnread as chatUnread } from './screens/inbox/chat/actions.js';
 
 pwa.register();
 trackViewport(); // teclado e barras do celular: modais medem a área visível de verdade
@@ -36,11 +37,13 @@ const ROUTES = [
   { id: 'onboarding', label: 'Onboarding', shell: false },
   { id: 'accept', label: 'Convite', shell: false },
   { id: 'home', label: 'Início', shell: true, nav: true },
-  { id: 'inbox', label: 'Inbox', shell: true, nav: true, require: ['conversation', 'read'] },
+  { id: 'inbox', label: 'Inbox', shell: true, nav: true },
   { id: 'pipeline', label: 'Negócios', shell: true, nav: true, require: ['deal', 'read'] },
   { id: 'contacts', label: 'Contatos', shell: true, nav: true, require: ['contact', 'read'] },
   // página de um negócio: não aparece no menu; o menu destaca Negócios e o caminho da página mostra Negócios › Negócio
   { id: 'deal', label: 'Negócio', shell: true, nav: false, parent: 'pipeline', require: ['deal', 'read'] },
+  // perfil da própria pessoa: não aparece no menu (abre pelo nome no menu lateral ou pelo avatar da barra superior)
+  { id: 'profile', label: 'Meu perfil', shell: true, nav: false },
   { id: 'tasks', label: 'Tarefas', shell: true, nav: true, require: ['task', 'read'] },
   { id: 'agent', label: 'Agente de IA', shell: true, nav: true, require: ['ai_agent', 'read'] },
   // desktopOnly: no celular a tela é substituída por um aviso (são telas densas, feitas para o computador)
@@ -79,7 +82,7 @@ function loadScreenCss(id) {
 
 // Só conta o que o usuário pode ver: o badge não pode vazar que existe conversa alheia.
 function unreadTotal() {
-  return visible('conversation', store.state.conversations).reduce((n, c) => n + (c.unread || 0), 0);
+  return visible('conversation', store.state.conversations).reduce((n, c) => n + (c.unread || 0), 0) + chatUnread();
 }
 
 /** Barra de abas do celular: o que mais se usa na rua. O resto fica no menu ☰. */
@@ -159,7 +162,7 @@ function renderSidebar(active) {
         impersonable.map((u) => h('option', { value: u.id, selected: u.id === s.currentUserId }, u.name))
       )
     ),
-    h('div', { class: 'sidebar__user' }, h('div', { class: 'avatar' }, initials(user.name)), h('div', { class: 'sidebar__user-text' }, h('span', { style: 'font-weight:600' }, user.name), h('small', null, `${s.roles.filter((r) => (user.roleIds || []).includes(r.id)).map((r) => r.name).join(', ') || 'Sem perfil'} · ${s.tenant.name}`)))
+    h('a', { class: 'sidebar__user', href: '#/profile', title: 'Meu perfil' }, h('div', { class: 'avatar' }, initials(user.name)), h('div', { class: 'sidebar__user-text' }, h('span', { style: 'font-weight:600' }, user.name), h('small', null, `${s.roles.filter((r) => (user.roleIds || []).includes(r.id)).map((r) => r.name).join(', ') || 'Sem perfil'} · ${s.tenant.name}`)))
   );
 }
 

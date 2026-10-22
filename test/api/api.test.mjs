@@ -59,7 +59,7 @@ before(async () => {
   if (skip) return;
   h = await startPostgres(env.pg, 'api');
   const c = await h.admin.connect();
-  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0007_pipeline_config.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0008_pipeline_probability_backfill.sql'), 'utf8')); } finally { c.release(); }
+  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0007_pipeline_config.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0008_pipeline_probability_backfill.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0009_chat_profile.sql'), 'utf8')); } finally { c.release(); }
   seed('empresa-a', 'admin@a.com.br');
   seed('empresa-b', 'admin@b.com.br');
   tenantA = (await h.admin.query("SELECT id FROM tenants WHERE slug='empresa-a'")).rows[0].id;
@@ -946,4 +946,130 @@ test('funis configuráveis: criar, renomear, editar etapas (probabilidade, ordem
   assert.match(last.error || last.message || '', /pelo menos um funil/);
   const audited = (await h.admin.query("SELECT count(*)::int AS n FROM audit_log WHERE tenant_id = $1 AND action LIKE 'pipeline.%'", [tenantA])).rows[0].n;
   assert.ok(audited >= 6, `auditoria dos funis: ${audited}`);
+});
+
+test('chat interno: conversa direta única, grupos, só participantes leem, não lidas, tempo real só para quem participa', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const bia = await login('bia@a.com.br');
+  const adminB = await login('admin@b.com.br');
+  const users = (await call('/api/bootstrap', { token: admin })).users;
+  const id = (email) => users.find((u) => u.email === email)?.id;
+  const [adminId, anaId, biaId] = [id('admin@a.com.br'), id('ana@a.com.br'), id('bia@a.com.br')];
+  assert.ok(adminId && anaId && biaId);
+  const post = (path, token, body, method = 'POST') => call(path, { method, token, body });
+
+  const wsAdmin = await wsOpen((await call('/api/ws-ticket', { method: 'POST', token: admin })).ticket);
+  const wsAna = await wsOpen((await call('/api/ws-ticket', { method: 'POST', token: ana })).ticket);
+  const wsBia = await wsOpen((await call('/api/ws-ticket', { method: 'POST', token: bia })).ticket);
+
+  // conversa direta: uma sala por par (idempotente, qualquer um dos dois lados abre a mesma)
+  const dm = await post('/api/chat/rooms', admin, { userId: anaId });
+  assert.equal(dm.status, 200, JSON.stringify(dm));
+  assert.equal(dm.room.kind, 'dm');
+  assert.deepEqual([...dm.room.members].sort(), [adminId, anaId].sort());
+  assert.equal((await post('/api/chat/rooms', admin, { userId: anaId })).room.id, dm.room.id, 'mesma sala');
+  assert.equal((await post('/api/chat/rooms', ana, { userId: adminId })).room.id, dm.room.id, 'do outro lado também');
+  assert.equal((await post('/api/chat/rooms', admin, { userId: adminId })).status, 400, 'não conversa consigo mesmo');
+  assert.equal((await post('/api/chat/rooms', admin, { userId: '00000000-0000-4000-8000-000000000000' })).status, 400, 'pessoa que não existe');
+  assert.equal((await post('/api/chat/rooms', admin, { userId: id('ana@a.com.br').replace(/.$/, 'x') })).status, 400, 'id malformado');
+
+  // mensagens: validação, ordem e tempo real SÓ para os dois
+  const send = (token, room, body) => post(`/api/chat/rooms/${room}/messages`, token, { body });
+  assert.equal((await send(admin, dm.room.id, '   ')).status, 400);
+  assert.equal((await send(admin, dm.room.id, 'x'.repeat(4001))).status, 400);
+  wsAdmin.events.length = 0;
+  wsAna.events.length = 0;
+  wsBia.events.length = 0;
+  const m1 = await send(admin, dm.room.id, 'Oi, Ana! Tudo certo com o cliente?');
+  assert.equal(m1.status, 200, JSON.stringify(m1));
+  assert.equal(m1.message.authorId, adminId);
+  await settle();
+  assert.equal(wsAna.events.some((e) => e.type === 'chat' && e.kind === 'message' && e.message.body.startsWith('Oi, Ana')), true, 'a Ana recebe na hora');
+  assert.equal(wsBia.events.some((e) => e.type === 'chat'), false, 'a Bia não participa: nada chega');
+  await send(ana, dm.room.id, 'Tudo! Mando a proposta hoje.');
+  const msgs = (await call(`/api/chat/rooms/${dm.room.id}/messages`, { token: admin })).messages;
+  assert.deepEqual(msgs.map((m) => m.authorId), [adminId, anaId]);
+
+  // não lidas: quem escreveu não tem; quem recebeu, sim, até abrir (marcar como lida)
+  const roomOf = async (token, rid) => (await call('/api/chat/rooms', { token })).rooms.find((r) => r.id === rid);
+  assert.equal((await roomOf(admin, dm.room.id)).unread, 1, 'o admin tem a resposta da Ana não lida');
+  assert.equal((await roomOf(ana, dm.room.id)).unread, 0, 'a Ana já leu o que escreveu');
+  assert.equal((await roomOf(admin, dm.room.id)).lastBody, 'Tudo! Mando a proposta hoje.');
+  assert.equal((await post(`/api/chat/rooms/${dm.room.id}/read`, admin)).ok, true);
+  assert.equal((await roomOf(admin, dm.room.id)).unread, 0);
+
+  // quem não participa não lê, não escreve, não marca e nem sabe que existe (nem o Admin de outra empresa)
+  assert.equal((await call(`/api/chat/rooms/${dm.room.id}/messages`, { token: bia })).status, 404);
+  assert.equal((await send(bia, dm.room.id, 'intrometida')).status, 404);
+  assert.equal((await post(`/api/chat/rooms/${dm.room.id}/read`, bia)).status, 404);
+  assert.equal((await post(`/api/chat/rooms/${dm.room.id}/members`, bia, { userIds: [biaId] })).status, 404);
+  assert.equal((await call('/api/chat/rooms', { token: bia })).rooms.some((r) => r.id === dm.room.id), false);
+  assert.equal((await call(`/api/chat/rooms/${dm.room.id}/messages`, { token: adminB })).status, 404);
+  assert.equal((await post('/api/chat/rooms', adminB, { userId: anaId })).status, 400, 'pessoa de outra empresa não existe para mim');
+
+  // grupo
+  assert.equal((await post('/api/chat/rooms', admin, { name: '', userIds: [anaId] })).status, 400, 'sem nome');
+  assert.equal((await post('/api/chat/rooms', admin, { name: 'Sozinho', userIds: [] })).status, 400, 'sem ninguém');
+  const g = await post('/api/chat/rooms', admin, { name: '  Comercial   time ', userIds: [anaId, anaId] });
+  assert.equal(g.status, 200, JSON.stringify(g));
+  assert.equal(g.room.name, 'Comercial time');
+  assert.deepEqual([...g.room.members].sort(), [adminId, anaId].sort());
+  wsAna.events.length = 0;
+  wsBia.events.length = 0;
+  assert.equal((await send(ana, g.room.id, 'Bom dia, time!')).status, 200);
+  await settle();
+  assert.equal(wsBia.events.some((e) => e.type === 'chat'), false, 'Bia ainda não está no grupo');
+  // a Ana convida a Bia: a sala aparece para ela e ela passa a ler e escrever
+  const added = await post(`/api/chat/rooms/${g.room.id}/members`, ana, { userIds: [biaId] });
+  assert.equal(added.status, 200, JSON.stringify(added));
+  await settle();
+  assert.equal(wsBia.events.some((e) => e.type === 'chat' && e.kind === 'room'), true, 'a sala aparece na hora para quem entrou');
+  assert.equal((await call(`/api/chat/rooms/${g.room.id}/messages`, { token: bia })).messages.length, 1, 'quem entra lê o histórico do grupo');
+  assert.equal((await send(bia, g.room.id, 'Cheguei!')).status, 200);
+  assert.equal((await post(`/api/chat/rooms/${dm.room.id}/members`, admin, { userIds: [biaId] })).status, 409, 'conversa direta não aceita mais gente');
+  assert.equal((await post(`/api/chat/rooms/${g.room.id}/members`, admin, { userIds: [adminB && '00000000-0000-4000-8000-000000000000'] })).status, 400);
+
+  // histórico em páginas
+  const old = (await call(`/api/chat/rooms/${g.room.id}/messages?before=1`, { token: admin })).messages;
+  assert.equal(old.length, 0, 'antes de 1970 não há nada');
+  wsAdmin.close();
+  wsAna.close();
+  wsBia.close();
+  const audited = (await h.admin.query("SELECT count(*)::int AS n FROM audit_log WHERE tenant_id = $1 AND action LIKE 'chat.%'", [tenantA])).rows[0].n;
+  assert.ok(audited >= 2, `auditoria do chat: ${audited}`);
+});
+
+test('perfil: cada pessoa edita o PRÓPRIO nome, cargo, telefone e sobre; valida; os outros veem o nome novo', { skip }, async () => {
+  const ana = await login('ana@a.com.br');
+  const admin = await login('admin@a.com.br');
+  const patch = (token, body) => call('/api/me', { method: 'PATCH', token, body });
+  assert.equal((await patch(ana, {})).status, 400, 'nada para alterar');
+  assert.equal((await patch(ana, { name: '   ' })).status, 400);
+  assert.equal((await patch(ana, { name: 'x'.repeat(201) })).status, 400);
+  assert.equal((await patch(ana, { phone: 'abc' })).status, 400);
+  assert.equal((await patch(ana, { bio: 'x'.repeat(301) })).status, 400);
+  assert.equal((await patch(ana, { jobTitle: 'x'.repeat(81) })).status, 400);
+  const r = await patch(ana, { name: '  Ana   Paula Souza ', jobTitle: 'Executiva de contas', phone: '+55 (11) 98888-7777', bio: 'Atendo clientes do Sudeste.' });
+  assert.equal(r.status, 200, JSON.stringify(r));
+  assert.deepEqual(r.me, { id: r.me.id, name: 'Ana Paula Souza', jobTitle: 'Executiva de contas', phone: '+55 (11) 98888-7777', bio: 'Atendo clientes do Sudeste.' });
+  // não consegue mexer em e-mail, perfil de acesso, status nem em outra pessoa (campos fora da lista são ignorados)
+  const before = (await call('/api/bootstrap', { token: admin })).users.find((u) => u.id === r.me.id);
+  assert.equal((await patch(ana, { email: 'novo@a.com.br', status: 'suspended', roleIds: ['role_admin'], id: before.id.replace(/.$/, '0') })).status, 400, 'só campos desconhecidos = nada para alterar');
+  const adminView = (await call('/api/bootstrap', { token: admin })).users.find((u) => u.id === r.me.id);
+  assert.equal(adminView.name, 'Ana Paula Souza');
+  assert.equal(adminView.jobTitle, 'Executiva de contas');
+  assert.equal(adminView.email, 'ana@a.com.br');
+  assert.equal(adminView.status, 'active');
+  assert.deepEqual(adminView.roleIds, before.roleIds);
+  // o telefone é privado: quem não lê usuários nem é a própria pessoa não recebe
+  const bia = await login('bia@a.com.br');
+  assert.equal((await call('/api/bootstrap', { token: bia })).users.find((u) => u.id === r.me.id).phone, '');
+  assert.equal((await call('/api/bootstrap', { token: ana })).users.find((u) => u.id === r.me.id).phone, '+55 (11) 98888-7777');
+  assert.equal(adminView.phone, '+55 (11) 98888-7777', 'admin lê usuários');
+  // campo vazio limpa
+  const cleared = await patch(ana, { jobTitle: '', bio: '' });
+  assert.equal(cleared.me.jobTitle, '');
+  assert.equal(cleared.me.bio, '');
+  assert.equal((await call('/api/me', { method: 'PATCH', body: { name: 'x' } })).status, 401, 'sem login não edita');
 });

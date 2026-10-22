@@ -69,6 +69,20 @@ function createHub({ pool, config }) {
     }
   }
 
+  /** Entrega SÓ às pessoas listadas (chat interno: a mensagem é dos participantes, não do tenant). */
+  async function emitTo(tenantId, userIds, event) {
+    const text = JSON.stringify(event);
+    const to = new Set(userIds);
+    for (const client of [...clients]) {
+      if (client.tenantId !== tenantId || !to.has(client.userId) || client.ws.readyState !== 1) continue;
+      try {
+        client.ws.send(text);
+      } catch {
+        /* um cliente com problema não pode impedir a entrega aos outros */
+      }
+    }
+  }
+
   /** Ponte dos canais: `notify('message'|'instance', payload)`. */
   function notify(type, p) {
     if (type === 'message') {
@@ -86,7 +100,7 @@ function createHub({ pool, config }) {
     for (const c of clients) c.ws.terminate();
     wss.close();
   };
-  return { attach, emit, notify, close, size: () => clients.size };
+  return { attach, emit, emitTo, notify, close, size: () => clients.size };
 }
 
 module.exports = { createHub, toApiConversation };

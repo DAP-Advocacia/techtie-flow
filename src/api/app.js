@@ -230,7 +230,7 @@ function createApp({ pool, config, hub, channel, openai }) {
           ? (await withTenant(pool, { tenantId: access.tenantId, userId: access.userId, readScopes: 'tenant', readOnly: true }, (c2) => c2.query('SELECT * FROM contacts WHERE id = ANY($1::uuid[])', [missing]))).rows
           : [];
         const readUsers = canAccess(access, 'user', 'read');
-        const users = (await c.query('SELECT id, name, email, status, mfa_enabled FROM users ORDER BY name')).rows;
+        const users = (await c.query('SELECT id, name, email, status, mfa_enabled, job_title, phone, bio, created_at FROM users ORDER BY name')).rows;
         // Todos recebem o PRÓPRIO perfil (o front calcula menu e telas com ele); os dos outros, só quem lê usuários.
         const roleLinks = (await c.query(readUsers ? 'SELECT user_id, system_role_id, role_id FROM user_roles' : 'SELECT user_id, system_role_id, role_id FROM user_roles WHERE user_id = $1', readUsers ? [] : [access.userId])).rows;
         const memberLinks = (await c.query('SELECT team_id, user_id FROM team_members')).rows;
@@ -277,6 +277,10 @@ function createApp({ pool, config, hub, channel, openai }) {
             email: readUsers || u.id === access.userId ? u.email : null,
             status: u.status,
             mfa: u.mfa_enabled,
+            jobTitle: u.job_title || '',
+            phone: readUsers || u.id === access.userId ? u.phone || '' : '',
+            bio: u.bio || '',
+            joinedAt: ms(u.created_at),
             roleIds: readUsers || u.id === access.userId ? roleLinks.filter((l) => l.user_id === u.id).map((l) => l.system_role_id || l.role_id) : [],
             teamIds: memberLinks.filter((m) => m.user_id === u.id).map((m) => m.team_id),
           })),
@@ -646,6 +650,7 @@ function createApp({ pool, config, hub, channel, openai }) {
   require('./routes-tasks')(taskH);
   const aiH = { pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, openai };
   require('./ai-routes')(aiH);
+  require('./routes-chat')({ pool, route, bad, notFound, HttpError, uuidOr400, tx, audit, hub });
   require('./routes-pipelines')({ pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, hub });
   require('./routes-crm')({ pool, route, must, bad, forbidden, notFound, HttpError, uuidOr400, tx, listWhere, getAccess, audit, withShares, visibleDeal, convRow, dealRow, apiContact, apiDeal, apiInstance, postOut, announce, EMAIL });
 

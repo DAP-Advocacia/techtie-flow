@@ -96,6 +96,7 @@ export function logout() {
 export async function hydrate({ keepMessages = false } = {}) {
   const data = await request('/api/bootstrap');
   store.update((s) => applyBootstrap(s, data, { keepMessages }));
+  loadChatRooms().catch(() => {}); // chat interno: salas e não lidas
   if (!ws) connectWs();
 }
 
@@ -169,6 +170,10 @@ function onEvent(ev) {
     if (viewing === ev.conversation.id && ev.message?.direction === 'in') markRead(viewing);
   } else if (ev.type === 'tasks') {
     hydrateSoon(); // alguém criou, delegou ou compartilhou uma tarefa comigo
+  } else if (ev.type === 'directory') {
+    hydrateSoon(); // alguém mudou o nome/cargo no perfil
+  } else if (ev.type === 'chat') {
+    onChatEvent(ev);
   } else if (ev.type === 'pipelines') {
     hydrateSoon(); // alguém mudou funis, etapas ou motivos de perda
   } else if (ev.type === 'instance') {
@@ -317,6 +322,71 @@ export const renamePipeline = (id, name) => request(`/api/pipelines/${id}`, { me
 export const savePipelineStages = (id, stages) => request(`/api/pipelines/${id}/stages`, { method: 'PUT', body: { stages } }).then((r) => (putPipeline(r.pipeline), r.pipeline));
 export const deletePipeline = (id) => request(`/api/pipelines/${id}`, { method: 'DELETE' }).then(() => store.update((s) => { s.pipelines = s.pipelines.filter((p) => p.id !== id); }));
 export const saveLossReasons = (reasons) => request('/api/loss-reasons', { method: 'PUT', body: { reasons } }).then((r) => (store.update((s) => { s.lossReasons = r.lossReasons; }), r.lossReasons));
+
+// ---- chat interno (conversa direta e grupos) ----
+const chatOf = (s) => (s.chat ||= { rooms: [], messages: {} });
+const putRoom = (s, room) => {
+  const c = chatOf(s);
+  const i = c.rooms.findIndex((r) => r.id === room.id);
+  if (i === -1) c.rooms.push(room);
+  else c.rooms[i] = { ...c.rooms[i], ...room };
+  c.rooms.sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
+};
+/** Põe a mensagem na sala (sem duplicar) e atualiza a prévia. */
+function appendChat(s, m) {
+  const c = chatOf(s);
+  const list = (c.messages[m.roomId] ||= []);
+  if (!list.some((x) => x.id === m.id)) list.push(m);
+  const room = c.rooms.find((r) => r.id === m.roomId);
+  if (room && (m.at || 0) >= (room.lastAt || 0)) Object.assign(room, { lastAt: m.at, lastBody: m.body.slice(0, 200), lastAuthorId: m.authorId });
+  return room;
+}
+let chatViewing = null;
+export const setChatViewing = (id) => {
+  chatViewing = id;
+};
+export async function loadChatRooms() {
+  const r = await request('/api/chat/rooms');
+  store.update((s) => {
+    chatOf(s).rooms = r.rooms;
+  });
+}
+export const openDm = (userId) => request('/api/chat/rooms', { method: 'POST', body: { userId } }).then((r) => (store.update((s) => putRoom(s, r.room)), r.room));
+export const createGroup = (name, userIds) => request('/api/chat/rooms', { method: 'POST', body: { name, userIds } }).then((r) => (store.update((s) => putRoom(s, r.room)), r.room));
+export const addToGroup = (roomId, userIds) => request(`/api/chat/rooms/${roomId}/members`, { method: 'POST', body: { userIds } }).then((r) => (store.update((s) => putRoom(s, r.room)), r.room));
+export async function loadChatMessages(roomId) {
+  const r = await request(`/api/chat/rooms/${roomId}/messages`);
+  store.update((s) => {
+    chatOf(s).messages[roomId] = r.messages;
+  });
+}
+export const sendChat = (roomId, body) => request(`/api/chat/rooms/${roomId}/messages`, { method: 'POST', body: { body } }).then((r) => (store.update((s) => appendChat(s, r.message)), r.message));
+export function markChatRead(roomId) {
+  store.update((s) => {
+    const room = chatOf(s).rooms.find((r) => r.id === roomId);
+    if (room) room.unread = 0;
+  });
+  return request(`/api/chat/rooms/${roomId}/read`, { method: 'POST' }).catch(() => {});
+}
+function onChatEvent(ev) {
+  if (ev.kind === 'room') {
+    loadChatRooms().catch(() => {});
+    return;
+  }
+  const m = ev.message;
+  if (!m) return;
+  const mine = m.authorId === store.state.currentUserId;
+  const known = store.state.chat?.rooms?.some((r) => r.id === m.roomId);
+  store.update((s) => {
+    const room = appendChat(s, m);
+    if (room && !mine && chatViewing !== m.roomId) room.unread = (room.unread || 0) + 1;
+  });
+  if (!known) loadChatRooms().catch(() => {});
+  if (!mine && chatViewing === m.roomId) markChatRead(m.roomId);
+}
+
+// ---- perfil (o próprio) ----
+export const saveProfile = (body) => request('/api/me', { method: 'PATCH', body }).then((r) => (store.update((s) => Object.assign(s.users.find((u) => u.id === r.me.id) || {}, r.me)), r.me));
 
 // ---- meta de receita do mês (Início) ----
 export const setGoal = (monthlyRevenue) => request('/api/tenant/goals', { method: 'PATCH', body: { monthlyRevenue } }).then((r) => (store.update((s) => { s.tenant.goals = r.goals; }), r.goals));

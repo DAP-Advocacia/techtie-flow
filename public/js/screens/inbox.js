@@ -3,7 +3,10 @@
 // coluna fica em screens/inbox/*.js, as regras de negócio em actions.js e a ponte
 // com o motor de permissões em perm.js. A tela NÃO decide permissão: pergunta ao motor.
 import { h, toast } from '../ui.js';
-import { audit } from '../access.js';
+import { audit, canAccess } from '../access.js';
+import { hashParam } from '../router.js';
+import { createChat } from './inbox/chat.js';
+import * as ChatA from './inbox/chat/actions.js';
 import { createList } from './inbox/list.js';
 import { createThread } from './inbox/thread.js';
 import { createComposer } from './inbox/composer.js';
@@ -21,7 +24,8 @@ const LEAD_REPLIES = {
 // outro usuário nunca herda a seleção. Além disso só vale se a conversa ainda é visível para ele.
 let remembered = { userId: null, id: null };
 
-export default {
+/** Atendimento (WhatsApp): lista · conversa · painel do contato. */
+const service = {
   mount(el, { store, navigate }) {
     const meId = store.state.currentUserId; // a tela é remontada a cada troca de usuário
     let selectedId = null; // estado por montagem: nada vaza entre usuários
@@ -268,6 +272,65 @@ export default {
         const m = messagesOf(store.state, convId).find((x) => x.id === msgId);
         if (m) m.status = 'delivered';
       }
+    };
+  },
+};
+
+/**
+ * A aba Inbox tem dois "inboxes" e a pessoa alterna entre eles: **Atendimento** (conversas de WhatsApp com clientes, quem tem
+ * permissão de ler conversas) e **Equipe** (chat interno entre as pessoas da empresa, aberto a todos).
+ * `#/inbox?view=chat` abre direto no chat.
+ */
+export default {
+  mount(el, ctx) {
+    const { store } = ctx;
+    const hasService = canAccess('conversation', 'read');
+    let mode = hasService && hashParam('view') !== 'chat' ? 'service' : 'chat';
+    const serviceHost = h('div', { class: 'inbox-pane' });
+    const chatHost = h('div', { class: 'inbox-pane' });
+    const chat = createChat({ store });
+    chatHost.append(chat.el);
+    const cleanupService = hasService ? service.mount(serviceHost, ctx) : null;
+
+    const badge = (n) => (n ? h('span', { class: 'badge' }, n > 99 ? '99+' : n) : null);
+    const bar = h('div', { class: 'inbox-modes', role: 'tablist', 'aria-label': 'Qual inbox ver' });
+    const tab = (id, label) => h('button', { class: 'inbox-mode', type: 'button', role: 'tab', 'data-mode': id, onclick: () => setMode(id) });
+    const tabs = { service: tab('service', 'Atendimento'), chat: tab('chat', 'Chat interno') };
+
+    function setMode(next) {
+      if (next === 'service' && !hasService) return;
+      mode = next;
+      try {
+        // sem recarregar a tela: só lembra na URL (compartilhar/voltar abre no mesmo inbox)
+        globalThis.history?.replaceState?.(null, '', next === 'chat' ? '#/inbox?view=chat' : '#/inbox');
+      } catch {
+        /* sem history (testes): ignora */
+      }
+      paint();
+    }
+    function paint() {
+      const svcUnread = hasService ? store.state.conversations.reduce((n, c) => n + (Number(c.unread) || 0), 0) : 0;
+      const chatUnread = ChatA.totalUnread();
+      for (const [id, b] of Object.entries(tabs)) {
+        b.classList.toggle('is-active', id === mode);
+        b.setAttribute('aria-selected', String(id === mode));
+        b.replaceChildren(id === 'service' ? 'Atendimento' : 'Chat interno', badge(id === 'service' ? svcUnread : chatUnread) || '');
+      }
+      serviceHost.hidden = mode !== 'service';
+      chatHost.hidden = mode !== 'chat';
+      chat.setActive(mode === 'chat');
+    }
+    // só há o que alternar quando a pessoa também atende clientes
+    if (hasService) bar.append(tabs.service, tabs.chat);
+    const shell = h('div', { class: 'inbox-shell' + (hasService ? '' : ' inbox-shell--chat') }, hasService ? bar : null, serviceHost, chatHost);
+    el.append(shell);
+    const unsub = store.subscribe(paint);
+    paint();
+
+    return () => {
+      unsub();
+      chat.destroy();
+      cleanupService?.();
     };
   },
 };

@@ -12,6 +12,8 @@ import { GROUPS, buildEntries, commandEntries, searchEntries, makeRecents } from
 export const NAV_COMMANDS = [
   { id: 'home', label: 'Início', keywords: 'inicio home resumo' },
   { id: 'inbox', label: 'Inbox', keywords: 'conversas whatsapp mensagens atendimento', require: ['conversation', 'read'] },
+  { id: 'inbox?view=chat', label: 'Chat interno', keywords: 'chat equipe conversa colegas grupo mensagem interna time' },
+  { id: 'profile', label: 'Meu perfil', keywords: 'perfil conta nome cargo telefone meus dados editar' },
   { id: 'pipeline', label: 'Negócios', keywords: 'funil pipeline vendas kanban', require: ['deal', 'read'] },
   { id: 'contacts', label: 'Contatos', keywords: 'clientes leads pessoas', require: ['contact', 'read'] },
   { id: 'tasks', label: 'Tarefas', keywords: 'atividades pendencias lembretes', require: ['task', 'read'] },

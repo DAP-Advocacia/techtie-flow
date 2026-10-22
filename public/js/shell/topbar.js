@@ -1,5 +1,6 @@
 // Barra superior (computador): recolher o menu, caminho da página, busca global (Ctrl+K), "+ Novo" e avisos.
-import { h, icon } from '../ui.js';
+import { h, icon, avatar } from '../ui.js';
+import { totalUnread as chatUnread } from '../screens/inbox/chat/actions.js';
 import { store } from '../store.js';
 import { visible, canAccess } from '../access.js';
 import { openMenu } from './menu.js';
@@ -21,7 +22,8 @@ export function attention() {
   const unread = convs.reduce((n, c) => n + (Number(c.unread) || 0), 0);
   const queue = convs.filter((c) => c.status === 'queue').length;
   const tasks = canAccess('task', 'read') ? todaySummary(visible('task', s.tasks || []), s.currentUserId) : { total: 0, overdue: 0 };
-  return { unread, queue, tasksToday: tasks.total, overdue: tasks.overdue, badge: unread + tasks.overdue };
+  const chat = chatUnread();
+  return { unread, queue, chat, tasksToday: tasks.total, overdue: tasks.overdue, badge: unread + chat + tasks.overdue };
 }
 
 /**
@@ -51,10 +53,13 @@ export function renderTopbar({ crumbs = [], onToggleSidebar, navigate }) {
     const items = [];
     if (now.unread) items.push({ label: `${now.unread} ${now.unread === 1 ? 'mensagem não lida' : 'mensagens não lidas'}`, hint: now.queue ? `${now.queue} na fila` : '', onSelect: () => navigate('inbox') });
     else if (now.queue) items.push({ label: `${now.queue} ${now.queue === 1 ? 'conversa na fila' : 'conversas na fila'}`, onSelect: () => navigate('inbox') });
+    if (now.chat) items.push({ label: `${now.chat} ${now.chat === 1 ? 'mensagem no chat interno' : 'mensagens no chat interno'}`, onSelect: () => (location.hash = '#/inbox?view=chat') });
     if (now.tasksToday) items.push({ label: `${now.tasksToday} ${now.tasksToday === 1 ? 'tarefa para hoje' : 'tarefas para hoje'}`, hint: now.overdue ? `${now.overdue} atrasada${now.overdue > 1 ? 's' : ''}` : '', onSelect: () => navigate('tasks') });
     if (!items.length) items.push({ label: 'Tudo em dia', disabled: true });
     openMenu(bell, items, { align: 'right' });
   });
-  return h('header', { class: 'topbar' }, toggle, trail, h('div', { class: 'topbar__grow' }), search, create, bell);
+  const me = store.user();
+  const profile = h('a', { class: 'topbar__me', href: '#/profile', 'aria-label': 'Meu perfil', title: me ? `${me.name} · Meu perfil` : 'Meu perfil' }, avatar(me?.name || '?', { small: true }));
+  return h('header', { class: 'topbar' }, toggle, trail, h('div', { class: 'topbar__grow' }), search, create, bell, profile);
 }
 
