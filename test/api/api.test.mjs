@@ -59,7 +59,7 @@ before(async () => {
   if (skip) return;
   h = await startPostgres(env.pg, 'api');
   const c = await h.admin.connect();
-  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); } finally { c.release(); }
+  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0007_pipeline_config.sql'), 'utf8')); } finally { c.release(); }
   seed('empresa-a', 'admin@a.com.br');
   seed('empresa-b', 'admin@b.com.br');
   tenantA = (await h.admin.query("SELECT id FROM tenants WHERE slug='empresa-a'")).rows[0].id;
@@ -834,4 +834,116 @@ test('meta do mês: só quem altera configurações grava; chega no bootstrap na
   // fica na auditoria
   const audited = (await h.admin.query("SELECT count(*)::int AS n FROM audit_log WHERE tenant_id = $1 AND action = 'tenant.goals'", [tenantA])).rows[0].n;
   assert.ok(audited >= 3, `auditoria da meta: ${audited}`);
+});
+
+test('funis configuráveis: criar, renomear, editar etapas (probabilidade, ordem), travas com negócios e motivos de perda', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const adminB = await login('admin@b.com.br');
+  const boot = () => call('/api/bootstrap', { token: admin });
+  const post = (path, token, body, method = 'POST') => call(path, { method, token, body });
+
+  // o que já existia ganhou probabilidade (ganho 100, perdido 0, abertas espalhadas)
+  const comercial = (await boot()).pipelines.find((p) => p.name === 'Comercial');
+  assert.deepEqual(comercial.stages.map((st) => [st.kind, st.probability]), [['open', 33], ['open', 67], ['won', 100], ['lost', 0]]);
+
+  // quem não tem a permissão é recusado em tudo
+  assert.equal((await post('/api/pipelines', ana, { name: 'Do atendente' })).status, 403);
+  assert.equal((await post(`/api/pipelines/${comercial.id}`, ana, { name: 'X' }, 'PATCH')).status, 403);
+  assert.equal((await post(`/api/pipelines/${comercial.id}/stages`, ana, { stages: [] }, 'PUT')).status, 403);
+  assert.equal((await post(`/api/pipelines/${comercial.id}`, ana, null, 'DELETE')).status, 403);
+  assert.equal((await post('/api/loss-reasons', ana, { reasons: ['A'] }, 'PUT')).status, 403);
+
+  // criar com etapas padrão
+  const created = await post('/api/pipelines', admin, { name: 'Pós-venda' });
+  assert.equal(created.status, 200, JSON.stringify(created));
+  const pv = created.pipeline;
+  assert.deepEqual(pv.stages.map((st) => [st.name, st.kind, st.probability]), [['Novo', 'open', 25], ['Qualificação', 'open', 50], ['Proposta', 'open', 75], ['Ganho', 'won', 100], ['Perdido', 'lost', 0]]);
+  assert.ok((await boot()).pipelines.some((p) => p.id === pv.id && p.stages.length === 5));
+  assert.equal((await post('/api/pipelines', admin, { name: '  pós-venda ' })).status, 409, 'nome repetido (sem diferenciar caixa)');
+  assert.equal((await post('/api/pipelines', admin, { name: '   ' })).status, 400);
+
+  // renomear
+  assert.equal((await post(`/api/pipelines/${pv.id}`, admin, { name: 'Sucesso do cliente' }, 'PATCH')).pipeline.name, 'Sucesso do cliente');
+  assert.equal((await post(`/api/pipelines/${comercial.id}`, admin, { name: 'sucesso do cliente' }, 'PATCH')).status, 409);
+
+  // etapas: renomear, reordenar, acrescentar, mudar probabilidade; ganho/perdido são forçados a 100/0
+  const [n, q, pr, w, l] = pv.stages;
+  const edited = await post(`/api/pipelines/${pv.id}/stages`, admin, { stages: [{ id: q.id, name: 'Em análise', kind: 'open', probability: 40 }, { id: n.id, name: 'Novo contato', kind: 'open', probability: 10 }, { name: 'Reunião', kind: 'open', probability: 60.4 }, { id: pr.id, name: 'Proposta enviada', kind: 'open', probability: 80 }, { id: w.id, name: 'Fechado', kind: 'won', probability: 50 }, { id: l.id, name: 'Perdido', kind: 'lost', probability: 30 }] }, 'PUT');
+  assert.equal(edited.status, 200, JSON.stringify(edited));
+  assert.deepEqual(edited.pipeline.stages.map((st) => [st.name, st.kind, st.probability]), [['Em análise', 'open', 40], ['Novo contato', 'open', 10], ['Reunião', 'open', 60], ['Proposta enviada', 'open', 80], ['Fechado', 'won', 100], ['Perdido', 'lost', 0]]);
+  assert.equal(edited.pipeline.stages[0].id, q.id, 'a etapa mantém o id (negócios continuam ligados)');
+  const stageIds = edited.pipeline.stages.map((st) => st.id);
+
+  // validações
+  const put = (stages) => post(`/api/pipelines/${pv.id}/stages`, admin, { stages }, 'PUT');
+  const ok = (extra = {}) => ({ id: stageIds[0], name: 'A', kind: 'open', probability: 10, ...extra });
+  assert.equal((await put([ok(), { name: 'B', kind: 'won' }])).status, 400, 'menos de 3 etapas');
+  assert.equal((await put([ok(), { id: stageIds[1], name: 'B', kind: 'open', probability: 5 }, { id: stageIds[4], name: 'C', kind: 'won' }])).status, 400, 'sem etapa perdida');
+  assert.equal((await put([ok(), { id: stageIds[4], name: 'C', kind: 'won' }, { id: stageIds[5], name: 'D', kind: 'lost' }, { name: 'E', kind: 'open', probability: 101 }])).status, 400, 'probabilidade acima de 100');
+  assert.equal((await put([ok(), ok(), { id: stageIds[4], name: 'C', kind: 'won' }, { id: stageIds[5], name: 'D', kind: 'lost' }])).status, 400, 'etapa repetida');
+  assert.equal((await put([ok({ id: comercial.stages[0].id }), { id: stageIds[4], name: 'C', kind: 'won' }, { id: stageIds[5], name: 'D', kind: 'lost' }])).status, 400, 'etapa de outro funil');
+  assert.equal((await put([ok({ kind: 'nada' }), { id: stageIds[4], name: 'C', kind: 'won' }, { id: stageIds[5], name: 'D', kind: 'lost' }])).status, 400, 'tipo inválido');
+
+  // com negócio na etapa: não remove nem muda o tipo; depois de mover, pode
+  const deal = (await post('/api/deals', admin, { title: 'Negócio no funil novo', pipelineId: pv.id, stageId: stageIds[1], value: 100 })).deal;
+  const keepAll = (over) => edited.pipeline.stages.map((st, i) => ({ id: st.id, name: st.name, kind: st.kind, probability: st.probability, ...(over[i] || {}) }));
+  const noStage1 = keepAll({}).filter((st) => st.id !== stageIds[1]);
+  const r409 = await put(noStage1);
+  assert.equal(r409.status, 409);
+  assert.match(r409.error || r409.message || '', /“Novo contato” tem 1 negócio/);
+  assert.equal((await put(keepAll({ 1: { kind: 'won' } }))).status, 409, 'tipo não muda com negócio na etapa');
+  assert.equal((await put(keepAll({ 1: { name: 'Contato inicial', probability: 20 } }))).status, 200, 'nome e probabilidade mudam à vontade');
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: admin, body: { stageId: stageIds[0] } })).deal.stageId, stageIds[0]);
+  assert.equal((await put(noStage1.map((st) => (st.id === stageIds[1] ? st : st)))).status, 200, 'sem negócio, a etapa sai');
+
+  // motivos de perda
+  const reasons = (list) => post('/api/loss-reasons', admin, { reasons: list }, 'PUT');
+  assert.equal((await reasons(['Preço', 'preço'])).status, 400, 'repetido');
+  assert.equal((await reasons(['x'.repeat(81)])).status, 400);
+  const saved = await reasons(['Preço', 'Escolheu concorrente', 'Sem resposta']);
+  assert.deepEqual(saved.lossReasons.map((x) => x.name), ['Preço', 'Escolheu concorrente', 'Sem resposta']);
+  assert.deepEqual((await boot()).lossReasons.map((x) => x.name), ['Preço', 'Escolheu concorrente', 'Sem resposta']);
+  assert.deepEqual((await call('/api/bootstrap', { token: ana })).lossReasons.map((x) => x.name), ['Preço', 'Escolheu concorrente', 'Sem resposta'], 'quem lê negócios recebe a lista');
+  assert.deepEqual((await call('/api/bootstrap', { token: adminB })).lossReasons, [], 'outra empresa não herda');
+  const lostId = (await boot()).pipelines.find((p) => p.id === pv.id).stages.find((st) => st.kind === 'lost').id;
+  const lose = (body) => call(`/api/deals/${deal.id}`, { method: 'PATCH', token: admin, body: { stageId: lostId, ...body } });
+  assert.equal((await lose({})).status, 400, 'perder exige o motivo');
+  assert.equal((await lose({ lostReason: 'Porque sim' })).status, 400, 'motivo fora da lista');
+  const lost = await lose({ lostReason: 'Preço' });
+  assert.equal(lost.status, 200, JSON.stringify(lost));
+  assert.equal(lost.deal.lostReason, 'Preço');
+  assert.equal(lost.deal.status, 'lost');
+  assert.ok((await call(`/api/deals/${deal.id}/activity`, { token: admin })).activity.some((a) => /moveu de .* para Perdido \(motivo: Preço\)/.test(a.text)), 'o motivo aparece na atividade');
+  const reopened = await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: admin, body: { stageId: stageIds[0] } });
+  assert.equal(reopened.deal.lostReason, null, 'reabrir limpa o motivo');
+  assert.equal((await reasons([])).lossReasons.length, 0);
+  assert.equal((await lose({})).status, 200, 'sem lista configurada o motivo é opcional');
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: admin, body: { stageId: stageIds[0] } })).status, 200);
+
+  // isolamento: a outra empresa não enxerga nem altera o funil
+  assert.equal((await post(`/api/pipelines/${pv.id}`, adminB, { name: 'Invasão' }, 'PATCH')).status, 404);
+  assert.equal((await post(`/api/pipelines/${pv.id}/stages`, adminB, { stages: edited.pipeline.stages }, 'PUT')).status, 404);
+  assert.equal((await post(`/api/pipelines/${pv.id}`, adminB, null, 'DELETE')).status, 404);
+
+  // excluir: com negócio não; sem negócio sim
+  const del409 = await post(`/api/pipelines/${pv.id}`, admin, null, 'DELETE');
+  assert.equal(del409.status, 409);
+  assert.match(del409.error || del409.message || '', /tem 1 negócio/);
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'DELETE', token: admin })).status, 200);
+  assert.equal((await post(`/api/pipelines/${pv.id}`, admin, null, 'DELETE')).status, 200);
+  assert.ok(!(await boot()).pipelines.some((p) => p.id === pv.id));
+
+  // a empresa não fica sem funil nenhum
+  let left = (await call('/api/bootstrap', { token: adminB })).pipelines;
+  assert.ok(left.length >= 1);
+  while (left.length > 1) {
+    assert.equal((await post(`/api/pipelines/${left[0].id}`, adminB, null, 'DELETE')).status, 200);
+    left = left.slice(1);
+  }
+  const last = await post(`/api/pipelines/${left[0].id}`, adminB, null, 'DELETE');
+  assert.equal(last.status, 409);
+  assert.match(last.error || last.message || '', /pelo menos um funil/);
+  const audited = (await h.admin.query("SELECT count(*)::int AS n FROM audit_log WHERE tenant_id = $1 AND action LIKE 'pipeline.%'", [tenantA])).rows[0].n;
+  assert.ok(audited >= 6, `auditoria dos funis: ${audited}`);
 });

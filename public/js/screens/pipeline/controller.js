@@ -57,7 +57,7 @@ export function createDealController({ root, navigate, rerender = () => {}, onSe
     const doMove = (reason) => {
       const r = A.moveDeal(dealId, stageId, { reason }); // re-verifica no motor (a permissão pode ter mudado com o modal aberto)
       if (!r.ok) {
-        toast(`Não foi possível mover para ${stage.name}: ${P.reasonOf(r.decision, 'mover este negócio')}`);
+        toast(`Não foi possível mover para ${stage.name}: ${r.error || P.reasonOf(r.decision, 'mover este negócio')}`);
         return;
       }
       toast(`Movido para ${stage.name}`);

@@ -43,6 +43,7 @@ const ROUTES = [
   { id: 'automations', label: 'Automações', shell: true, nav: true, desktopOnly: true, require: ['automation', 'read'] },
   { id: 'dashboard', label: 'Dashboard', shell: true, nav: true, require: ['report', 'read'] },
   { id: 'instances', label: 'Instâncias', shell: true, nav: true, require: ['instance', 'read'] },
+  { id: 'funnels', label: 'Funis', shell: true, nav: true, admin: true, desktopOnly: true, require: ['pipeline', 'update'] },
   { id: 'users', label: 'Usuários', shell: true, nav: true, admin: true, desktopOnly: true, require: ['user', 'read'] },
   { id: 'settings', label: 'Configurações', shell: true, nav: true, admin: true, desktopOnly: true, require: ['tenant_settings', 'read'] },
   { id: 'permissions', label: 'Permissões', shell: true, nav: true, admin: true, desktopOnly: true, require: ['role', 'read'] },

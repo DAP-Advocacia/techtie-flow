@@ -60,7 +60,10 @@ try {
     const pid = randomUUID();
     await client.query('INSERT INTO pipelines (id, tenant_id, name) VALUES ($1, $2, $3)', [pid, tenantId, f.name]);
     let pos = 0;
-    for (const [name, kind] of f.stages) await client.query('INSERT INTO pipeline_stages (tenant_id, pipeline_id, name, kind, position) VALUES ($1, $2, $3, $4, $5)', [tenantId, pid, name, kind, pos++]);
+    let open = 0;
+    const nOpen = f.stages.filter(([, k]) => k === 'open').length;
+    // probabilidade: ganho 100, perdido 0, abertas espalhadas pelo funil (2 abertas → 33 e 67)
+    for (const [name, kind] of f.stages) await client.query('INSERT INTO pipeline_stages (tenant_id, pipeline_id, name, kind, position, probability) VALUES ($1, $2, $3, $4, $5, $6)', [tenantId, pid, name, kind, pos++, kind === 'won' ? 100 : kind === 'lost' ? 0 : Math.round((100 * ++open) / (nOpen + 1))]);
   }
   await client.query('COMMIT');
   console.log(`Tenant "${tenantName}" criado (${tenantId}). Admin: ${email}`);

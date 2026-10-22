@@ -50,6 +50,7 @@ test('Início: "Fechando este mês" lista só negócios abertos com previsão ne
   const titles = closingRows(host).map((r) => text($(r, '.home-closing__title')));
   assert.deepEqual(titles, ['Dashboards de BI', 'Implantação CRM + WhatsApp'], 'ordem pela data; ganho e mês seguinte ficam de fora');
   assert.match(text($(card, '.home-card__sum')), /2 negócios · R\$\s?60\.400/);
+  assert.match(text($(card, '.home-card__sum')), /previsão ponderada R\$\s?40\.700/, 'Negociação 75% de 42.000 + Proposta 50% de 18.400');
   assert.equal($(card, '.home-card__link').getAttribute('href'), '#/pipeline?view=closing');
   assert.equal(closingRows(host)[0].getAttribute('href'), '#/deal?id=d3');
   if (now.getDate() > 1) {

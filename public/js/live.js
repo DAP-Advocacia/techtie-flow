@@ -169,6 +169,8 @@ function onEvent(ev) {
     if (viewing === ev.conversation.id && ev.message?.direction === 'in') markRead(viewing);
   } else if (ev.type === 'tasks') {
     hydrateSoon(); // alguém criou, delegou ou compartilhou uma tarefa comigo
+  } else if (ev.type === 'pipelines') {
+    hydrateSoon(); // alguém mudou funis, etapas ou motivos de perda
   } else if (ev.type === 'instance') {
     store.update((s) => upsertInstance(s, ev.instance));
     for (const fn of [...instanceListeners]) fn(ev);
@@ -229,7 +231,7 @@ export const sendMessage = (convId, type, text, local) =>
 
 export const patchConversation = (convId, body) => sync(() => request(`/api/conversations/${convId}`, { method: 'PATCH', body }).then((r) => store.update((s) => mergeConversation(s, r.conversation))));
 
-export const moveDeal = (dealId, stageId) => sync(() => request(`/api/deals/${dealId}`, { method: 'PATCH', body: { stageId } }).then((r) => store.update((s) => replaceById(s.deals, dealId, r.deal))));
+export const moveDeal = (dealId, stageId, lostReason) => sync(() => request(`/api/deals/${dealId}`, { method: 'PATCH', body: { stageId, ...(lostReason ? { lostReason } : {}) } }).then((r) => store.update((s) => replaceById(s.deals, dealId, r.deal))));
 
 /** Cria no servidor o negócio criado localmente (e o contato novo, se houver). */
 export const createDeal = (local, newContact) =>
@@ -302,6 +304,19 @@ export const createContact = (body) =>
   });
 export const updateContact = (id, body) => request(`/api/contacts/${id}`, { method: 'PATCH', body }).then((r) => (store.update((s) => replaceById(s.contacts, id, r.contact)), r.contact));
 export const deleteContact = (id) => request(`/api/contacts/${id}`, { method: 'DELETE' }).then(() => store.update((s) => { s.contacts = s.contacts.filter((c) => c.id !== id); }));
+
+// ---- funis configuráveis (esperam o servidor: os IDs são dele) ----
+const putPipeline = (p) =>
+  store.update((s) => {
+    const i = s.pipelines.findIndex((x) => x.id === p.id);
+    if (i === -1) s.pipelines.push(p);
+    else s.pipelines[i] = { ...s.pipelines[i], ...p };
+  });
+export const createPipeline = (body) => request('/api/pipelines', { method: 'POST', body }).then((r) => (putPipeline(r.pipeline), r.pipeline));
+export const renamePipeline = (id, name) => request(`/api/pipelines/${id}`, { method: 'PATCH', body: { name } }).then((r) => (putPipeline(r.pipeline), r.pipeline));
+export const savePipelineStages = (id, stages) => request(`/api/pipelines/${id}/stages`, { method: 'PUT', body: { stages } }).then((r) => (putPipeline(r.pipeline), r.pipeline));
+export const deletePipeline = (id) => request(`/api/pipelines/${id}`, { method: 'DELETE' }).then(() => store.update((s) => { s.pipelines = s.pipelines.filter((p) => p.id !== id); }));
+export const saveLossReasons = (reasons) => request('/api/loss-reasons', { method: 'PUT', body: { reasons } }).then((r) => (store.update((s) => { s.lossReasons = r.lossReasons; }), r.lossReasons));
 
 // ---- meta de receita do mês (Início) ----
 export const setGoal = (monthlyRevenue) => request('/api/tenant/goals', { method: 'PATCH', body: { monthlyRevenue } }).then((r) => (store.update((s) => { s.tenant.goals = r.goals; }), r.goals));

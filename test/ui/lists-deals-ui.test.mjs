@@ -70,6 +70,10 @@ test('Negócios: o alternador troca o quadro pela lista (e lembra); visão padr�
   assert.equal(ptitles(host)[0], 'Implantação CRM + WhatsApp', 'mais novo primeiro');
   assert.match(text($(host, `${PL} .lt-count`)), /4 negócios/);
   assert.match(text($(host, `${PL} .lt-count`)), /Soma R\$\s?100\.400/);
+  assert.match(text($(host, `${PL} .lt-count`)), /ponderada R\$\s?70\.700/, 'valor × probabilidade da etapa');
+  openPanelBtn(host, 'columns');
+  assert.ok(/Valor ponderado/.test(text(panelOf(host))) && /Probabilidade/.test(text(panelOf(host))), 'colunas de probabilidade e valor ponderado disponíveis');
+  openPanelBtn(host, 'columns');
   assert.match(text(rowOf(host, 'Implantação')), /Carlos Menezes/, 'contato aparece pelo nome');
   assert.match(text(rowOf(host, 'Implantação')), /Marina Alves/);
   assert.equal($(rowOf(host, 'Implantação'), 'a.lt-link').getAttribute('href'), '#/deal?id=d1');

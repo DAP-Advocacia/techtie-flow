@@ -1,0 +1,195 @@
+/* Funis (#/funnels): lista de funis à esquerda; nome, etapas, motivos de perda e exclusão à direita. */
+.funnels {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+}
+.funnels-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.funnels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.funnels-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.funnels-item:hover {
+  background: var(--glow);
+}
+.funnels-item.is-active {
+  background: var(--line);
+}
+.funnels-item__name {
+  font-weight: 600;
+}
+.funnels-item__sub,
+.funnels-hint {
+  font-size: 12.5px;
+  color: var(--mute);
+  line-height: 1.45;
+}
+.funnels-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.funnels-card {
+  padding: 20px 22px;
+  gap: 14px;
+}
+.funnels-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.funnels-namerow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.funnels-namerow .input {
+  max-width: 420px;
+}
+
+/* ---------- etapas ---------- */
+.funnels-stages,
+.funnels-reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.funnels-stage {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) 150px 110px 100px auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+.funnels-stage[data-kind='won'] {
+  border-left-color: var(--green);
+}
+.funnels-stage[data-kind='lost'] {
+  border-left-color: var(--red);
+}
+.funnels-stage[data-kind='open'] {
+  border-left-color: var(--acc);
+}
+.funnels-stage .input,
+.funnels-stage .select,
+.funnels-reason .input {
+  padding: 9px 12px;
+  font-size: 14px;
+}
+.funnels-stage__order {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.funnels-move,
+.funnels-x {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--mute);
+}
+.funnels-x {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+.funnels-move:hover:not(:disabled),
+.funnels-x:hover:not(:disabled) {
+  background: var(--line);
+  color: var(--text);
+}
+.funnels-move:disabled,
+.funnels-x:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.funnels-stage__probwrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.funnels-stage__prob {
+  text-align: right;
+}
+.funnels-stage__n {
+  white-space: nowrap;
+}
+.funnels-reason {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 520px;
+}
+.funnels-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.funnels-spacer {
+  flex: 1;
+}
+.funnels-card--danger {
+  border-color: color-mix(in srgb, var(--red) 35%, var(--line));
+}
+.funnels-card--danger .funnels-hint {
+  margin: 0;
+}
+.funnels-danger:not(:disabled) {
+  color: var(--red);
+}
+
+@media (max-width: 1000px) {
+  .funnels-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .funnels-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .funnels-item {
+    width: auto;
+  }
+  .funnels-stage {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .funnels-stage__kind,
+  .funnels-stage__probwrap,
+  .funnels-stage__n {
+    grid-column: 2 / 3;
+  }
+}

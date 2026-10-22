@@ -209,7 +209,7 @@ module.exports = function registerCrmRoutes(H) {
               text = `${who(l.actor_id)} alterou ${(d.fields || []).map((f) => FIELD_TEXT[f] || f).join(', ') || 'o negócio'}`;
               break;
             case 'deal.move':
-              text = `${who(l.actor_id)} moveu de ${stages[d.from] || 'uma etapa'} para ${stages[d.to] || 'outra etapa'}`;
+              text = `${who(l.actor_id)} moveu de ${stages[d.from] || 'uma etapa'} para ${stages[d.to] || 'outra etapa'}${d.reason ? ` (motivo: ${d.reason})` : ''}`;
               break;
             case 'deal.transfer':
               text = `${who(l.actor_id)} passou o negócio para ${who(d.to)}`;

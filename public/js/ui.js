@@ -71,6 +71,7 @@ export const ICONS = {
   tasks: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
   inbox: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
   pipeline: 'M3 3h6v18H3zM15 3h6v10h-6z',
+  funnels: 'M3 4h18l-7 8v6l-4 2v-8z',
   agent: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z',
   automations: 'M13 2L4 14h7l-1 8 9-12h-7z',
   dashboard: 'M4 20V10M10 20V4M16 20v-7M22 20H2',

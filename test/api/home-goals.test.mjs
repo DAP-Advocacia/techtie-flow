@@ -28,7 +28,13 @@ test('fechando este mês: só abertos com previsão no mês, do mais próximo ao
   assert.equal(r.overdueBefore, 1);
   assert.equal(r.total, 650);
   assert.equal(closingThisMonth({ deals, stageKind: (id) => kind[id], now: NOW, valueHidden: true }).total, null, 'valor oculto: sem total (nunca 0)');
-  assert.deepEqual(closingThisMonth({}), { rows: [], count: 0, late: 0, overdueBefore: 0, total: 0 });
+  assert.deepEqual(closingThisMonth({}), { rows: [], count: 0, late: 0, overdueBefore: 0, total: 0, weighted: 0 });
+  // previsão ponderada: valor × probabilidade da etapa de cada negócio (etapa sem probabilidade conta 0)
+  const prob = { a: 50, b: 20 };
+  const w = closingThisMonth({ deals: [{ stageId: 'a', value: 1000, expectedClose: '2026-10-30' }, { stageId: 'b', value: 500, expectedClose: '2026-10-25' }, { stageId: 'zz', value: 999, expectedClose: '2026-10-26' }], stageKind: () => 'open', probability: (id) => prob[id], now: NOW });
+  assert.equal(w.total, 2499);
+  assert.equal(w.weighted, 600, '1000×50% + 500×20% + 999×0%');
+  assert.equal(closingThisMonth({ deals: [{ stageId: 'a', value: 1000, expectedClose: '2026-10-30' }], probability: () => 50, now: NOW, valueHidden: true }).weighted, null, 'valor oculto: sem previsão');
 });
 
 test('meta do mês: soma só os ganhos deste mês, % da meta, o que falta, dias restantes e ritmo', () => {

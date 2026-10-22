@@ -65,6 +65,9 @@ export function moveDeal(dealId, stageId, { reason = '' } = {}) {
   const decision = P.moveDecision(deal, stage);
   if (decision.effect !== 'allow') return denied(decision);
   if (deal.stageId === stageId) return allowed(decision);
+  // motivo da perda: com a lista da empresa cadastrada (tela Funis) ele é obrigatório e precisa ser um dos motivos
+  const reasons = (store.state.lossReasons || []).map((r) => r.name);
+  if (stage?.kind === 'lost' && reasons.length && !reasons.includes(String(reason).trim())) return { ok: false, error: 'Informe o motivo da perda.' };
   store.update((s) => {
     const d = s.deals.find((x) => x.id === dealId);
     if (!d || d.stageId === stageId) return;
@@ -74,7 +77,7 @@ export function moveDeal(dealId, stageId, { reason = '' } = {}) {
     else delete d.lostReason;
     logTimeline(s, d.contactId, `Negócio movido para ${stage?.name || 'outra etapa'}`);
   });
-  if (live.enabled) live.moveDeal(dealId, stageId);
+  if (live.enabled) live.moveDeal(dealId, stageId, stage?.kind === 'lost' ? String(reason).trim() : undefined);
   return allowed(decision);
 }
 

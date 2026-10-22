@@ -6,6 +6,7 @@ import { canAccess, visible, fieldLevel } from '../../access.js';
 import { parseDay } from '../../lists/model.js';
 import { isOpen } from '../tasks/model.js';
 import { kindOf } from './perm.js';
+import { weightedValue } from '../funnels/model.js';
 
 const DAY = 86400000;
 const fmtDate = (t) => new Date(t).toLocaleDateString('pt-BR');
@@ -64,6 +65,8 @@ export function dealColumns(pipeline) {
       visible: true,
     },
     { id: 'expectedClose', label: 'Previsão de fechamento', type: 'date', get: (d) => (d.expectedClose ? parseDay(d.expectedClose) : null), cell: (d) => (d.expectedClose && !Number.isNaN(parseDay(d.expectedClose)) ? lateDate(parseDay(d.expectedClose), statusOf(d) === 'open') : '—'), visible: true },
+    { id: 'probability', label: 'Probabilidade', type: 'number', get: (d) => { const p = Number(store.stage(d.stageId)?.probability); return Number.isFinite(p) ? p : null; }, cell: (d) => { const p = Number(store.stage(d.stageId)?.probability); return Number.isFinite(p) ? `${p}%` : '—'; }, align: 'right' },
+    valueOk && { id: 'weighted', label: 'Valor ponderado', type: 'money', get: (d) => weightedValue(d.value, store.stage(d.stageId)?.probability), align: 'right' },
     { id: 'daysInStage', label: 'Dias na etapa', type: 'number', get: (d) => (d.stageChangedAt ? Math.max(0, Math.floor((Date.now() - d.stageChangedAt) / DAY)) : null), align: 'right' },
     {
       id: 'status',
@@ -89,7 +92,7 @@ export function dealViews(userId) {
     v('open', 'Em aberto', base, [open], { col: 'createdAt', dir: 'desc' }),
     v('all', 'Todos os negócios', [...base.slice(0, 5), 'status', 'createdAt'], [], { col: 'createdAt', dir: 'desc' }),
     v('mine', 'Meus em aberto', base, [open, { col: 'owner', op: 'is', value: userId }], { col: 'createdAt', dir: 'desc' }),
-    v('closing', 'Fechando este mês', ['title', 'contact', 'stage', 'value', 'owner', 'expectedClose'], [open, { col: 'expectedClose', op: 'thisMonth' }], { col: 'expectedClose', dir: 'asc' }),
+    v('closing', 'Fechando este mês', ['title', 'contact', 'stage', 'value', 'weighted', 'owner', 'expectedClose'], [open, { col: 'expectedClose', op: 'thisMonth' }], { col: 'expectedClose', dir: 'asc' }),
     v('stale', 'Parados há 7+ dias', ['title', 'contact', 'stage', 'value', 'owner', 'daysInStage'], [open, { col: 'daysInStage', op: 'gt', value: 6 }], { col: 'daysInStage', dir: 'desc' }),
   ];
   if (canAccess('task', 'read')) views.push(v('notask', 'Sem tarefa em aberto', ['title', 'contact', 'stage', 'value', 'owner', 'openTasks'], [open, { col: 'openTasks', op: 'eq', value: 0 }], { col: 'createdAt', dir: 'desc' }));

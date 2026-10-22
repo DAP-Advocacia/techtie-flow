@@ -18,6 +18,7 @@ export const NAV_COMMANDS = [
   { id: 'dashboard', label: 'Dashboard', keywords: 'numeros relatorios metricas', require: ['report', 'read'] },
   { id: 'agent', label: 'Agente de IA', keywords: 'ia robo automatico openai', require: ['ai_agent', 'read'] },
   { id: 'instances', label: 'Instâncias', keywords: 'numeros whatsapp qr conexao', require: ['instance', 'read'] },
+  { id: 'funnels', label: 'Funis', keywords: 'etapas pipeline probabilidade motivos perda configurar funil', require: ['pipeline', 'update'] },
 ];
 
 const recents = () => makeRecents(window.localStorage || globalThis.localStorage);

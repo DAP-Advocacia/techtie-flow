@@ -10,6 +10,7 @@ export function applyBootstrap(s, d, { keepMessages = false } = {}) {
   s.roles = d.roles;
   s.teams = d.teams;
   s.pipelines = d.pipelines;
+  s.lossReasons = d.lossReasons || [];
   s.contacts = d.contacts;
   s.deals = d.deals;
   s.products = d.products || [];

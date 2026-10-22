@@ -10,6 +10,7 @@ import { mask, fieldLevel } from '../access.js';
 import { createTable } from '../lists/table.js';
 import { dealColumns, dealCtx, dealViews } from './pipeline/list.js';
 import { dealBulk } from './pipeline/bulk.js';
+import { weightedValue } from './funnels/model.js';
 import { renderBoard, clearDrag, autoScroll } from './pipeline/board.js';
 import { renderPanel, renderPanelEmpty } from './pipeline/panel.js';
 import { createDealController, sending } from './pipeline/controller.js';
@@ -183,7 +184,7 @@ export default {
             searchPlaceholder: 'Buscar por negócio, contato ou empresa',
             rowHref: (d) => linkTo('deal', { id: d.id }),
             onOpen: open,
-            summary: (rows) => (fieldLevel('deal', 'value') === 'hidden' ? '' : `Soma ${fmtBRL(rows.reduce((n, d) => n + (Number(d.value) || 0), 0))}`),
+            summary: (rows) => (fieldLevel('deal', 'value') === 'hidden' ? '' : `Soma ${fmtBRL(rows.reduce((n, d) => n + (Number(d.value) || 0), 0))} · ponderada ${fmtBRL(rows.reduce((n, d) => n + (weightedValue(d.value, store.stage(d.stageId)?.probability) || 0), 0))}`),
           })
         );
       }

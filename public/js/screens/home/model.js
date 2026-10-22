@@ -1,5 +1,6 @@
 // Modelo PURO da tela Início (sem DOM, sem store): recebe listas JÁ filtradas pelo motor de permissões e devolve
 // os números do resumo. Testado em Node (test/api/home-model.test.mjs).
+import { weightedValue } from '../funnels/model.js';
 
 /** "Bom dia" / "Boa tarde" / "Boa noite" para a hora local. */
 export function greeting(date = new Date()) {
@@ -53,9 +54,10 @@ function parseDay(s) {
 /**
  * Negócios EM ABERTO com previsão de fechamento no mês corrente, do mais próximo ao mais distante.
  * `late` marca a previsão que já passou (e o negócio segue aberto); `overdueBefore` conta os de meses anteriores.
- * @returns {{ rows: {deal, at, late}[], count, late, overdueBefore, total: number|null }}
+ * `weighted` = soma de valor × probabilidade da etapa (previsão de receita ponderada); `probability(stageId)` vem do funil.
+ * @returns {{ rows: {deal, at, late}[], count, late, overdueBefore, total: number|null, weighted: number|null }}
  */
-export function closingThisMonth({ deals = [], stageKind = () => 'open', now = new Date(), valueHidden = false }) {
+export function closingThisMonth({ deals = [], stageKind = () => 'open', probability = () => null, now = new Date(), valueHidden = false }) {
   const [from, to] = monthRange(now);
   const today = startOfDay(now);
   const rows = [];
@@ -68,7 +70,8 @@ export function closingThisMonth({ deals = [], stageKind = () => 'open', now = n
     else if (at < to) rows.push({ deal: d, at, late: at < today });
   }
   rows.sort((a, b) => a.at - b.at || money(b.deal.value) - money(a.deal.value));
-  return { rows, count: rows.length, late: rows.filter((r) => r.late).length, overdueBefore, total: valueHidden ? null : rows.reduce((n, r) => n + money(r.deal.value), 0) };
+  const weighted = rows.reduce((n, r) => n + (weightedValue(r.deal.value, probability(r.deal.stageId)) || 0), 0);
+  return { rows, count: rows.length, late: rows.filter((r) => r.late).length, overdueBefore, total: valueHidden ? null : rows.reduce((n, r) => n + money(r.deal.value), 0), weighted: valueHidden ? null : Math.round(weighted * 100) / 100 };
 }
 
 /**

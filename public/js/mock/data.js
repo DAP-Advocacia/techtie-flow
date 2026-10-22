@@ -66,10 +66,10 @@ export function createMockData(now = Date.now()) {
       name: 'Vendas · SDR',
       teamId: 'tm_sdr',
       stages: [
-        { id: 's_novo', name: 'Novo lead', accent: '#6e6353' },
-        { id: 's_qualif', name: 'Qualificação', accent: 'var(--ins)' },
-        { id: 's_reuniao', name: 'Reunião', accent: 'var(--acc)' },
-        { id: 's_ganho_sdr', name: 'Ganho', accent: 'var(--green)', kind: 'won' },
+        { id: 's_novo', name: 'Novo lead', accent: '#6e6353', probability: 15 },
+        { id: 's_qualif', name: 'Qualificação', accent: 'var(--ins)', probability: 35 },
+        { id: 's_reuniao', name: 'Reunião', accent: 'var(--acc)', probability: 60 },
+        { id: 's_ganho_sdr', name: 'Ganho', accent: 'var(--green)', kind: 'won', probability: 100 },
       ],
     },
     {
@@ -77,10 +77,10 @@ export function createMockData(now = Date.now()) {
       name: 'Comercial',
       teamId: 'tm_comercial',
       stages: [
-        { id: 's_proposta', name: 'Proposta', accent: 'var(--acc)' },
-        { id: 's_negoc', name: 'Negociação', accent: 'var(--acc)' },
-        { id: 's_fechamento', name: 'Fechamento', accent: 'var(--green)', kind: 'won' },
-        { id: 's_perdido', name: 'Perdido', accent: 'var(--red)', kind: 'lost' },
+        { id: 's_proposta', name: 'Proposta', accent: 'var(--acc)', probability: 50 },
+        { id: 's_negoc', name: 'Negociação', accent: 'var(--acc)', probability: 75 },
+        { id: 's_fechamento', name: 'Fechamento', accent: 'var(--green)', kind: 'won', probability: 100 },
+        { id: 's_perdido', name: 'Perdido', accent: 'var(--red)', kind: 'lost', probability: 0 },
       ],
     },
     {
@@ -88,9 +88,9 @@ export function createMockData(now = Date.now()) {
       name: 'Pós-venda',
       teamId: 'tm_cs',
       stages: [
-        { id: 's_onboarding', name: 'Onboarding', accent: 'var(--ins)' },
-        { id: 's_ativo', name: 'Ativo', accent: 'var(--green)' },
-        { id: 's_renovacao', name: 'Renovação', accent: 'var(--acc)' },
+        { id: 's_onboarding', name: 'Onboarding', accent: 'var(--ins)', probability: 25 },
+        { id: 's_ativo', name: 'Ativo', accent: 'var(--green)', probability: 50 },
+        { id: 's_renovacao', name: 'Renovação', accent: 'var(--acc)', probability: 75 },
       ],
     },
   ];
@@ -280,6 +280,8 @@ export function createMockData(now = Date.now()) {
 
   return {
     auditLog, tenant, roles, users, teams, pipelines, products, contacts, deals,
+    // motivos de perda da empresa (vazio = o motivo ao perder um negócio é opcional)
+    lossReasons: [],
     conversations, messages, timeline, instances, agent, automations, dashboard, messageTemplates,
     // usuário logado no protótipo
     currentUserId: 'u_marina',

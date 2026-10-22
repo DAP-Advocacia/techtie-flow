@@ -38,7 +38,7 @@ const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 // --------------------------------------------------------------------- mapeamentos DB → API
 const apiContact = (r) => ({ id: r.id, name: r.name, company: r.company || '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null, createdAt: ms(r.created_at) });
-const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], proposalSentAt: ms(r.proposal_sent_at), expectedClose: dateStr(r.expected_close), lastMessage: '' });
+const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], proposalSentAt: ms(r.proposal_sent_at), expectedClose: dateStr(r.expected_close), lostReason: r.lost_reason || null, lastMessage: '' });
 const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null, ownerId: r.owner_id || null, teamId: r.team_id || null, ownerName: r.owner_name || '', aiActive: !!r.ai_active });
 const apiMessage = (r) => ({
   id: r.id,
@@ -240,7 +240,7 @@ function createApp({ pool, config, hub, channel, openai }) {
         const pipelines = canAccess(access, 'pipeline', 'read')
           ? (await c.query(`SELECT t.id, t.name FROM pipelines t WHERE ${pw.sql} ORDER BY t.name`, pw.params)).rows
           : canAccess(access, 'deal', 'read') ? (await c.query('SELECT id, name FROM pipelines ORDER BY name')).rows : [];
-        const stages = pipelines.length ? (await c.query('SELECT id, pipeline_id, name, kind FROM pipeline_stages WHERE pipeline_id = ANY($1::uuid[]) ORDER BY pipeline_id, position', [pipelines.map((p) => p.id)])).rows : [];
+        const stages = pipelines.length ? (await c.query('SELECT id, pipeline_id, name, kind, probability FROM pipeline_stages WHERE pipeline_id = ANY($1::uuid[]) ORDER BY pipeline_id, position', [pipelines.map((p) => p.id)])).rows : [];
         const iw = listWhere(access, 'instance', 'read');
         const instances = canAccess(access, 'instance', 'read') ? (await c.query(`SELECT t.id, t.name, t.channel, t.status, t.phone, t.attention_reason, t.owner_id, t.team_id, t.ai_active, (SELECT u.name FROM users u WHERE u.id = t.owner_id) AS owner_name FROM instances t WHERE ${iw.sql} ORDER BY t.name`, iw.params)).rows : [];
         const teams = (await c.query('SELECT id, name, parent_id FROM teams ORDER BY name')).rows;
@@ -282,8 +282,10 @@ function createApp({ pool, config, hub, channel, openai }) {
           })),
           roles: [...E.SYSTEM_ROLES, ...tenantRoles],
           teams: teams.map((t) => ({ id: t.id, name: t.name, parentId: t.parent_id, members: memberLinks.filter((m) => m.team_id === t.id).length, pipelineId: null })),
-          pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, teamId: null, stages: stages.filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name, kind: s.kind, accent: s.kind === 'won' ? 'var(--green)' : s.kind === 'lost' ? 'var(--red)' : 'var(--acc)' })) })),
+          pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, teamId: null, stages: stages.filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name, kind: s.kind, probability: Number(s.probability) || 0, accent: s.kind === 'won' ? 'var(--green)' : s.kind === 'lost' ? 'var(--red)' : 'var(--acc)' })) })),
           // maskRow: campos que o perfil não pode ver (telefone, valor…) NEM saem do servidor
+          // motivos de perda: quem lê negócios precisa deles para perder um negócio
+          lossReasons: canAccess(access, 'deal', 'read') || canAccess(access, 'pipeline', 'read') ? (await c.query('SELECT id, name FROM loss_reasons ORDER BY position')).rows : [],
           contacts: [...contacts.rows, ...viaConversation].map((r) => apiContact(E.maskRow(access.ctx, 'contact', r))),
           deals: deals.rows.map((r) => ({ ...apiDeal(E.maskRow(access.ctx, 'deal', r)), sharedWith: sharedOf(r.id) })),
           agent: canAccess(access, 'ai_agent', 'read') ? await aiH.loadAgent(c) : undefined,
@@ -491,6 +493,7 @@ function createApp({ pool, config, hub, channel, openai }) {
         sets.push(`${col} = $${vals.length + 1}`);
       };
       let context;
+      let lostReason = null;
       if (body.title !== undefined) {
         const t = String(body.title).trim();
         if (!t || t.length > 200) throw bad('Título inválido.');
@@ -532,6 +535,16 @@ function createApp({ pool, config, hub, channel, openai }) {
         const from = stages.find((s) => s.id === cur.stage_id);
         // contexto da movimentação: DERIVADO DO BANCO (o cliente não pode declarar "etapa aberta")
         context = { fromStageId: cur.stage_id, toStageId: to, fromStageKind: from?.kind || 'open', toStageKind: dest.kind };
+        // motivo da perda: com a lista da empresa configurada ele é obrigatório e precisa ser um dos motivos; reabrir limpa
+        if (dest.kind === 'lost' && to !== cur.stage_id) {
+          const reasons = (await c.query('SELECT name FROM loss_reasons')).rows.map((x) => x.name);
+          const raw = body.lostReason == null ? '' : String(body.lostReason).trim();
+          if (reasons.length && !raw) throw bad('Informe o motivo da perda.');
+          if (reasons.length && !reasons.includes(raw)) throw bad('Motivo da perda inválido.');
+          if (raw.length > 200) throw bad('Motivo da perda: até 200 caracteres.');
+          lostReason = raw || null;
+          set('lost_reason', lostReason);
+        } else if (dest.kind !== 'lost' && cur.lost_reason) set('lost_reason', null);
         patch.stageId = to;
         patch.status = dest.kind;
         set('stage_id', to);
@@ -555,7 +568,7 @@ function createApp({ pool, config, hub, channel, openai }) {
       const r = await c.query(`UPDATE deals SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, [id, ...vals]);
       const edited = ['title', 'value', 'items', 'expectedClose'].filter((k) => body[k] !== undefined);
       if (edited.length) await audit(c, access, req, 'deal.update', 'deal', id, { fields: edited });
-      if (context || patch.ownerId) await audit(c, access, req, context ? 'deal.move' : 'deal.transfer', 'deal', id, context ? { from: context.fromStageId, to: context.toStageId } : { from: cur.owner_id, to: patch.ownerId });
+      if (context || patch.ownerId) await audit(c, access, req, context ? 'deal.move' : 'deal.transfer', 'deal', id, context ? { from: context.fromStageId, to: context.toStageId, ...(lostReason ? { reason: lostReason } : {}) } : { from: cur.owner_id, to: patch.ownerId });
       return { deal: apiDeal(r.rows[0]) };
     });
   });
@@ -633,6 +646,7 @@ function createApp({ pool, config, hub, channel, openai }) {
   require('./routes-tasks')(taskH);
   const aiH = { pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, openai };
   require('./ai-routes')(aiH);
+  require('./routes-pipelines')({ pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, hub });
   require('./routes-crm')({ pool, route, must, bad, forbidden, notFound, HttpError, uuidOr400, tx, listWhere, getAccess, audit, withShares, visibleDeal, convRow, dealRow, apiContact, apiDeal, apiInstance, postOut, announce, EMAIL });
 
   // ===================================================================== USUÁRIOS

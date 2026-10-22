@@ -19,9 +19,16 @@ function report(ok, total, doneOne, doneMany) {
 }
 
 /** Confirmação simples (com motivo opcional): onConfirm(motivo). */
-export function openBulkConfirm({ title, message, confirmLabel, danger = false, withReason = false, onConfirm }) {
-  const reason = withReason ? h('textarea', { class: 'textarea', rows: '2', maxlength: '300', placeholder: 'Motivo (opcional)', 'aria-label': 'Motivo' }) : null;
-  const ok = h('button', { class: 'btn btn--primary', type: 'button' }, confirmLabel);
+export function openBulkConfirm({ title, message, confirmLabel, danger = false, withReason = false, reasons = [], onConfirm }) {
+  // com motivos cadastrados (tela Funis) escolher um é obrigatório; sem lista, texto livre opcional
+  const required = withReason && reasons.length > 0;
+  const reason = !withReason
+    ? null
+    : required
+      ? h('select', { class: 'select', 'aria-label': 'Motivo da perda' }, h('option', { value: '' }, 'Escolha o motivo da perda…'), ...reasons.map((n) => h('option', { value: n }, n)))
+      : h('textarea', { class: 'textarea', rows: '2', maxlength: '300', placeholder: 'Motivo (opcional)', 'aria-label': 'Motivo' });
+  const ok = h('button', { class: 'btn btn--primary', type: 'button', disabled: required }, confirmLabel);
+  if (required) reason.addEventListener('change', () => (ok.disabled = !reason.value));
   const cancel = h('button', { class: 'btn btn--quiet', type: 'button', 'data-autofocus': true }, 'Cancelar');
   const dlg = openDialog({ eyebrow: danger ? 'AÇÃO SEM VOLTA' : 'EM MASSA', title, content: h('div', { class: 'contacts-form' }, h('p', { class: 'muted' }, message), reason, h('div', { class: 'contacts-form__actions' }, cancel, ok)) });
   cancel.addEventListener('click', () => dlg.close());
@@ -54,6 +61,7 @@ export function moveBulk(rows, stageId, done) {
       message: stage.kind === 'won' ? 'Os negócios serão marcados como ganhos.' : 'Os negócios serão marcados como perdidos.',
       confirmLabel: `Mover para ${stage.name}`,
       withReason: stage.kind === 'lost',
+      reasons: (store.state.lossReasons || []).map((r) => r.name),
       onConfirm: apply,
     });
   } else apply();

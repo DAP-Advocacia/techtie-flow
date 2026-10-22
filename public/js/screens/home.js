@@ -34,7 +34,7 @@ const plural = (n, one, many) => `${fmtInt(n)} ${n === 1 ? one : many}`;
 
 /** Negócios abertos com previsão de fechamento neste mês (do mais próximo ao mais distante). */
 function closingCard(c, valueHidden) {
-  const sub = [plural(c.count, 'negócio', 'negócios'), valueHidden || c.total == null ? null : fmtBRL(c.total), c.late ? `${c.late} com previsão vencida` : null].filter(Boolean).join(' · ');
+  const sub = [plural(c.count, 'negócio', 'negócios'), valueHidden || c.total == null ? null : fmtBRL(c.total), valueHidden || !c.weighted ? null : `previsão ponderada ${fmtBRL(c.weighted)}`, c.late ? `${c.late} com previsão vencida` : null].filter(Boolean).join(' · ');
   return h(
     'section',
     { class: 'home-card home-closing', 'aria-label': 'Fechando este mês' },
@@ -151,7 +151,7 @@ export default {
 
       // "Fechando este mês" (previsão de fechamento) e meta do mês. A meta é da EMPRESA: só aparece para quem lê os negócios
       // de todo o tenant (senão o ganho parcial do perfil pareceria atraso em relação à meta) e que enxerga os valores.
-      const closing = canDeals ? closingThisMonth({ deals, stageKind, valueHidden }) : null;
+      const closing = canDeals ? closingThisMonth({ deals, stageKind, probability: (id) => store.stage(id)?.probability, valueHidden }) : null;
       const dealRead = canDeals ? matrixFor()?.deal?.read : null;
       const goal = canDeals && !valueHidden && dealRead?.scope === 'tenant' && !dealRead.conditional ? monthGoal({ deals, stageKind, goal: s.tenant?.goals?.monthlyRevenue }) : null;
 

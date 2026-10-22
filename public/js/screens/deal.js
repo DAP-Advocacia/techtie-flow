@@ -55,7 +55,7 @@ export default {
       activityLoading = false;
       if (alive && tab === 'activity') draw();
     }
-    const signature = (d) => [d.stageId, d.ownerId, d.value, d.title, d.proposalSentAt, d.expectedClose, (d.items || []).length, A.itemsOf(d).length, tasksOfDeal(d.id).map((t) => `${t.id}${t.status}`).join(',')].join('|');
+    const signature = (d) => [d.stageId, d.ownerId, d.value, d.title, d.proposalSentAt, d.expectedClose, d.lostReason, (d.items || []).length, A.itemsOf(d).length, tasksOfDeal(d.id).map((t) => `${t.id}${t.status}`).join(',')].join('|');
 
     const field = (label, value, { wide = false } = {}) => h('div', { class: 'deal-field' + (wide ? ' deal-field--wide' : '') }, h('dt', { class: 'label' }, label), h('dd', null, value ?? '—'));
 
@@ -167,6 +167,7 @@ export default {
           field('Responsável', owner?.name || 'Sem responsável'),
           field('Equipe', team?.name || '—'),
           field('Previsão de fechamento', fmtDay(deal.expectedClose)),
+          kind === 'lost' ? field('Motivo da perda', deal.lostReason || '—') : null,
           field('Criado em', fmtDate(deal.createdAt)),
           field('Na etapa desde', fmtDate(deal.stageChangedAt)),
           field('Última proposta enviada', deal.proposalSentAt ? fmtDate(deal.proposalSentAt) : '—'),
