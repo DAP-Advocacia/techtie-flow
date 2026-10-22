@@ -5,6 +5,7 @@ import { fieldLevel, decide, audit } from '../../access.js';
 import { store } from '../../store.js';
 import * as live from '../../live.js';
 import { ensureScreenCss } from '../../css.js';
+import { burst } from '../../fx.js';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -84,6 +85,7 @@ export function openContactForm({ contact = null, onSaved } = {}) {
             const saved = live.enabled ? (editing ? await live.updateContact(contact.id, body) : await live.createContact(body)) : saveLocal(contact, body);
             dlg.close();
             toast(editing ? 'Contato atualizado' : 'Contato criado');
+            if (!editing) burst({ n: 7 });
             onSaved?.(saved);
           } catch (err) {
             error.textContent = err.message || 'Não foi possível salvar.';

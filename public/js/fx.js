@@ -56,6 +56,26 @@ export function burstOnce(key) {
   return burst();
 }
 
+/** Botão "trabalhando": mostra o anel girando (CSS) e ignora cliques até acabar. */
+export function busy(el, on) {
+  if (!el) return;
+  if (on) el.setAttribute('aria-busy', 'true');
+  else el.removeAttribute('aria-busy');
+}
+
+/** Estrelinhas paradas que piscam devagar (fundo do login): posições e tempos espalhados, sem repetir padrão. */
+export function sparkles(n = 9) {
+  const box = document.createElement('div');
+  box.className = 'fx-sparkles';
+  box.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('span');
+    s.style.cssText = `left:${Math.round(6 + ((i * 37 + 11) % 88))}%;top:${Math.round(8 + ((i * 53 + 7) % 84))}%;--s:${(0.5 + ((i * 29) % 7) / 8).toFixed(2)};--d:${(i * 0.7).toFixed(1)}s;--t:${(3.2 + ((i * 13) % 5) * 0.6).toFixed(1)}s`;
+    box.append(s);
+  }
+  return box;
+}
+
 export function initFx() {
   if (!hasDom()) return;
   document.addEventListener(

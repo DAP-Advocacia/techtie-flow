@@ -71,3 +71,8 @@ Contatos (**Lista | Tabela**) e Negócios (**Quadro | Lista**). No celular só e
   principal ganha um brilho que cruza ao passar o mouse e "afunda" ao pressionar; o que é IA (menu do Agente, mensagens do agente)
   pisca devagar como uma estrela; chuva curta de brilhos de 4 pontas ao **ganhar um negócio**, **concluir uma tarefa** e **bater a
   meta do mês**. Só decora, em dourado da marca, e some com "reduzir movimento". Teste: `test/ui/fx.test.mjs`.
+- **Brilho, rodada 2**: a tela que abre **sobe suave** e os cartões entram em sequência (a barra da meta enche do zero e os números
+  do resumo "estalam"); avisos entram deslizando com uma estrelinha dourada e saem suaves; botões que estão salvando mostram um **anel
+  girando**; mensagens do chat carregando mostram **esqueleto** com brilho passando; criar contato ou negócio solta um brilho
+  pequeno (ganhar negócio, concluir tarefa e bater a meta continuam com o maior); o login ganha **estrelinhas** piscando ao fundo.
+  Tudo some com "reduzir movimento".

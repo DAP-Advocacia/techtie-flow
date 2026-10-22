@@ -140,7 +140,10 @@ export function toast(message, ms = 2600) {
   }
   const t = h('div', { class: 'toast' }, message);
   toastHost.append(t);
-  setTimeout(() => t.remove(), ms);
+  setTimeout(() => {
+    t.classList.add('is-leaving'); // sai deslizando e some
+    setTimeout(() => t.remove(), 220);
+  }, ms);
 }
 
 /** Toggle acessível. onChange(novoValor). Devolve o <button>. */

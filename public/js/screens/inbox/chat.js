@@ -3,6 +3,7 @@
 // as regras puras (títulos, não lidas, agrupamento) em chat/model.js.
 import { h, icon, ICONS, replaceChildren, avatar, fmtListTime, fmtTime, toast } from '../../ui.js';
 import { openDialog } from '../contacts/form.js';
+import { busy } from '../../fx.js';
 import * as A from './chat/actions.js';
 import { roomTitle, previewOf, peerOf, matchRoom, groupMessages, cleanDraft, MAX_GROUP } from './chat/model.js';
 
@@ -17,6 +18,7 @@ export function createChat({ store }) {
   let query = '';
   let active = false; // a aba do chat está à vista (só então marca como lida)
   let lastSig = '';
+  let loadingId = null; // sala cujas mensagens ainda estão vindo do servidor (mostra o esqueleto)
   let stick = true; // a conversa acompanha as mensagens novas (se a pessoa não subiu para ler o histórico)
 
   // ---------------------------------------------------------------- esqueleto fixo (o rascunho não se perde ao redesenhar)
@@ -65,8 +67,10 @@ export function createChat({ store }) {
     const body = cleanDraft(input.value);
     if (!selectedId || !body) return;
     sendBtn.disabled = true;
+    busy(sendBtn, true);
     const r = await A.send(selectedId, body);
     sendBtn.disabled = false;
+    busy(sendBtn, false);
     if (!r.ok) {
       toast(r.error);
       return;
@@ -189,7 +193,14 @@ export function createChat({ store }) {
     stick = true;
     lastSig = '';
     setView('thread');
-    A.load(id);
+    if (!A.messagesOf(id).length) {
+      loadingId = id;
+      A.load(id).finally(() => {
+        if (loadingId === id) loadingId = null;
+        lastSig = '';
+        draw();
+      });
+    } else A.load(id);
     A.setViewing(active ? id : null);
     draw();
     if (focus) input.focus();
@@ -234,6 +245,10 @@ export function createChat({ store }) {
       room.kind === 'group' && room.members.length < MAX_GROUP ? h('button', { class: 'btn btn--quiet btn--sm chat-add', type: 'button', onclick: () => openInvite(room) }, '+ Pessoa') : null
     );
     const items = groupMessages(A.messagesOf(room.id));
+    if (loadingId === room.id && !items.length) {
+      replaceChildren(msgsEl, h('div', { class: 'chat-skel', 'aria-label': 'Carregando mensagens', 'aria-busy': 'true' }, ...[62, 40, 74, 48].map((w, i) => h('span', { class: 'skeleton chat-skel__bar' + (i % 2 ? ' is-mine' : ''), style: { width: `${w}%` } }))));
+      return;
+    }
     replaceChildren(
       msgsEl,
       ...(items.length ? items : [h('div', { class: 'chat-first muted' }, room.kind === 'group' ? 'Grupo criado. Diga olá!' : `Comece a conversa com ${roomTitle(room, me, nameOf).split(' ')[0]}.`)]).map((it) => {

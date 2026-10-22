@@ -209,7 +209,7 @@ export default {
     function stagesCard(p) {
       const upd = check('pipeline', 'update', { id: p.id });
       const list = stagesOf(p);
-      const saveBtn = lock(h('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-fk': 'save-stages', disabled: busy || !dirtyStages(p) }, 'Salvar etapas'), upd);
+      const saveBtn = lock(h('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-fk': 'save-stages', 'aria-busy': busy ? 'true' : null, disabled: busy || !dirtyStages(p) }, 'Salvar etapas'), upd);
       const discard = h('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-fk': 'discard-stages', hidden: !dirtyStages(p), onclick: () => (drafts.delete(p.id), (errors.stages = ''), draw()) }, 'Descartar alterações');
       const add = lock(h('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-fk': 'add-stage', disabled: list.length >= MAX_STAGES, onclick: () => {
         const copy = [...list];
@@ -250,7 +250,7 @@ export default {
         const x = lock(h('button', { class: 'funnels-x', type: 'button', 'aria-label': `Remover o motivo ${r || i + 1}`, 'data-fk': `rx${i}`, onclick: () => ((reasonsDraft = reasonsOf().filter((_, j) => j !== i)), draw()) }, icon(CLOSE, 16)), upd);
         return h('li', { class: 'funnels-reason' }, input, x);
       });
-      const save = lock(h('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-fk': 'save-reasons', disabled: busy || !dirty }, 'Salvar motivos'), upd);
+      const save = lock(h('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-fk': 'save-reasons', 'aria-busy': busy ? 'true' : null, disabled: busy || !dirty }, 'Salvar motivos'), upd);
       save.addEventListener('click', async () => {
         errors.reasons = '';
         const r = await run(() => A.saveLossReasons(reasonsDraft), 'Motivos de perda salvos');

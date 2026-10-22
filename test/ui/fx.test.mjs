@@ -87,3 +87,25 @@ test('CSS: pressionar, brilho do botão principal, IA piscando e movimento reduz
   assert.match(css, /\.btn:active:not\(:disabled\)[^}]*\{\s*transform: scale\(0\.97\)/s);
   assert.match(css, /prefers-reduced-motion: reduce\) \{\s*\.fx-ripple/);
 });
+
+test('rodada 2: aviso sai suave, botão ocupado, estrelinhas do login, esqueleto e entrada de tela no CSS', async () => {
+  const { toast } = await import('../../public/js/ui.js');
+  toast('Teste de saída', 20);
+  const t = [...document.querySelectorAll('.toast')].find((x) => x.textContent === 'Teste de saída');
+  assert.ok(t);
+  await new Promise((r) => setTimeout(r, 60));
+  assert.ok(t.classList.contains('is-leaving'), 'primeiro sai deslizando');
+  await new Promise((r) => setTimeout(r, 260));
+  assert.equal(t.isConnected, false, 'depois some do DOM');
+  const b = document.createElement('button');
+  fx.busy(b, true);
+  assert.equal(b.getAttribute('aria-busy'), 'true');
+  fx.busy(b, false);
+  assert.equal(b.hasAttribute('aria-busy'), false);
+  const sp = fx.sparkles(9);
+  assert.equal(sp.children.length, 9);
+  assert.equal(sp.getAttribute('aria-hidden'), 'true');
+  assert.ok([...sp.children].every((s) => /left:\d+%;top:\d+%/.test(s.style.cssText)));
+  for (const k of ['.fx-in > *', '@keyframes fx-bar', ".btn[aria-busy='true']::before", '.skeleton::after', '.toast.is-leaving', '.fx-sparkles span']) assert.ok(css.includes(k), k);
+  assert.match(css, /prefers-reduced-motion: reduce\) \{\s*\.fx-in \*/);
+});

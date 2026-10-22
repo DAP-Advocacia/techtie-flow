@@ -4,6 +4,7 @@ import { store } from '../store.js';
 import { toast } from '../ui.js';
 import { ensureScreenCss } from '../css.js';
 import { linkTo } from '../router.js';
+import { burst } from '../fx.js';
 import { openTaskPanel } from '../screens/tasks/panel.js';
 import * as TA from '../screens/tasks/actions.js';
 import { openContactForm, canCreateContact } from '../screens/contacts/form.js';
@@ -38,6 +39,7 @@ export function newActions() {
           pipeline,
           onCreated: (deal) => {
             toast('Negócio criado');
+            burst({ n: 7 });
             location.hash = linkTo('deal', { id: deal.id });
           },
         });

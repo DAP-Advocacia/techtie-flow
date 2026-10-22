@@ -127,7 +127,7 @@ export default {
               { class: 'profile-actions' },
               h('span', { class: 'profile-spacer' }),
               h('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'discard', hidden: !dirty(), onclick: () => ((draft = snapshot(me())), (errors = {}), (saved = ''), draw()) }, 'Descartar'),
-              h('button', { class: 'btn btn--primary', type: 'submit', 'data-act': 'save', disabled: busy || !dirty() }, busy ? 'Salvando…' : 'Salvar alterações')
+              h('button', { class: 'btn btn--primary', type: 'submit', 'data-act': 'save', 'aria-busy': busy ? 'true' : null, disabled: busy || !dirty() }, busy ? 'Salvando…' : 'Salvar alterações')
             )
           )
         )

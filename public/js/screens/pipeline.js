@@ -17,6 +17,7 @@ import { createDealController, sending } from './pipeline/controller.js';
 import { openNewDeal } from './pipeline/new-deal.js';
 import { openMoveMenu, closeMoveMenu } from './pipeline/move-menu.js';
 import { createPicker } from './pipeline/picker.js';
+import { burst } from '../fx.js';
 import { closeAllModals } from './pipeline/modal.js';
 import * as A from './pipeline/actions.js';
 import * as P from './pipeline/perm.js';
@@ -309,6 +310,7 @@ export default {
           render();
           el.querySelector(`[data-deal-id="${CSS.escape(deal.id)}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
           toast('Negócio criado');
+          burst({ n: 7 });
         },
       });
     }

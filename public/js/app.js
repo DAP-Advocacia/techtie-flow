@@ -276,6 +276,9 @@ async function render() {
     const mod = await import(`./screens/${route.id}.js`);
     if (token !== renderToken) return; // navegou de novo enquanto carregava
     screenCleanup = await mod.default.mount(screenEl, { store, navigate, route });
+    // a tela recém-aberta entra suave (elementos sobem em sequência); a classe sai logo, para redesenhos não repetirem a entrada
+    screenEl.classList.add('fx-in');
+    setTimeout(() => screenEl.classList.remove('fx-in'), 900);
   } catch (err) {
     console.error(`[app] falha ao montar a tela "${route.id}":`, err);
     if (token === renderToken) replaceChildren(screenEl, placeholder(route, err.code === 'MODULE_NOT_FOUND' ? null : err));

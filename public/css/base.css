@@ -595,3 +595,171 @@ p {
     transform: none;
   }
 }
+
+/* ---------- entrada de tela, carregando e detalhes (rodada 2 de brilho) ---------- */
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+/* a tela que acabou de abrir sobe suave e os cartões entram em sequência (a classe .fx-in sai em ~1s) */
+.fx-in > * {
+  animation: fx-rise 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field) {
+  animation: fx-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--n, 0) * 45ms);
+}
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field):nth-child(1) { --n: 1; }
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field):nth-child(2) { --n: 2; }
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field):nth-child(3) { --n: 3; }
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field):nth-child(4) { --n: 4; }
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field):nth-child(5) { --n: 5; }
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field):nth-child(6) { --n: 6; }
+.fx-in :is(.home-stat, .home-tile, .home-card, .pipeline-col, .tasks-card, .profile-card, .funnels-card, .deal-field):nth-child(n + 7) { --n: 7; }
+/* a barra da meta enche do zero */
+@keyframes fx-bar {
+  from {
+    width: 0;
+  }
+}
+.fx-in .home-goal__fill {
+  animation: fx-bar 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s backwards;
+}
+/* números do resumo "estalam" ao aparecer */
+@keyframes fx-num {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+}
+.fx-in .home-stat__value {
+  animation: fx-num 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s backwards;
+}
+
+/* botão trabalhando: anel dourado girando */
+@keyframes fx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.btn[aria-busy='true'] {
+  pointer-events: none;
+}
+.btn[aria-busy='true']::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: fx-spin 0.7s linear infinite;
+}
+
+/* esqueleto de carregamento (brilho que passa) */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--line);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--acc) 16%, transparent) 50%, transparent 80%);
+  animation: fx-shimmer 1.3s ease-in-out infinite;
+}
+@keyframes fx-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+.chat-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+.chat-skel__bar {
+  height: 38px;
+  align-self: flex-start;
+}
+.chat-skel__bar.is-mine {
+  align-self: flex-end;
+}
+
+/* aviso: estrelinha dourada, entra deslizando e sai suave */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: toast-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.toast::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: var(--acc);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+.toast.is-leaving {
+  opacity: 0;
+  transform: translateX(16px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* estrelinhas de fundo (login): paradas, piscando devagar */
+.fx-sparkles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.fx-sparkles span {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--acc);
+  opacity: 0;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  transform: scale(var(--s, 1));
+  animation: fx-twinkle var(--t, 4s) ease-in-out var(--d, 0s) infinite;
+}
+@keyframes fx-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(calc(var(--s, 1) * 0.4)) rotate(0);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(var(--s, 1)) rotate(45deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-in *,
+  .fx-in > *,
+  .fx-sparkles span,
+  .skeleton::after,
+  .btn[aria-busy='true']::before {
+    animation: none !important;
+  }
+  .fx-sparkles {
+    display: none;
+  }
+}
+/* as estrelinhas do login ficam ATRÁS do conteúdo */
+.login {
+  isolation: isolate;
+}
+.login > .fx-sparkles {
+  z-index: -1;
+}
