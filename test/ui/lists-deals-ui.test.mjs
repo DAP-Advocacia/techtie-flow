@@ -128,15 +128,18 @@ test('Negócios (lista): clicar na linha abre a página do negócio; cada funil 
   pick(pviews(host), 'open'); // a lista lembra a visão da vez anterior
   click(rowOf(host, 'Dashboards de BI'));
   assert.equal(location.hash, '#/deal?id=d3');
-  const pill = (name) => $$(host, '.pills [role="tab"]').find((b) => text(b) === name);
-  click(pill('Vendas · SDR'));
+  const choose = (name) => {
+    click($(host, '.picker__btn'));
+    click($$(host, '.picker__item').find((o) => text($(o, '.picker__item-name')) === name));
+  };
+  choose('Vendas · SDR');
   pick(pviews(host), 'open');
   assert.deepEqual(ptitles(host).sort(), ['Agente de IA p/ agendamento', 'Automação de cobrança', 'Site institucional']);
   openFilters(host);
   pick($(panelOf(host), '[data-focus="f-col"]'), 'stage');
   const stageNames = [...$(panelOf(host), '[data-focus="f-val"]').querySelectorAll('option')].map((o) => text(o));
   assert.ok(stageNames.includes('Qualificação') && !stageNames.includes('Negociação'), `etapas do funil SDR: ${stageNames}`);
-  click(pill('Comercial'));
+  choose('Comercial');
   assert.equal(ptitles(host).length, 4, 'voltou ao funil Comercial');
   cleanup();
 });

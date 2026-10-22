@@ -16,6 +16,7 @@ import { renderPanel, renderPanelEmpty } from './pipeline/panel.js';
 import { createDealController, sending } from './pipeline/controller.js';
 import { openNewDeal } from './pipeline/new-deal.js';
 import { openMoveMenu, closeMoveMenu } from './pipeline/move-menu.js';
+import { createPicker } from './pipeline/picker.js';
 import { closeAllModals } from './pipeline/modal.js';
 import * as A from './pipeline/actions.js';
 import * as P from './pipeline/perm.js';
@@ -65,20 +66,14 @@ export default {
       if (!Array.isArray(d.items)) d.items = [];
     });
 
-    const pills = h('div', {
-      class: 'pills',
-      role: 'tablist',
-      'aria-label': 'Pipeline',
-      onkeydown: (e) => {
-        const nav = { ArrowRight: 1, ArrowLeft: -1, Home: 'first', End: 'last' }[e.key];
-        if (nav === undefined) return;
-        const tabs = [...pills.querySelectorAll('[role="tab"]')];
-        const i = tabs.indexOf(document.activeElement);
-        if (i === -1) return;
-        e.preventDefault();
-        const next = nav === 'first' ? 0 : nav === 'last' ? tabs.length - 1 : (i + nav + tabs.length) % tabs.length;
-        tabs[next].click(); // a aba é selecionada ao receber foco (ativação automática); o render devolve o foco pelo data-focus
-        el.querySelector(`[data-focus="${CSS.escape(tabs[next].dataset.focus)}"]`)?.focus();
+    // Funil em lista suspensa (como no Bitrix): escala para empresas com muitos funis, onde abas não cabem.
+    const picker = createPicker({
+      label: 'Funil',
+      onPick: (id) => {
+        if (view.pipelineId === id) return;
+        view.pipelineId = id;
+        board.scrollLeft = 0;
+        render();
       },
     });
     const modeBtns = ['board', 'list'].map((id) => h('button', { class: 'pill', type: 'button', 'data-mode': id, 'aria-pressed': 'false', onclick: () => setMode(id) }, id === 'board' ? 'Quadro' : 'Lista'));
@@ -97,7 +92,7 @@ export default {
     const setMView = (v) => (pipelineEl.dataset.mview = v);
 
     pipelineEl.append(
-        h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), pills, modeToggle, h('div', { class: 'pipeline-header__new' }, newBtn, newHint)),
+        h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), picker.el, modeToggle, h('div', { class: 'pipeline-header__new' }, newBtn, newHint)),
         stagebar,
         listHost,
         h('div', { class: 'pipeline-body' }, mback, board, panel)
@@ -212,30 +207,8 @@ export default {
       const deal = selectedDeal(pipeline, deals);
       const levels = P.fieldLevels();
 
-      replaceChildren(
-        pills,
-        ...pipelines.map((p) =>
-          h(
-            'button',
-            {
-              class: 'pill',
-              type: 'button',
-              role: 'tab',
-              'aria-selected': String(p.id === pipeline?.id),
-              tabindex: p.id === pipeline?.id ? '0' : '-1', // roving tabindex: só a aba ativa entra na ordem de Tab
-              'aria-controls': 'pipeline-board',
-              'data-focus': `pill:${p.id}`,
-              onclick: () => {
-                if (view.pipelineId === p.id) return;
-                view.pipelineId = p.id;
-                board.scrollLeft = 0;
-                render();
-              },
-            },
-            p.name
-          )
-        )
-      );
+      const countOf = (p) => deals.filter((d) => d.pipelineId === p.id).length;
+      picker.update({ items: pipelines.map((p) => ({ id: p.id, name: p.name, sub: `${countOf(p)} ${countOf(p) === 1 ? 'negócio' : 'negócios'}` })), selectedId: pipeline?.id ?? null });
 
       // "+ Novo negócio": habilitado se o motor aceita algum responsável neste pipeline.
       const create = pipeline ? P.createOwners(pipeline) : null;
@@ -348,6 +321,7 @@ export default {
     return () => {
       alive = false;
       tables.forEach((t) => t.destroy());
+      picker.close();
       unsub();
       document.removeEventListener('dragend', clearDrag);
       clearDrag();

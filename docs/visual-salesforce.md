@@ -56,3 +56,14 @@ Contatos (**Lista | Tabela**) e Negócios (**Quadro | Lista**). No celular só e
 `test/ui/lists-ui.test.mjs`, `lists-deals-ui.test.mjs`, `home-ui.test.mjs`, `deal-ui.test.mjs`, `shell-ui.test.mjs`
 (telas em DOM simulado, com os perfis Admin, Gestor, SDR, Financeiro, Somente leitura e o de valor oculto) ·
 `test/api/api.test.mjs` (meta do mês e atividade do negócio contra Postgres real).
+
+## Ajustes de uso (depois da onda 4)
+- **Funil em lista suspensa** (Negócios): botão com o funil atual e a contagem de negócios; ao abrir, a lista de todos os funis, com
+  busca a partir de 6 funis e teclado (↑ ↓ Enter Esc). Substitui as pílulas, que não cabiam com muitos funis (`pipeline/picker.js`).
+- **Contatos (lista)**: filtros rápidos com contagem (Todos, Meus, Sem responsável, Com negócio aberto, Novos), ordenação (nome,
+  empresa, mais recentes) com letras, linhas com negócios abertos e responsável; a escolha fica lembrada. **Ficha**: copiar telefone
+  e e-mail, botão E-mail, etiquetas, "Cadastrado em", atividade (quando há) e **+ Negócio** com o contato já escolhido.
+- **Modais e gavetas**: todos abrem com animação (respeita "reduzir movimento"); no celular viram folha que sobe de baixo.
+  Medem a **área realmente visível** (`js/viewport.js` → `--vvh`/`--vvt`), então o teclado e as barras do navegador não escondem
+  mais os botões de baixo (ex.: criar tarefa no celular). Botões de ação de formulários longos ficam fixos ao rolar. O campo que
+  ganha foco dentro de um modal é trazido para o meio da tela. Teste estático em `test/ui/overlays.test.mjs` evita voltar a `100vh`.

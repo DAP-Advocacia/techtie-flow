@@ -23,7 +23,7 @@ export function contactCtx() {
     for (const t of visible('task', s.tasks || [])) if (t.contactId && isOpen(t)) count(tasks, t.contactId);
   }
   const users = s.users.filter((u) => !u.isBot && u.status !== 'inactive');
-  return { users, deals, openDeals, tasks, userName: (id) => store.userById(id)?.name || '' };
+  return { users, deals, openDeals, tasks, me: s.currentUserId, userName: (id) => store.userById(id)?.name || '' };
 }
 
 export function contactColumns() {

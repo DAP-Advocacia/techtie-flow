@@ -288,22 +288,30 @@
 /* diálogo (novo / editar / excluir) */
 .contacts-overlay {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vvt, 0px);
+  height: var(--vvh, 100dvh);
   z-index: 900;
   display: grid;
   place-items: center;
   padding: 16px;
   background: color-mix(in srgb, var(--bg) 72%, transparent);
   backdrop-filter: blur(2px);
+  animation: ov-fade 0.16s ease-out;
 }
 .contacts-dialog {
+  --pad-x: 24px;
+  --pad-b: 24px;
   width: min(460px, 100%);
-  max-height: calc(100vh - 32px);
+  max-height: calc(var(--vvh, 100dvh) - 32px);
   overflow: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 22px 24px 24px;
+  padding: 22px var(--pad-x) var(--pad-b);
+  animation: ov-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   background: var(--card);
@@ -319,10 +327,16 @@
   flex-direction: column;
   gap: 14px;
 }
+/* os botões ficam sempre à vista, mesmo quando o formulário rola */
 .contacts-form__actions {
+  position: sticky;
+  bottom: calc(-1 * var(--pad-b, 24px));
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  margin: 0 calc(-1 * var(--pad-x, 24px)) calc(-1 * var(--pad-b, 24px));
+  padding: 12px var(--pad-x, 24px) var(--pad-b, 24px);
+  background: linear-gradient(to bottom, transparent, var(--card) 14px);
 }
 @media (max-width: 820px) {
   .contacts-overlay {
@@ -330,8 +344,172 @@
     place-items: end stretch;
   }
   .contacts-dialog {
+    --pad-x: 16px;
+    --pad-b: calc(env(safe-area-inset-bottom) + 20px);
     width: auto;
     border-radius: 18px 18px 0 0;
-    padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
+    animation-name: ov-sheet;
+    animation-duration: 0.26s;
+  }
+}
+
+/* ---------- lista: filtros rápidos, ordenação, letras e linhas mais ricas ---------- */
+.contacts-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.contacts-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--mute);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.contacts-chip:hover {
+  color: var(--text);
+  border-color: var(--dim);
+}
+.contacts-chip.is-active {
+  color: var(--acc2);
+  border-color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 10%, var(--card));
+  font-weight: 600;
+}
+.contacts-chip__n {
+  font-size: 11px;
+  color: var(--mute);
+}
+.contacts-chip.is-active .contacts-chip__n {
+  color: var(--acc2);
+}
+.contacts-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.contacts-sort {
+  width: auto;
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+.contacts-letter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px 4px;
+  background: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--acc);
+}
+.contacts-item__meta {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.contacts-item__deals {
+  padding: 1px 8px;
+  border: 1px solid var(--dim);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--acc2);
+  white-space: nowrap;
+}
+
+/* ---------- ficha: copiar, etiquetas, cabeçalho de bloco e atividade ---------- */
+.contacts-kv dd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.contacts-kv__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.contacts-copy {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mute);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.contacts-copy:hover {
+  color: var(--acc);
+}
+.contacts-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.contacts-block__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.contacts-block__head .contacts-block__title {
+  margin: 0;
+}
+.contacts-block__add {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--acc);
+  font-size: 13px;
+}
+.contacts-block__add:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.contacts-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.contacts-history li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+}
+.contacts-history li + li {
+  border-top: 1px solid var(--line);
+}
+.contacts-history__time {
+  font-size: 12px;
+  color: var(--mute);
+}
+
+@media (max-width: 820px) {
+  /* os filtros rápidos viram uma faixa que rola de lado (não ocupam a tela inteira) */
+  .contacts-quick {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -14px;
+    padding: 0 14px 4px;
+    scrollbar-width: none;
+  }
+  .contacts-quick::-webkit-scrollbar {
+    display: none;
   }
 }

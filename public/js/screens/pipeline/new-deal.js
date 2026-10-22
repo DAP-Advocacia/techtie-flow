@@ -9,7 +9,7 @@ import { createOwners, createStageDecision, fieldLevels, reasonOf } from './perm
 
 const NEW_CONTACT = '__new__';
 
-export function openNewDeal({ pipeline, onCreated }) {
+export function openNewDeal({ pipeline, onCreated, contactId = null }) {
   const s = store.state;
   const stages = pipeline?.stages || [];
   // Responsável: só quem o motor aceita como dono de um negócio novo neste pipeline (Atendente/SDR: ele mesmo).
@@ -34,6 +34,7 @@ export function openNewDeal({ pipeline, onCreated }) {
     ...contacts.map((c) => h('option', { value: c.id }, c.company ? `${c.name} — ${c.company}` : c.name)),
     mayCreateContact ? h('option', { value: NEW_CONTACT }, '+ Novo contato…') : null
   );
+  if (contactId && contacts.some((c) => c.id === contactId)) contact.value = contactId; // vindo da ficha do contato
   const cname = h('input', { class: 'input', type: 'text', maxlength: '80', autocomplete: 'off', placeholder: 'Nome do contato' });
   const ccompany = h('input', { class: 'input', type: 'text', maxlength: '80', autocomplete: 'off', placeholder: 'Empresa (opcional)' });
   const cphone = h('input', { class: 'input', type: 'tel', maxlength: '24', autocomplete: 'off', placeholder: '+55 11 90000-0000' });

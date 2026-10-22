@@ -2,9 +2,9 @@
 // Só mostra o que o motor deixa ler (visible) e respeita campos ocultos do perfil (telefone/e-mail).
 // Celular: a ficha abre em tela cheia (botão voltar) e só existe o modo lista; computador: lista à esquerda, ficha à direita
 // — ou, no modo Tabela, a tabela ocupa a tela e a ficha abre no lugar dela (com botão voltar).
-import { h, icon, replaceChildren, avatar, fmtBRL, fmtInt, timeAgo } from '../ui.js';
+import { h, icon, replaceChildren, avatar, fmtBRL, fmtInt, timeAgo, toast } from '../ui.js';
 import { canAccess, visible, fieldLevel, mask, decide } from '../access.js';
-import { hashParam } from '../router.js';
+import { hashParam, linkTo } from '../router.js';
 import { isMobile } from '../mobile.js';
 import { ensureScreenCss } from '../css.js';
 import { openContactForm, openDeleteContact, canCreateContact } from './contacts/form.js';
@@ -13,6 +13,8 @@ import { createTable } from '../lists/table.js';
 import { tasksBlock } from './tasks/mini.js';
 import { tasksOfContact } from './tasks/actions.js';
 import { pointInboxTo } from './pipeline/actions.js';
+import { dealTarget } from '../shell/new.js';
+import { openNewDeal } from './pipeline/new-deal.js';
 
 const PAGE = 60;
 const HIDDEN = '••• oculto';
@@ -28,6 +30,44 @@ function savedMode() {
   }
 }
 
+const PREFS_KEY = 'ttf:contacts:list';
+const DAY = 86400000;
+/** Filtros rápidos da lista (as mesmas ideias das visões da tabela). `needs` = só para quem lê negócios. */
+const QUICK = [
+  { id: 'all', label: 'Todos', test: () => true },
+  { id: 'mine', label: 'Meus', test: (c, ctx) => c.ownerId === ctx.me },
+  { id: 'noowner', label: 'Sem responsável', test: (c) => !c.ownerId },
+  { id: 'withdeal', label: 'Com negócio aberto', needs: 'deal', test: (c, ctx) => (ctx.openDeals.get(c.id) || 0) > 0 },
+  { id: 'recent', label: 'Novos (30 dias)', test: (c) => !!c.createdAt && Date.now() - c.createdAt < 30 * DAY },
+];
+const SORTS = [
+  { id: 'name', label: 'Nome (A–Z)', key: (c) => norm(c.name) },
+  { id: 'company', label: 'Empresa (A–Z)', key: (c) => norm(c.company) || '~' },
+  { id: 'recent', label: 'Mais recentes', key: (c) => -(c.createdAt || 0) },
+];
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    return { quick: QUICK.some((q) => q.id === p.quick) ? p.quick : 'all', sort: SORTS.some((x) => x.id === p.sort) ? p.sort : 'name' };
+  } catch {
+    return { quick: 'all', sort: 'name' };
+  }
+}
+const letterOf = (c, sortId) => {
+  const base = sortId === 'company' ? c.company : c.name;
+  const ch = norm(base).trim()[0] || '#';
+  return /[a-z]/.test(ch) ? ch.toUpperCase() : '#';
+};
+const copy = async (value, what) => {
+  try {
+    await navigator.clipboard.writeText(String(value));
+    toast(`${what} copiado`);
+  } catch {
+    toast('Não foi possível copiar neste navegador.');
+  }
+};
+const fmtDate = (t) => new Date(t).toLocaleDateString('pt-BR');
+
 export default {
   mount(el, { store, navigate }) {
     ensureScreenCss('lists');
@@ -37,6 +77,8 @@ export default {
     let timer = null;
     let mode = savedMode();
     let ctxCache = null;
+    let prefs = loadPrefs();
+    const getCtx = () => (ctxCache ||= contactCtx());
     const effectiveMode = () => (isMobile() ? 'list' : mode);
 
     const newBtns = [];
@@ -58,7 +100,22 @@ export default {
     const head = (extra) => h('header', { class: 'contacts-head' }, h('div', { class: 'contacts-head__row' }, h('div', null, h('div', { class: 'eyebrow' }, 'RELACIONAMENTO'), h('h1', { class: 'page-title' }, 'CONTATOS')), h('div', { class: 'contacts-head__tools' }, modeToggle(), newBtn())), extra);
 
     const search = h('input', { class: 'input contacts-search__input', type: 'search', placeholder: 'Buscar por nome, telefone, e-mail ou empresa', autocomplete: 'off', 'aria-label': 'Buscar contatos' });
-    const count = h('span', { class: 'contacts-count muted' });
+    const count = h('span', { class: 'contacts-count muted', role: 'status' });
+    const quickEl = h('div', { class: 'contacts-quick', role: 'group', 'aria-label': 'Filtros rápidos' });
+    const sortSel = h('select', { class: 'select contacts-sort', 'aria-label': 'Ordenar contatos' }, ...SORTS.map((x) => h('option', { value: x.id, selected: x.id === prefs.sort }, x.label)));
+    sortSel.addEventListener('change', () => {
+      prefs = { ...prefs, sort: sortSel.value };
+      savePrefs();
+      limit = PAGE;
+      draw();
+    });
+    const savePrefs = () => {
+      try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+      } catch {
+        /* sem armazenamento: só não lembra */
+      }
+    };
     const listEl = h('ul', { class: 'contacts-list' });
     const more = h('button', { class: 'btn btn--ghost contacts-more', type: 'button', onclick: () => ((limit += PAGE), draw()) }, 'Mostrar mais');
     const detail = h('section', { class: 'contacts-detail', 'aria-label': 'Ficha do contato' });
@@ -68,7 +125,7 @@ export default {
       id: 'contacts',
       scope: store.state.currentUserId,
       columns: () => contactColumns(),
-      ctx: () => (ctxCache ||= contactCtx()),
+      ctx: getCtx,
       getRows: () => visibleMasked(),
       builtins: contactViews(store.state.currentUserId),
       noun: ['contato', 'contatos'],
@@ -84,7 +141,7 @@ export default {
     const root = h(
       'div',
       { class: 'contacts', 'data-mview': 'list', 'data-mode': effectiveMode() },
-      h('section', { class: 'contacts-col', 'aria-label': 'Lista de contatos' }, head(count), h('div', { class: 'contacts-search' }, icon('M21 21l-4.3-4.3M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z', 18), search), listEl, more),
+      h('section', { class: 'contacts-col', 'aria-label': 'Lista de contatos' }, head(null), h('div', { class: 'contacts-search' }, icon('M21 21l-4.3-4.3M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z', 18), search), quickEl, h('div', { class: 'contacts-meta' }, count, sortSel), listEl, more),
       h('section', { class: 'contacts-tablecol', 'aria-label': 'Contatos em tabela' }, head(null), table.el),
       detail
     );
@@ -134,13 +191,25 @@ export default {
       return visible('contact', store.state.contacts).map((c) => mask('contact', c));
     }
 
-    /** Os mesmos, filtrados pela busca da lista e em ordem alfabética. */
-    function listed(all) {
+    const quickOk = (q) => !q.needs || canAccess(q.needs, 'read');
+    const matchesSearch = (c) => {
       const q = norm(query.trim());
       const qd = digits(query);
+      return !q || norm(c.name).includes(q) || norm(c.company).includes(q) || norm(c.email).includes(q) || (qd.length >= 3 && digits(c.phone).includes(qd));
+    };
+
+    /** Os mesmos, filtrados pela busca, pelo filtro rápido e na ordem escolhida. */
+    function listed(all) {
+      const ctx = getCtx();
+      const quick = QUICK.find((q) => q.id === prefs.quick && quickOk(q)) || QUICK[0];
+      const sort = SORTS.find((x) => x.id === prefs.sort) || SORTS[0];
       return all
-        .filter((c) => !q || norm(c.name).includes(q) || norm(c.company).includes(q) || norm(c.email).includes(q) || (qd.length >= 3 && digits(c.phone).includes(qd)))
-        .sort((a, b) => norm(a.name).localeCompare(norm(b.name), 'pt-BR'));
+        .filter((c) => matchesSearch(c) && quick.test(c, ctx))
+        .sort((x, y) => {
+          const a = sort.key(x);
+          const b = sort.key(y);
+          return (typeof a === 'number' ? a - b : String(a).localeCompare(String(b), 'pt-BR')) || norm(x.name).localeCompare(norm(y.name), 'pt-BR');
+        });
     }
 
     function drawDetail(all) {
@@ -157,8 +226,22 @@ export default {
       const deals = canAccess('deal', 'read') ? visible('deal', s.deals).filter((d) => d.contactId === c.id) : [];
       const convs = canAccess('conversation', 'read') ? visible('conversation', s.conversations).filter((cv) => cv.contactId === c.id) : [];
       const tasksSection = canAccess('task', 'read') ? tasksBlock({ tasks: visible('task', tasksOfContact(c.id)), defaults: { contactId: c.id } }) : null;
-      const row = (label, value) => h('div', { class: 'contacts-kv' }, h('dt', { class: 'label' }, label), h('dd', null, value));
+      const copyBtn = (value, what) => (value ? h('button', { class: 'contacts-copy', type: 'button', 'aria-label': `Copiar ${what}`, title: `Copiar ${what}`, onclick: () => copy(value, what) }, 'Copiar') : null);
+      const row = (label, value, extra) => h('div', { class: 'contacts-kv' }, h('dt', { class: 'label' }, label), h('dd', null, h('span', { class: 'contacts-kv__value' }, value), extra));
       const phone = phoneHidden ? HIDDEN : c.phone || '—';
+      const dealPipeline = dealTarget();
+      const history = (store.state.timeline?.[c.id] || []).slice(0, 8);
+      const newDeal = () => {
+        ensureScreenCss('pipeline');
+        openNewDeal({
+          pipeline: dealPipeline,
+          contactId: c.id,
+          onCreated: (deal) => {
+            toast('Negócio criado');
+            location.hash = linkTo('deal', { id: deal.id });
+          },
+        });
+      };
 
       replaceChildren(
         detail,
@@ -172,21 +255,24 @@ export default {
             { class: 'contacts-actions' },
             convs.length ? h('button', { class: 'btn btn--primary', type: 'button', onclick: () => pointInboxTo(convs[0].id) && navigate('inbox') }, 'Abrir conversa') : null,
             !phoneHidden && c.phone ? h('a', { class: 'btn btn--ghost', href: `tel:${c.phone}` }, 'Ligar') : null,
+            !emailHidden && c.email ? h('a', { class: 'btn btn--ghost', href: `mailto:${c.email}` }, 'E-mail') : null,
             decide('contact', 'update', c).effect === 'allow' ? h('button', { class: 'btn btn--ghost', type: 'button', onclick: () => openForm(c) }, 'Editar') : null,
             decide('contact', 'delete', c).effect === 'allow' ? h('button', { class: 'btn btn--quiet', type: 'button', onclick: () => confirmDelete(c) }, 'Excluir') : null
           ),
           h(
             'dl',
             { class: 'contacts-kvs' },
-            row('Telefone', phone),
-            row('E-mail', emailHidden ? HIDDEN : c.email || '—'),
+            row('Telefone', phone, phoneHidden ? null : copyBtn(c.phone, 'telefone')),
+            row('E-mail', emailHidden ? HIDDEN : c.email || '—', emailHidden ? null : copyBtn(c.email, 'e-mail')),
             row('Responsável', owner?.name || 'Sem responsável'),
-            c.source ? row('Origem', c.source) : null
+            c.source ? row('Origem', c.source) : null,
+            c.createdAt ? row('Cadastrado em', fmtDate(c.createdAt)) : null,
+            (c.tags || []).length ? row('Etiquetas', h('span', { class: 'contacts-tags' }, ...c.tags.map((t) => h('span', { class: 'chip' }, t)))) : null
           ),
           h(
             'div',
             { class: 'contacts-block' },
-            h('h3', { class: 'contacts-block__title' }, `Negócios (${deals.length})`),
+            h('div', { class: 'contacts-block__head' }, h('h3', { class: 'contacts-block__title' }, `Negócios (${deals.length})`), dealPipeline ? h('button', { class: 'contacts-block__add', type: 'button', onclick: newDeal }, '+ Negócio') : null),
             deals.length
               ? h(
                   'ul',
@@ -196,6 +282,14 @@ export default {
               : h('p', { class: 'muted' }, 'Nenhum negócio visível para você.')
           ),
           tasksSection,
+          history.length
+            ? h(
+                'div',
+                { class: 'contacts-block' },
+                h('h3', { class: 'contacts-block__title' }, 'Atividade'),
+                h('ul', { class: 'contacts-history' }, ...history.map((e) => h('li', null, h('span', { class: 'contacts-history__text' }, e.text), h('span', { class: 'contacts-history__time' }, [e.who, `há ${timeAgo(e.at)}`].filter(Boolean).join(' · ')))))
+              )
+            : null,
           convs.length
             ? h(
                 'div',
@@ -236,10 +330,48 @@ export default {
         table.redraw();
       } else {
         const all = listed(everyone);
-        count.textContent = `${fmtInt(all.length)} ${all.length === 1 ? 'contato' : 'contatos'}${query.trim() ? ' encontrados' : ''}`;
+        const ctx = getCtx();
+        count.textContent = `${fmtInt(all.length)} ${all.length === 1 ? 'contato' : 'contatos'}${query.trim() || prefs.quick !== 'all' ? ' encontrados' : ''}`;
+        // filtros rápidos com a contagem (respeitando a busca digitada)
+        const base = everyone.filter(matchesSearch);
+        const quickNow = QUICK.find((q) => q.id === prefs.quick && quickOk(q))?.id || 'all';
         replaceChildren(
-          listEl,
-          ...all.slice(0, limit).map((c) =>
+          quickEl,
+          ...QUICK.filter(quickOk).map((q) =>
+            h(
+              'button',
+              {
+                class: 'contacts-chip' + (q.id === quickNow ? ' is-active' : ''),
+                type: 'button',
+                'data-quick': q.id,
+                'aria-pressed': String(q.id === quickNow),
+                onclick: () => {
+                  prefs = { ...prefs, quick: q.id };
+                  savePrefs();
+                  limit = PAGE;
+                  draw();
+                },
+              },
+              q.label,
+              h('span', { class: 'contacts-chip__n' }, fmtInt(base.filter((c) => q.test(c, ctx)).length))
+            )
+          )
+        );
+        sortSel.value = prefs.sort;
+        const letters = prefs.sort !== 'recent';
+        let lastLetter = '';
+        const items = [];
+        for (const c of all.slice(0, limit)) {
+          if (letters) {
+            const l = letterOf(c, prefs.sort);
+            if (l !== lastLetter) {
+              lastLetter = l;
+              items.push(h('li', { class: 'contacts-letter', 'aria-hidden': 'true' }, l));
+            }
+          }
+          const owner = c.ownerId ? store.userById(c.ownerId) : null;
+          const open = ctx.openDeals.get(c.id) || 0;
+          items.push(
             h(
               'li',
               null,
@@ -255,12 +387,13 @@ export default {
                   },
                 },
                 avatar(c.name),
-                h('span', { class: 'contacts-item__text' }, h('span', { class: 'contacts-item__name truncate' }, c.name), h('span', { class: 'contacts-item__sub truncate' }, c.company || (fieldLevel('contact', 'phone') === 'hidden' ? HIDDEN : c.phone) || c.email || ''))
+                h('span', { class: 'contacts-item__text' }, h('span', { class: 'contacts-item__name truncate' }, c.name), h('span', { class: 'contacts-item__sub truncate' }, c.company || (fieldLevel('contact', 'phone') === 'hidden' ? HIDDEN : c.phone) || c.email || '')),
+                h('span', { class: 'contacts-item__meta' }, open ? h('span', { class: 'contacts-item__deals', title: `${open} ${open === 1 ? 'negócio aberto' : 'negócios abertos'}` }, `${open} ${open === 1 ? 'negócio' : 'negócios'}`) : null, owner ? avatar(owner.name, { small: true }) : null)
               )
             )
-          ),
-          all.length ? null : h('li', { class: 'contacts-none muted' }, query.trim() ? 'Nenhum contato com essa busca.' : 'Nenhum contato visível para você.')
-        );
+          );
+        }
+        replaceChildren(listEl, ...items, all.length ? null : h('li', { class: 'contacts-none muted' }, query.trim() || prefs.quick !== 'all' ? 'Nenhum contato com esse filtro.' : 'Nenhum contato visível para você.'));
         more.hidden = all.length <= limit;
       }
       drawDetail(everyone);

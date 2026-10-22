@@ -53,6 +53,14 @@ export function installDom() {
       }
     },
   });
+  Object.defineProperty(window.HTMLSelectElement.prototype, 'selectedOptions', {
+    configurable: true,
+    get() {
+      const opts = [...this.querySelectorAll('option')];
+      const picked = opts.filter((o) => o.hasAttribute('selected'));
+      return picked.length ? picked : opts.slice(0, 1);
+    },
+  });
   return { window, document };
 }
 

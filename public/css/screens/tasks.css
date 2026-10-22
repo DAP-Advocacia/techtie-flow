@@ -369,16 +369,21 @@ body.tasks-lock {
 }
 .tasks-overlay {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vvt, 0px);
+  height: var(--vvh, 100dvh);
   z-index: 900;
   display: flex;
   justify-content: flex-end;
   background: color-mix(in srgb, var(--bg) 60%, transparent);
   backdrop-filter: blur(2px);
+  animation: ov-fade 0.16s ease-out;
 }
 .tasks-panel {
   width: min(540px, 100%);
   height: 100%;
+  animation: ov-drawer 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   display: flex;
   flex-direction: column;
   background: var(--card);
@@ -712,6 +717,8 @@ body.tasks-lock {
   .tasks-panel {
     width: 100%;
     border-left: 0;
+    animation-name: ov-sheet;
+    animation-duration: 0.26s;
   }
   .tasks-row {
     padding-right: 10px;

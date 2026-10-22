@@ -378,6 +378,47 @@ p {
   transform: translateX(18px);
 }
 
+/* ---------- sobreposições: área visível e animações ----------
+   --vvh/--vvt vêm de js/viewport.js (a área REAL visível: o teclado e as barras do navegador do celular a encolhem).
+   Modais, gavetas e a busca usam essas medidas, então os botões de baixo nunca ficam escondidos atrás do teclado. */
+:root {
+  --vvh: 100dvh;
+  --vvt: 0px;
+}
+@supports not (height: 100dvh) {
+  :root {
+    --vvh: 100vh;
+  }
+}
+@keyframes ov-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ov-pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+@keyframes ov-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes ov-drawer {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*='-overlay'],
+  [class*='-overlay'] > * {
+    animation: none !important;
+  }
+}
+
 /* ---------- toast ---------- */
 .toast-host {
   position: fixed;
