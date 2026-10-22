@@ -882,3 +882,24 @@
   align-items: center;
   gap: 6px;
 }
+
+/* ---------- modo Lista (tabela) — computador ---------- */
+.pipeline-list {
+  display: none;
+}
+.pipeline[data-mode='list'] .pipeline-list {
+  flex: 1;
+  min-height: 0;
+  display: block;
+  overflow: auto;
+  padding: 4px 28px 24px;
+}
+.pipeline[data-mode='list'] .pipeline-body,
+.pipeline[data-mode='list'] .pipeline-stagebar {
+  display: none;
+}
+@media (max-width: 820px) {
+  .pipeline-list {
+    display: none !important;
+  }
+}

@@ -102,13 +102,13 @@ export function createMockData(now = Date.now()) {
   ];
 
   const contacts = [
-    { id: 'c_carlos', name: 'Carlos Menezes', company: 'Menezes Engenharia', phone: '+55 11 98765-4321', email: 'carlos@menezes.eng.br', ownerId: 'u_marina', source: 'Landing page', tags: ['Quente', 'Integração ERP'] },
-    { id: 'c_patricia', name: 'Patrícia Duarte', company: 'Duarte Odontologia', phone: '+55 21 99123-0099', email: 'patricia@duarteodonto.com', ownerId: 'u_rafael', source: 'Indicação', tags: ['Clínica'] },
-    { id: 'c_aurora', name: 'Grupo Aurora', company: 'Aurora Distribuidora', phone: '+55 31 98877-1122', email: 'ti@aurora.com.br', ownerId: 'u_marina', source: 'Campanha', tags: ['Enterprise'] },
-    { id: 'c_bruno', name: 'Bruno Tavares', company: 'Tavares & Filhos', phone: '+55 41 99555-7788', email: 'bruno@tavares.com', ownerId: 'u_rafael', source: 'Site', tags: [] },
-    { id: 'c_lopes', name: 'Helena Lopes', company: 'Lopes Contábil', phone: '+55 11 97766-5544', email: 'helena@lopescontabil.com.br', ownerId: 'u_marina', source: 'Evento', tags: ['Contabilidade'] },
-    { id: 'c_nina', name: 'Nina Prado', company: 'Prado Seguros', phone: '+55 11 97711-2233', email: 'nina@pradoseguros.com.br', ownerId: 'u_pedro', source: 'Indicação', tags: ['Seguros'] },
-    { id: 'c_vieira', name: 'Otávio Vieira', company: 'Vieira Logística', phone: '+55 19 98123-4455', email: 'otavio@vieiralog.com.br', ownerId: 'u_rafael', source: 'Outbound', tags: ['Integração ERP'] },
+    { id: 'c_carlos', name: 'Carlos Menezes', company: 'Menezes Engenharia', phone: '+55 11 98765-4321', email: 'carlos@menezes.eng.br', ownerId: 'u_marina', source: 'Landing page', tags: ['Quente', 'Integração ERP'], createdAt: ago(20 * DAY) },
+    { id: 'c_patricia', name: 'Patrícia Duarte', company: 'Duarte Odontologia', phone: '+55 21 99123-0099', email: 'patricia@duarteodonto.com', ownerId: 'u_rafael', source: 'Indicação', tags: ['Clínica'], createdAt: ago(3 * DAY) },
+    { id: 'c_aurora', name: 'Grupo Aurora', company: 'Aurora Distribuidora', phone: '+55 31 98877-1122', email: 'ti@aurora.com.br', ownerId: 'u_marina', source: 'Campanha', tags: ['Enterprise'], createdAt: ago(45 * DAY) },
+    { id: 'c_bruno', name: 'Bruno Tavares', company: 'Tavares & Filhos', phone: '+55 41 99555-7788', email: 'bruno@tavares.com', ownerId: 'u_rafael', source: 'Site', tags: [], createdAt: ago(2 * DAY) },
+    { id: 'c_lopes', name: 'Helena Lopes', company: 'Lopes Contábil', phone: '+55 11 97766-5544', email: 'helena@lopescontabil.com.br', ownerId: 'u_marina', source: 'Evento', tags: ['Contabilidade'], createdAt: ago(12 * DAY) },
+    { id: 'c_nina', name: 'Nina Prado', company: 'Prado Seguros', phone: '+55 11 97711-2233', email: 'nina@pradoseguros.com.br', ownerId: 'u_pedro', source: 'Indicação', tags: ['Seguros'], createdAt: ago(8 * DAY) },
+    { id: 'c_vieira', name: 'Otávio Vieira', company: 'Vieira Logística', phone: '+55 19 98123-4455', email: 'otavio@vieiralog.com.br', ownerId: 'u_rafael', source: 'Outbound', tags: ['Integração ERP'], createdAt: ago(60 * DAY) },
   ];
 
   const deals = [

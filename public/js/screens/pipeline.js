@@ -2,9 +2,14 @@
 // Referência: docs/design-handoff (seção 4). Dados 100% em store.state.
 // Permissões: a tela só REFLETE o motor (shared/permissions via access.js, decisões em
 // pipeline/perm.js): negócios visíveis, pipelines, mover, proposta, conversa, campos e compartilhamento.
-import { h, icon, replaceChildren, toast } from '../ui.js';
+import { h, icon, replaceChildren, toast, fmtBRL } from '../ui.js';
 import { isMobile } from '../mobile.js';
 import { linkTo } from '../router.js';
+import { ensureScreenCss } from '../css.js';
+import { mask, fieldLevel } from '../access.js';
+import { createTable } from '../lists/table.js';
+import { dealColumns, dealCtx, dealViews } from './pipeline/list.js';
+import { dealBulk } from './pipeline/bulk.js';
 import { renderBoard, clearDrag, autoScroll } from './pipeline/board.js';
 import { renderPanel, renderPanelEmpty } from './pipeline/panel.js';
 import { createDealController, sending } from './pipeline/controller.js';
@@ -16,6 +21,15 @@ import * as P from './pipeline/perm.js';
 
 // Estado só de UI. Fica no módulo (não no store), mas é REINICIADO a cada mount: ao trocar de usuário
 // ("Ver como") a tela remonta e nenhuma seleção/pipeline do usuário anterior vaza.
+const MODE_KEY = 'ttf:pipeline:mode';
+function savedMode() {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'list' ? 'list' : 'board';
+  } catch {
+    return 'board';
+  }
+}
+
 const view = {
   pipelineId: null,
   selectedByPipeline: {}, // pipelineId -> dealId (a seleção volta ao trocar de aba)
@@ -26,6 +40,11 @@ const view = {
 export default {
   mount(el, { store, navigate }) {
     let alive = true;
+    ensureScreenCss('lists');
+    let mode = savedMode();
+    let ctxCache = null;
+    const tables = new Map(); // pipelineId -> tabela (cada funil guarda os próprios filtros e colunas)
+    const effectiveMode = () => (isMobile() ? 'board' : mode);
     view.pipelineId = null;
     view.selectedByPipeline = {};
     view.pendingFocus = null;
@@ -59,6 +78,9 @@ export default {
         el.querySelector(`[data-focus="${CSS.escape(tabs[next].dataset.focus)}"]`)?.focus();
       },
     });
+    const modeBtns = ['board', 'list'].map((id) => h('button', { class: 'pill', type: 'button', 'data-mode': id, 'aria-pressed': 'false', onclick: () => setMode(id) }, id === 'board' ? 'Quadro' : 'Lista'));
+    const modeToggle = h('div', { class: 'pills lt-mode', role: 'group', 'aria-label': 'Forma de ver os negócios' }, ...modeBtns);
+    const listHost = h('div', { class: 'pipeline-list', 'aria-label': 'Negócios em lista' });
     const newBtn = h('button', { class: 'btn btn--primary', type: 'button', onclick: () => newDeal() }, '+ Novo negócio');
     const newHint = h('span', { class: 'pipeline-header__hint', role: 'note' });
     const board = h('div', { class: 'pipeline-board', id: 'pipeline-board', role: 'tabpanel', 'aria-label': 'Quadro do pipeline', onscroll: () => closeMoveMenu({ restoreFocus: false }), ondragover: (e) => autoScroll(e, board) });
@@ -68,12 +90,13 @@ export default {
     // tocar num negócio abre a proposta em tela cheia. Mover de etapa continua pelo menu "Mover para…" do cartão.
     const stagebar = h('div', { class: 'pipeline-stagebar', role: 'tablist', 'aria-label': 'Etapas' });
     const mback = h('button', { class: 'pipeline-mback', type: 'button', onclick: () => setMView('board') }, icon('M15 5l-7 7 7 7', 22), h('span', null, 'Negócios'));
-    const pipelineEl = h('div', { class: 'pipeline', 'data-mview': 'board' });
+    const pipelineEl = h('div', { class: 'pipeline', 'data-mview': 'board', 'data-mode': 'board' });
     const setMView = (v) => (pipelineEl.dataset.mview = v);
 
     pipelineEl.append(
-        h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), pills, h('div', { class: 'pipeline-header__new' }, newBtn, newHint)),
+        h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), pills, modeToggle, h('div', { class: 'pipeline-header__new' }, newBtn, newHint)),
         stagebar,
+        listHost,
         h('div', { class: 'pipeline-body' }, mback, board, panel)
     );
     el.append(pipelineEl);
@@ -129,9 +152,53 @@ export default {
       );
     }
 
+    function setMode(m) {
+      mode = m;
+      try {
+        localStorage.setItem(MODE_KEY, m);
+      } catch {
+        /* sem armazenamento: só não lembra */
+      }
+      render();
+    }
+
+    /** Tabela do funil (criada sob demanda): linhas = negócios que o motor deixa ler, sem campos ocultos. */
+    function tableFor(pipeline) {
+      if (!tables.has(pipeline.id)) {
+        const open = (d) => (location.hash = linkTo('deal', { id: d.id }));
+        tables.set(
+          pipeline.id,
+          createTable({
+            id: 'deals',
+            scope: `${store.state.currentUserId}:${pipeline.id}`,
+            columns: () => dealColumns(store.pipeline(pipeline.id)),
+            ctx: () => (ctxCache ||= dealCtx()),
+            getRows: () => P.visibleDeals().filter((d) => d.pipelineId === pipeline.id).map((d) => mask('deal', d)),
+            builtins: dealViews(store.state.currentUserId),
+            bulk: dealBulk(pipeline.id),
+            noun: ['negócio', 'negócios'],
+            emptyText: 'Nenhum negócio visível neste funil.',
+            searchPlaceholder: 'Buscar por negócio, contato ou empresa',
+            rowHref: (d) => linkTo('deal', { id: d.id }),
+            onOpen: open,
+            summary: (rows) => (fieldLevel('deal', 'value') === 'hidden' ? '' : `Soma ${fmtBRL(rows.reduce((n, d) => n + (Number(d.value) || 0), 0))}`),
+          })
+        );
+      }
+      return tables.get(pipeline.id);
+    }
+
     // ---- render ----
     function render() {
       if (!alive) return;
+      ctxCache = null; // contatos e tarefas por negócio mudam com o estado
+      const m = effectiveMode();
+      pipelineEl.dataset.mode = m;
+      for (const b of modeBtns) {
+        const on = b.dataset.mode === m;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-pressed', String(on));
+      }
       // Mantém o foco no mesmo elemento (cartão, botão, aba) depois de reconstruir o DOM.
       let focusKey = el.contains(document.activeElement) ? document.activeElement.dataset?.focus : null;
       if (!focusKey && document.activeElement === document.body) focusKey = view.pendingFocus;
@@ -175,6 +242,17 @@ export default {
       newBtn.title = newWhy;
       newHint.textContent = newWhy;
       newHint.hidden = !newWhy;
+
+      if (m === 'list') {
+        if (!pipeline) replaceChildren(listHost, h('div', { class: 'empty pipeline-noaccess' }, h('div', { class: 'section-title gold' }, 'Nenhum pipeline disponível'), h('div', null, 'Seu perfil não permite ler negócios em nenhum pipeline.')));
+        else {
+          const t = tableFor(pipeline);
+          if (listHost.firstChild !== t.el) replaceChildren(listHost, t.el);
+          t.redraw();
+        }
+        if (focusKey) el.querySelector(`[data-focus="${CSS.escape(focusKey)}"]:not(:disabled)`)?.focus();
+        return;
+      }
 
       if (!pipeline) {
         // Nenhum pipeline legível: estado vazio explicativo (nada de quadro).
@@ -262,6 +340,7 @@ export default {
 
     return () => {
       alive = false;
+      tables.forEach((t) => t.destroy());
       unsub();
       document.removeEventListener('dragend', clearDrag);
       clearDrag();

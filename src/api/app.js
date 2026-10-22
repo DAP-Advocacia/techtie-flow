@@ -37,7 +37,7 @@ const parseDay = (v) => {
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 // --------------------------------------------------------------------- mapeamentos DB → API
-const apiContact = (r) => ({ id: r.id, name: r.name, company: r.company || '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null });
+const apiContact = (r) => ({ id: r.id, name: r.name, company: r.company || '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null, createdAt: ms(r.created_at) });
 const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], proposalSentAt: ms(r.proposal_sent_at), expectedClose: dateStr(r.expected_close), lastMessage: '' });
 const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null, ownerId: r.owner_id || null, teamId: r.team_id || null, ownerName: r.owner_name || '', aiActive: !!r.ai_active });
 const apiMessage = (r) => ({

@@ -4,7 +4,7 @@
 // desabilita o botão, mas a ação não confia nisso) e devolve { ok, decision }.
 import { store } from '../../store.js';
 import { fmtBRL } from '../../ui.js';
-import { decide, audit } from '../../access.js';
+import { decide, audit, canPatch } from '../../access.js';
 import * as P from './perm.js';
 import * as live from '../../live.js';
 
@@ -209,6 +209,28 @@ export function deleteDeal(dealId) {
   });
   audit('deal.delete', dealId, `Negócio "${title}" excluído`);
   if (live.enabled) live.deleteDeal(dealId);
+  return allowed(decision);
+}
+
+/**
+ * Passa o negócio para outro responsável. O motor precisa permitir `transfer` do negócio atual E o resultado
+ * (já com o novo dono/equipe) ainda ser editável por quem transfere — mesma checagem do servidor (checkPatch).
+ */
+export function transferDeal(dealId, ownerId) {
+  const deal = store.deal(dealId);
+  const owner = store.userById(ownerId);
+  if (!deal || !owner || owner.isBot || owner.status !== 'active') return denied({ effect: 'deny', reason: 'unknown_action', matched: [] });
+  const decision = decide('deal', 'transfer', deal);
+  if (decision.effect !== 'allow') return denied(decision);
+  if (deal.ownerId === ownerId) return allowed(decision);
+  const teamId = owner.teamIds?.[0] ?? null;
+  if (!canPatch('deal', deal, { ownerId, teamId })) return denied({ effect: 'deny', reason: 'no_grant', matched: [] });
+  store.update((s) => {
+    const d = s.deals.find((x) => x.id === dealId);
+    if (d) Object.assign(d, { ownerId, teamId });
+  });
+  audit('deal.transfer', dealId, `Negócio "${deal.title}" passou para ${owner.name}`);
+  if (live.enabled) live.updateDeal(dealId, { ownerId });
   return allowed(decision);
 }
 

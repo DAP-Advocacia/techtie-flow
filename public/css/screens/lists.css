@@ -1,0 +1,339 @@
+/* Listas em tabela (Contatos e Negócios): barra de ferramentas, filtros, tabela e ações em massa. */
+.lt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.lt [hidden] {
+  display: none !important;
+}
+
+/* ---------- barra ---------- */
+.lt-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.lt-spacer {
+  flex: 1;
+}
+.lt-search-wrap {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 380px;
+  color: var(--mute);
+}
+.lt-search-wrap > svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.lt-search {
+  padding: 9px 14px 9px 38px;
+  font-size: 14px;
+}
+.lt-views {
+  width: auto;
+  min-width: 190px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.lt-modified {
+  border: 0;
+  background: none;
+  padding: 4px 2px;
+  color: var(--acc);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lt-btn.is-open {
+  color: var(--acc);
+  border-color: var(--dim);
+}
+
+/* ---------- chips dos filtros ---------- */
+.lt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.lt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 12px;
+  border: 1px solid var(--dim);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--acc2);
+  font-size: 12.5px;
+}
+.lt-chip__x {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--mute);
+  font-size: 16px;
+  line-height: 1;
+}
+.lt-chip__x:hover {
+  background: var(--line);
+  color: var(--text);
+}
+.lt-clear {
+  border: 0;
+  background: none;
+  color: var(--mute);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- painéis (filtro, colunas, salvar) ---------- */
+.lt-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.lt-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+}
+.lt-panel__title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--acc);
+}
+.lt-panel__hint {
+  margin: 0;
+  font-size: 12.5px;
+}
+.lt-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lt-filter__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.lt-filter__row .select,
+.lt-filter__row .input {
+  width: auto;
+  min-width: 150px;
+  flex: 0 1 220px;
+  padding: 9px 12px;
+  font-size: 14px;
+  background: var(--bg);
+}
+.lt-cols {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px 18px;
+}
+.lt-check-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 14px;
+}
+.lt-check-label input:disabled + span {
+  color: var(--mute);
+}
+
+/* ---------- ações em massa ---------- */
+.lt-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 1px solid var(--dim);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--acc) 10%, var(--card));
+}
+.lt-bulk__n {
+  margin-right: 6px;
+  font-weight: 600;
+  color: var(--acc2);
+}
+.lt-bulk .lt-bulk__select {
+  width: auto;
+  min-width: 170px;
+  padding: 5px 12px;
+  font-size: 13px;
+  background: var(--bg);
+}
+.lt-danger:not(:disabled) {
+  color: var(--red);
+}
+
+/* ---------- tabela ---------- */
+.lt-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.lt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.lt-th {
+  position: sticky;
+  top: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--card2, var(--card));
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mute);
+  white-space: nowrap;
+}
+.lt-th:not(.lt-th--check) {
+  padding: 0;
+}
+.lt-th > span {
+  display: block;
+  padding: 12px 14px;
+}
+.lt-sort {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: inherit;
+}
+.lt-sort:hover,
+.lt-sort.is-sorted {
+  color: var(--acc2);
+}
+.lt-sort__arrow {
+  min-width: 10px;
+}
+.lt-right,
+.lt-right .lt-sort {
+  text-align: right;
+  justify-content: flex-end;
+}
+.lt-td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lt-td--main {
+  font-weight: 600;
+}
+.lt-th--check,
+.lt-td--check {
+  width: 44px;
+  padding-left: 14px;
+  padding-right: 0;
+}
+.lt-row:last-child .lt-td {
+  border-bottom: 0;
+}
+.lt-row[tabindex] {
+  cursor: pointer;
+}
+.lt-row:hover {
+  background: var(--glow);
+}
+.lt-row.is-selected {
+  background: color-mix(in srgb, var(--acc) 9%, transparent);
+}
+.lt-row:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: -2px;
+}
+.lt-link {
+  color: inherit;
+  text-decoration: none;
+}
+.lt-link:hover {
+  color: var(--acc2);
+  text-decoration: underline;
+}
+.lt-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--acc);
+}
+.lt-empty {
+  padding: 36px 16px;
+}
+.lt-pill {
+  display: inline-block;
+  padding: 1px 9px;
+  border: 1px solid var(--dim);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--acc2);
+}
+.lt-pill--won {
+  color: var(--green);
+  border-color: var(--green);
+}
+.lt-pill--lost {
+  color: var(--red);
+  border-color: var(--red);
+}
+.lt-late {
+  color: var(--red);
+}
+.lt-quiet {
+  color: var(--mute);
+}
+
+/* ---------- rodapé ---------- */
+.lt-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+}
+
+/* ---------- alternador Quadro/Lista (usado em Negócios e Contatos) ---------- */
+.lt-mode {
+  display: inline-flex;
+}
+@media (max-width: 820px) {
+  .lt-mode {
+    display: none !important;
+  }
+}

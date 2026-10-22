@@ -14,6 +14,7 @@ import {
   fieldAccess,
   explain as engineExplain,
   effectiveMatrix,
+  checkPatch as engineCheckPatch,
   ENTITIES,
 } from '/shared/permissions/index.js';
 import { store } from './store.js';
@@ -95,6 +96,9 @@ export function canAccess(entity, action = 'read', userId) {
 export function fieldLevel(entity, field, userId) {
   return fieldAccess(ctxFor(userId), entity)[field] || 'write';
 }
+
+/** Pode aplicar `patch` a este registro? Campos controlados passam pela ação certa (dono → transfer) e o resultado precisa continuar editável. */
+export const canPatch = (entity, row, patch, context) => engineCheckPatch(ctxFor(), entity, aclRow(entity, row), patch, context).ok;
 
 /** Cópia do registro sem os campos ocultos (use ao exibir). */
 export const mask = (entity, row, userId) => maskRow(ctxFor(userId), entity, row);
