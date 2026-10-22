@@ -268,7 +268,7 @@ function createApp({ pool, config, hub, channel, openai }) {
             : await c.query('SELECT r.* FROM roles r WHERE r.id IN (SELECT role_id FROM user_roles WHERE user_id = $1 AND role_id IS NOT NULL) ORDER BY r.name', [access.userId])
         ).rows.map((r) => apiRole(r));
         return {
-          tenant: { id: access.tenantId, name: access.tenant?.name, policy: access.tenant?.settings || {} },
+          tenant: { id: access.tenantId, name: access.tenant?.name, policy: access.tenant?.settings || {}, goals: (await c.query("SELECT settings->'goals' AS goals FROM tenants WHERE id = $1", [access.tenantId])).rows[0]?.goals || {} },
           currentUserId: access.userId,
           users: users.map((u) => ({
             id: u.id,

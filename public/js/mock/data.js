@@ -24,6 +24,8 @@ export function createMockData(now = Date.now()) {
     onboarded: true,
     // política de segurança do tenant (consumida pelo motor de permissões)
     policy: { requireMfaForSensitive: false },
+    // metas do mês (Início): receita ganha no mês. Em branco/0 = sem meta.
+    goals: { monthlyRevenue: 120000 },
     brand: { productName: 'TechTie Flow', domain: 'crm.acme.com.br', domainStatus: 'verified', accent: 'gold', logo: null },
   };
 

@@ -4,7 +4,7 @@
 
 /** Aplica o /api/bootstrap em `s`. `keepMessages`: preserva mensagens já carregadas (atualização incremental). */
 export function applyBootstrap(s, d, { keepMessages = false } = {}) {
-  s.tenant = { ...s.tenant, id: d.tenant.id, name: d.tenant.name, policy: d.tenant.policy || {} };
+  s.tenant = { ...s.tenant, id: d.tenant.id, name: d.tenant.name, policy: d.tenant.policy || {}, goals: d.tenant.goals || {} };
   s.currentUserId = d.currentUserId;
   s.users = d.users;
   s.roles = d.roles;

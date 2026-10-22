@@ -115,6 +115,12 @@ p {
   flex-direction: column;
   gap: 22px;
 }
+@media (min-width: 1200px) {
+  .page {
+    padding: 32px 48px;
+    gap: 26px;
+  }
+}
 .page-header {
   display: flex;
   align-items: flex-end;

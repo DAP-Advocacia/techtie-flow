@@ -1,6 +1,6 @@
 /* Página do negócio (#/deal?id=…) — destaque, Path e abas. Reaproveita o CSS do Negócios (pipeline.css) para a proposta. */
 .deal {
-  max-width: 1180px;
+  max-width: 1320px;
   width: 100%;
   margin: 0 auto;
 }

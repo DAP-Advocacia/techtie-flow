@@ -470,6 +470,10 @@ export function createTable(o) {
     get selected() {
       return shown.filter((r) => selected.has(String(rowKey(r))));
     },
+    /** Troca para a visão `id` (se existir) — usado por atalhos de outras telas. */
+    selectView(vid) {
+      pickView(vid);
+    },
     clearSelection() {
       selected.clear();
       draw();

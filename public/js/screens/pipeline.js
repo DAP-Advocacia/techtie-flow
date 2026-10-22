@@ -4,7 +4,7 @@
 // pipeline/perm.js): negócios visíveis, pipelines, mover, proposta, conversa, campos e compartilhamento.
 import { h, icon, replaceChildren, toast, fmtBRL } from '../ui.js';
 import { isMobile } from '../mobile.js';
-import { linkTo } from '../router.js';
+import { linkTo, hashParam } from '../router.js';
 import { ensureScreenCss } from '../css.js';
 import { mask, fieldLevel } from '../access.js';
 import { createTable } from '../lists/table.js';
@@ -41,7 +41,9 @@ export default {
   mount(el, { store, navigate }) {
     let alive = true;
     ensureScreenCss('lists');
-    let mode = savedMode();
+    // #/pipeline?view=closing (atalho do Início): abre a lista já na visão pedida, sem trocar a preferência salva
+    let pendingView = hashParam('view');
+    let mode = pendingView ? 'list' : savedMode();
     let ctxCache = null;
     const tables = new Map(); // pipelineId -> tabela (cada funil guarda os próprios filtros e colunas)
     const effectiveMode = () => (isMobile() ? 'board' : mode);
@@ -247,6 +249,10 @@ export default {
         if (!pipeline) replaceChildren(listHost, h('div', { class: 'empty pipeline-noaccess' }, h('div', { class: 'section-title gold' }, 'Nenhum pipeline disponível'), h('div', null, 'Seu perfil não permite ler negócios em nenhum pipeline.')));
         else {
           const t = tableFor(pipeline);
+          if (pendingView) {
+            t.selectView(pendingView);
+            pendingView = null;
+          }
           if (listHost.firstChild !== t.el) replaceChildren(listHost, t.el);
           t.redraw();
         }

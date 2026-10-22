@@ -303,6 +303,9 @@ export const createContact = (body) =>
 export const updateContact = (id, body) => request(`/api/contacts/${id}`, { method: 'PATCH', body }).then((r) => (store.update((s) => replaceById(s.contacts, id, r.contact)), r.contact));
 export const deleteContact = (id) => request(`/api/contacts/${id}`, { method: 'DELETE' }).then(() => store.update((s) => { s.contacts = s.contacts.filter((c) => c.id !== id); }));
 
+// ---- meta de receita do mês (Início) ----
+export const setGoal = (monthlyRevenue) => request('/api/tenant/goals', { method: 'PATCH', body: { monthlyRevenue } }).then((r) => (store.update((s) => { s.tenant.goals = r.goals; }), r.goals));
+
 // ---- produtos (catálogo das propostas) ----
 export const createProduct = (body) => request('/api/products', { method: 'POST', body }).then((r) => (store.update((s) => { (s.products ||= []).push(r.product); }), r.product));
 export const archiveProduct = (id) => request(`/api/products/${id}`, { method: 'PATCH', body: { active: false } }).then(() => store.update((s) => { s.products = (s.products || []).filter((p) => p.id !== id); }));

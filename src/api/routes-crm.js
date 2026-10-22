@@ -239,6 +239,24 @@ module.exports = function registerCrmRoutes(H) {
     );
   });
 
+  // ===================================================================== META DE RECEITA DO MÊS (Início)
+  // Fica em tenants.settings.goals. Quem define é quem altera as configurações da empresa (motor: tenant_settings.update).
+  // O bootstrap lê direto do banco (não do cache de acesso), então a meta nova aparece na hora para todos.
+  route('PATCH', '/api/tenant/goals', async ({ req, access, body }) => {
+    must(access, 'tenant_settings', 'update', { tenantId: access.tenantId });
+    let monthly = null;
+    if (body.monthlyRevenue !== null && body.monthlyRevenue !== undefined && body.monthlyRevenue !== '') {
+      const n = Number(body.monthlyRevenue);
+      if (!Number.isFinite(n) || n < 0 || n > 1e10) throw bad('Meta inválida: informe um valor entre 0 e 10 bilhões.');
+      monthly = n > 0 ? Math.round(n * 100) / 100 : null; // 0 = sem meta
+    }
+    return tx(H.pool, access, async (c) => {
+      await c.query("UPDATE tenants SET settings = jsonb_set(settings, '{goals}', COALESCE(settings->'goals', '{}'::jsonb) || $2::jsonb, true) WHERE id = $1", [access.tenantId, JSON.stringify({ monthlyRevenue: monthly })]);
+      await audit(c, access, req, 'tenant.goals', 'tenant', access.tenantId, { monthlyRevenue: monthly });
+      return { goals: { monthlyRevenue: monthly } };
+    });
+  });
+
   // ===================================================================== PRODUTOS (catálogo das propostas)
   const apiProduct = (r) => ({ id: r.id, name: r.name, unit: r.unit, price: Number(r.price) });
   const productInput = (body, { partial = false } = {}) => {

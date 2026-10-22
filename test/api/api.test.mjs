@@ -803,3 +803,35 @@ test('negócio: previsão de fechamento e atividade real (criar, alterar, mover,
   has(/passou o negócio para/, (await call(`/api/deals/${deal.id}/activity`, { token: bia })).activity.map((a) => a.text));
   assert.ok(feed.every((a) => a.id && a.kind && a.at), 'itens completos');
 });
+
+test('meta do mês: só quem altera configurações grava; chega no bootstrap na hora; valida o valor e não vaza entre empresas', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const adminB = await login('admin@b.com.br');
+  assert.deepEqual((await call('/api/bootstrap', { token: admin })).tenant.goals, {}, 'sem meta no começo');
+  const put = (token, body) => call('/api/tenant/goals', { method: 'PATCH', token, body });
+  // quem não altera configurações é recusado e nada muda
+  assert.equal((await put(ana, { monthlyRevenue: 5 })).status, 403);
+  assert.deepEqual((await call('/api/bootstrap', { token: admin })).tenant.goals, {});
+  // admin grava (arredonda em centavos) e todos da empresa leem a meta nova no bootstrap seguinte
+  const r = await put(admin, { monthlyRevenue: 120000.456 });
+  assert.equal(r.status, 200, JSON.stringify(r));
+  assert.equal(r.goals.monthlyRevenue, 120000.46);
+  assert.equal((await call('/api/bootstrap', { token: admin })).tenant.goals.monthlyRevenue, 120000.46);
+  assert.equal((await call('/api/bootstrap', { token: ana })).tenant.goals.monthlyRevenue, 120000.46, 'o atendente vê a meta da empresa (só não altera)');
+  // a política de segurança que já existia em settings continua intacta
+  const settings = (await h.admin.query('SELECT settings FROM tenants WHERE id = $1', [tenantA])).rows[0].settings;
+  assert.equal(settings.goals.monthlyRevenue, 120000.46);
+  // valores inválidos
+  for (const bad of [-1, 'abc', 1e11, {}]) assert.equal((await put(admin, { monthlyRevenue: bad })).status, 400, `inválido: ${JSON.stringify(bad)}`);
+  assert.equal((await call('/api/bootstrap', { token: admin })).tenant.goals.monthlyRevenue, 120000.46, 'inválido não altera');
+  // outra empresa não herda nem enxerga
+  assert.deepEqual((await call('/api/bootstrap', { token: adminB })).tenant.goals, {});
+  // zero ou vazio remove a meta
+  assert.equal((await put(admin, { monthlyRevenue: 0 })).goals.monthlyRevenue, null);
+  assert.equal((await call('/api/bootstrap', { token: admin })).tenant.goals.monthlyRevenue, null);
+  assert.equal((await put(admin, { monthlyRevenue: '' })).goals.monthlyRevenue, null);
+  // fica na auditoria
+  const audited = (await h.admin.query("SELECT count(*)::int AS n FROM audit_log WHERE tenant_id = $1 AND action = 'tenant.goals'", [tenantA])).rows[0].n;
+  assert.ok(audited >= 3, `auditoria da meta: ${audited}`);
+});
