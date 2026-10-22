@@ -59,7 +59,7 @@ before(async () => {
   if (skip) return;
   h = await startPostgres(env.pg, 'api');
   const c = await h.admin.connect();
-  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); } finally { c.release(); }
+  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); } finally { c.release(); }
   seed('empresa-a', 'admin@a.com.br');
   seed('empresa-b', 'admin@b.com.br');
   tenantA = (await h.admin.query("SELECT id FROM tenants WHERE slug='empresa-a'")).rows[0].id;
@@ -746,4 +746,60 @@ test('tarefas: criar, vincular, concluir, delegar, compartilhar, comentar e excl
   const keep = (await anaPost({ title: 'Sobrevive ao negócio', dealId: deal.id })).task;
   assert.equal((await call(`/api/deals/${deal.id}`, { method: 'DELETE', token: admin })).ok, true);
   assert.equal((await tasksOf(ana)).find((t) => t.id === keep.id).dealId, null);
+});
+
+test('negócio: previsão de fechamento e atividade real (criar, alterar, mover, passar, compartilhar, proposta, tarefas)', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const bia = await login('bia@a.com.br');
+  const biaId = (await call('/api/bootstrap', { token: bia })).users.find((u) => u.email === 'bia@a.com.br').id;
+  const pipe = (await call('/api/bootstrap', { token: admin })).pipelines[0];
+  const [s0, s1] = pipe.stages.filter((s) => s.kind === 'open');
+  const prod = (await call('/api/products', { method: 'POST', token: admin, body: { name: 'Plano atividade', unit: 'mês', price: 100 } })).product;
+
+  // ---- previsão de fechamento: só data válida
+  assert.equal((await call('/api/deals', { method: 'POST', token: ana, body: { title: 'x', pipelineId: pipe.id, stageId: s0.id, expectedClose: '2026-02-31' } })).status, 400);
+  assert.equal((await call('/api/deals', { method: 'POST', token: ana, body: { title: 'x', pipelineId: pipe.id, stageId: s0.id, expectedClose: '15/12/2026' } })).status, 400);
+  const deal = (await call('/api/deals', { method: 'POST', token: ana, body: { title: 'Negócio com atividade', pipelineId: pipe.id, stageId: s0.id, expectedClose: '2026-12-15' } })).deal;
+  assert.equal(deal.expectedClose, '2026-12-15');
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { expectedClose: '2027-01-10' } })).deal.expectedClose, '2027-01-10');
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { expectedClose: 'amanhã' } })).status, 400);
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { expectedClose: null } })).deal.expectedClose, null);
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { expectedClose: '2026-12-31' } })).deal.expectedClose, '2026-12-31');
+  assert.equal((await call('/api/bootstrap', { token: ana })).deals.find((d) => d.id === deal.id).expectedClose, '2026-12-31', 'o bootstrap traz a data');
+
+  // ---- gera atividade de vários tipos
+  await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { title: 'Negócio com atividade (v2)' } });
+  await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { items: [{ productId: prod.id, qty: 2 }] } });
+  await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: ana, body: { stageId: s1.id } });
+  assert.equal((await call(`/api/deals/${deal.id}/activity`, { token: bia })).status, 404, 'quem não vê o negócio não vê a atividade');
+  await call(`/api/deals/${deal.id}/shares`, { method: 'POST', token: ana, body: { type: 'user', id: biaId, level: 'read' } });
+  const sentP = await call(`/api/deals/${deal.id}/proposal/send`, { method: 'POST', token: ana });
+  assert.equal(sentP.result, 'no-chat', JSON.stringify(sentP));
+  const taskRes = await call('/api/tasks', { method: 'POST', token: ana, body: { title: 'Ligar para fechar', dealId: deal.id } });
+  assert.ok(taskRes.task, JSON.stringify(taskRes));
+  const task = taskRes.task;
+  await call(`/api/tasks/${task.id}`, { method: 'PATCH', token: ana, body: { status: 'done' } });
+  // a dona vê tudo, inclusive as tarefas dela
+  const feed = (await call(`/api/deals/${deal.id}/activity`, { token: ana })).activity;
+  const texts = feed.map((a) => a.text);
+  const has = (re, list = texts) => assert.ok(list.some((t) => re.test(t)), `faltou na atividade: ${re} — ${list.join(' | ')}`);
+  has(/criou o negócio/);
+  has(/alterou o título/);
+  has(/alterou a proposta/);
+  has(/alterou a previsão de fechamento/);
+  has(new RegExp(`moveu de ${s0.name} para ${s1.name}`));
+  has(/compartilhou com .* \(leitura\)/);
+  has(/registrou o envio da proposta/);
+  has(/criou a tarefa “Ligar para fechar”/);
+  has(/concluiu a tarefa “Ligar para fechar”/);
+  assert.deepEqual(feed.map((a) => a.at), [...feed.map((a) => a.at)].sort((a, b) => b - a), 'mais recente primeiro');
+  // a Bia (compartilhada) vê os eventos do negócio, mas NÃO as tarefas da Ana (que ela não pode ler)
+  const biaTexts = (await call(`/api/deals/${deal.id}/activity`, { token: bia })).activity.map((a) => a.text);
+  has(/moveu de/, biaTexts);
+  assert.ok(!biaTexts.some((t) => /tarefa/.test(t)), 'tarefa que a pessoa não lê não vaza pela atividade');
+  // passar o negócio para a Bia: aparece no feed dela
+  assert.equal((await call(`/api/deals/${deal.id}`, { method: 'PATCH', token: admin, body: { ownerId: biaId } })).deal.ownerId, biaId);
+  has(/passou o negócio para/, (await call(`/api/deals/${deal.id}/activity`, { token: bia })).activity.map((a) => a.text));
+  assert.ok(feed.every((a) => a.id && a.kind && a.at), 'itens completos');
 });

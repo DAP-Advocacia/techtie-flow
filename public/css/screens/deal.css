@@ -1,0 +1,385 @@
+/* Página do negócio (#/deal?id=…) — destaque, Path e abas. Reaproveita o CSS do Negócios (pipeline.css) para a proposta. */
+.deal {
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+}
+.deal-missing {
+  align-items: center;
+  gap: 12px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+/* ---------- destaque ---------- */
+.deal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px 24px;
+}
+.deal-head__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.deal-head__id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deal-head__title {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.deal-head__sub a {
+  color: var(--acc2);
+  text-decoration: none;
+}
+.deal-head__sub a:hover {
+  text-decoration: underline;
+}
+.deal-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.deal-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 18px 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.deal-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deal-field dd {
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.deal-field--wide {
+  grid-column: 1 / -1;
+}
+.deal-owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.deal-stage {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid var(--dim);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--acc2);
+}
+.deal-stage--won {
+  color: var(--green);
+  border-color: var(--green);
+}
+.deal-stage--lost {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+/* ---------- Path ---------- */
+.deal-path {
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+.path {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  min-width: max-content;
+  width: 100%;
+}
+.path__item {
+  flex: 1 1 0;
+  min-width: 120px;
+}
+.path__step {
+  position: relative;
+  width: 100%;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 22px 0 26px;
+  border: 0;
+  background: var(--line);
+  color: var(--mute);
+  font-size: 13.5px;
+  font-weight: 500;
+  /* seta: ponta à direita e entalhe à esquerda */
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 14px 50%);
+  margin-right: -6px;
+  cursor: pointer;
+}
+.path__item:first-child .path__step {
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
+  border-radius: 10px 0 0 10px;
+  padding-left: 18px;
+}
+.path__item:last-child .path__step {
+  margin-right: 0;
+}
+.path__step:hover:not(:disabled):not([aria-disabled='true']) {
+  background: color-mix(in srgb, var(--acc) 22%, var(--line));
+  color: var(--text);
+}
+.path__step[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.path__item--done .path__step {
+  background: color-mix(in srgb, var(--acc) 30%, var(--card));
+  color: var(--text);
+}
+.path__item--current .path__step {
+  background: var(--acc);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: default;
+}
+.path__item--won.path__item--current .path__step {
+  background: var(--green);
+  color: #fff;
+}
+.path__item--lost.path__item--current .path__step {
+  background: var(--red);
+  color: #fff;
+}
+.path__check {
+  display: inline-flex;
+}
+.path__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- abas ---------- */
+.deal-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.deal-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--mute);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.deal-tab:hover {
+  color: var(--text);
+}
+.deal-tab.is-active {
+  color: var(--acc2);
+  border-bottom-color: var(--acc);
+  font-weight: 600;
+}
+.deal-tab__n {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--text);
+  font-size: 11.5px;
+  text-align: center;
+}
+.deal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------- detalhes ---------- */
+.deal-grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px 32px;
+  padding: 22px 24px;
+}
+.deal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.deal-won:not(:disabled) {
+  color: var(--green);
+  border-color: var(--green);
+}
+.deal-lost:not(:disabled),
+.deal-danger {
+  color: var(--red);
+}
+
+/* ---------- atividade ---------- */
+.deal-activity {
+  padding: 20px 24px;
+}
+.deal-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.deal-timeline__item {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 0 0 18px;
+}
+.deal-timeline__item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+.deal-timeline__dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.deal-timeline__item--task .deal-timeline__dot {
+  background: var(--acc);
+}
+.deal-timeline__text {
+  font-size: 14.5px;
+}
+.deal-timeline time {
+  font-size: 12px;
+  color: var(--mute);
+}
+
+/* ---------- proposta e relacionados ---------- */
+.deal-proposal.pipeline-panel {
+  width: auto;
+  max-width: 720px;
+  border-left: 0;
+  background: none;
+  padding: 0;
+}
+.deal-related {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.deal-related__col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.deal-contact,
+.deal-convs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+}
+.deal-contact__name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.deal-contact__name a {
+  color: var(--acc2);
+  font-weight: 600;
+  text-decoration: none;
+}
+.deal-contact__kv {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.deal-convs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.deal-convs__list li + li {
+  border-top: 1px solid var(--line);
+}
+.deal-conv {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.deal-conv:hover .deal-conv__msg {
+  color: var(--acc2);
+}
+.deal-conv__msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deal-conv__meta {
+  font-size: 12.5px;
+}
+
+@media (max-width: 820px) {
+  .deal-head {
+    padding: 16px;
+    gap: 14px;
+  }
+  .deal-head__actions {
+    width: 100%;
+  }
+  .deal-head__actions .btn {
+    flex: 1;
+  }
+  .deal-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .deal-grid {
+    padding: 16px;
+    gap: 14px;
+  }
+  .deal-related {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .path__item {
+    min-width: 108px;
+  }
+}

@@ -21,7 +21,7 @@ before(async () => {
   if (skip) return;
   h = await startPostgres(env.pg, 'srv');
   const c = await h.admin.connect();
-  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); } finally { c.release(); }
+  try { await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); } finally { c.release(); }
   const direct = `postgres://postgres:${h.admin.options.password}@127.0.0.1:${h.port}/postgres`;
   const r = spawnSync(process.execPath, [path.join(repoRoot, 'db', 'seed.mjs')], { env: { ...process.env, DIRECT_URL: direct, SEED_TENANT_NAME: 'Smoke', SEED_TENANT_SLUG: 'smoke', SEED_ADMIN_NAME: 'Admin', SEED_ADMIN_EMAIL: 'admin@smoke.com.br', SEED_ADMIN_PASSWORD: 'senha-de-teste-longa' }, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);

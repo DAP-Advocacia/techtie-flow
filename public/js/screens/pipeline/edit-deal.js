@@ -11,6 +11,7 @@ export function openEditDeal({ deal, onSave, restoreFocus }) {
   const valueLocked = lv.value !== 'write' || hasItems;
   const title = h('input', { class: 'input', type: 'text', maxlength: '200', value: deal.title, 'data-autofocus': true, autocomplete: 'off' });
   const value = h('input', { class: 'input num', type: 'text', inputmode: 'decimal', value: String(deal.value ?? 0).replace('.', ','), disabled: valueLocked });
+  const close = h('input', { class: 'input', type: 'date', value: deal.expectedClose || '', 'aria-label': 'Previsão de fechamento' });
   const error = h('span', { class: 'field-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn--primary', type: 'submit' }, 'Salvar');
   const cancelBtn = h('button', { class: 'btn btn--quiet', type: 'button' }, 'Cancelar');
@@ -28,7 +29,7 @@ export function openEditDeal({ deal, onSave, restoreFocus }) {
           e.preventDefault();
           const t = title.value.trim();
           if (!t) return (error.textContent = 'Informe o título.');
-          const patch = { title: t };
+          const patch = { title: t, expectedClose: close.value || null };
           if (!valueLocked) {
             const v = parseMoney(value.value);
             if (Number.isNaN(v)) return (error.textContent = 'Informe um valor válido, como 1.500,00.');
@@ -41,6 +42,7 @@ export function openEditDeal({ deal, onSave, restoreFocus }) {
       },
       h('label', { class: 'field' }, 'Título', title),
       h('label', { class: 'field' }, 'Valor estimado (R$)', value, hasItems ? h('span', { class: 'muted', style: { fontSize: '12.5px' } }, 'Calculado pelos produtos da proposta.') : lv.value !== 'write' ? h('span', { class: 'muted', style: { fontSize: '12.5px' } }, 'Seu perfil não pode editar o valor.') : null),
+      h('label', { class: 'field' }, 'Previsão de fechamento', close, h('span', { class: 'muted', style: { fontSize: '12.5px' } }, 'Alimenta “Fechando este mês” no Início.')),
       error,
       h('div', { class: 'pipeline-modal__actions' }, cancelBtn, saveBtn)
     ),

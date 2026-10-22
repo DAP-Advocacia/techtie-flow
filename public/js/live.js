@@ -291,6 +291,9 @@ export const unshareTask = (id, { type, id: subjectId }) => request(`/api/tasks/
 export const loadTaskComments = (id) => request(`/api/tasks/${id}/comments`).then((r) => r.comments);
 export const addTaskComment = (id, text) => request(`/api/tasks/${id}/comments`, { method: 'POST', body: { text } }).then((r) => r.comment);
 
+/** Linha do tempo real do negócio (auditoria + tarefas ligadas). */
+export const dealActivity = (id) => request(`/api/deals/${id}/activity`).then((r) => r.activity);
+
 // ---- contatos (esperam o servidor: não há ID provisório) ----
 export const createContact = (body) =>
   request('/api/contacts', { method: 'POST', body }).then((r) => {

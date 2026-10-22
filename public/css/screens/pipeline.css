@@ -876,3 +876,9 @@
   gap: 8px;
   margin-top: 10px;
 }
+
+.pipeline-panel__acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

@@ -4,14 +4,11 @@
 // pipeline/perm.js): negócios visíveis, pipelines, mover, proposta, conversa, campos e compartilhamento.
 import { h, icon, replaceChildren, toast } from '../ui.js';
 import { isMobile } from '../mobile.js';
+import { linkTo } from '../router.js';
 import { renderBoard, clearDrag, autoScroll } from './pipeline/board.js';
 import { renderPanel, renderPanelEmpty } from './pipeline/panel.js';
+import { createDealController, sending } from './pipeline/controller.js';
 import { openNewDeal } from './pipeline/new-deal.js';
-import { openAddProduct } from './pipeline/add-product.js';
-import { openEditDeal } from './pipeline/edit-deal.js';
-import * as live from '../live.js';
-import { openConfirmMove } from './pipeline/confirm-move.js';
-import { openConfirmDelete } from './pipeline/confirm-delete.js';
 import { openMoveMenu, closeMoveMenu } from './pipeline/move-menu.js';
 import { closeAllModals } from './pipeline/modal.js';
 import * as A from './pipeline/actions.js';
@@ -22,11 +19,9 @@ import * as P from './pipeline/perm.js';
 const view = {
   pipelineId: null,
   selectedByPipeline: {}, // pipelineId -> dealId (a seleção volta ao trocar de aba)
-  sending: new Set(), // dealIds com envio de proposta em andamento
   pendingFocus: null, // chave data-focus a devolver ao foco quando o elemento estiver utilizável de novo
   mStage: null, // celular: etapa mostrada (o quadro vira uma lista por etapa)
 };
-let liveRender = null; // render da instância montada (o envio simulado pode terminar depois de sair)
 
 export default {
   mount(el, { store, navigate }) {
@@ -35,6 +30,13 @@ export default {
     view.selectedByPipeline = {};
     view.pendingFocus = null;
     view.mStage = null;
+    // ações do negócio (mover, editar, proposta, excluir, compartilhar) são as mesmas da página do negócio
+    const { requestMove, editDeal, addProduct, removeItem, send, openChat, confirmDelete, share, unshare } = createDealController({
+      root: el,
+      navigate,
+      rerender: () => render(),
+      onSendStart: () => (view.pendingFocus = 'send'),
+    });
 
     // Negócios antigos/importados podem vir sem lista de itens.
     store.state.deals.forEach((d) => {
@@ -200,8 +202,9 @@ export default {
         board.querySelectorAll('.pipeline-col').forEach((col) => col.classList.toggle('is-mshow', col.dataset.stageId === view.mStage));
         renderPanel(panel, {
           deal,
-          sending: !!deal && view.sending.has(deal.id),
+          sending: !!deal && sending.has(deal.id),
           emptyMessage: deals.some((d) => d.pipelineId === pipeline.id) ? null : 'Você não tem negócios visíveis neste pipeline.',
+          onOpenPage: () => (location.hash = linkTo('deal', { id: deal.id })),
           onEdit: () => editDeal(deal),
           onAddProduct: () => addProduct(deal),
           onRemoveItem: (i) => removeItem(deal, i),
@@ -233,42 +236,6 @@ export default {
       openMoveMenu({ anchor, options, currentStageId: deal.stageId, returnTo: back, onPick: (stageId) => requestMove(deal.id, stageId, { refocus: true }) });
     }
 
-    /**
-     * Único caminho de mover (arraste, menu, atalhos Ganho/Perdido): consulta o motor com o contexto
-     * derivado dos dados e, se negado, avisa com o motivo e NÃO muda nada. Etapas finais pedem confirmação.
-     */
-    function requestMove(dealId, stageId, { refocus = false } = {}) {
-      const deal = store.deal(dealId);
-      const stage = store.stage(stageId);
-      if (!deal || !stage || deal.stageId === stageId) return;
-      if (!P.visibleDeals().some((d) => d.id === dealId)) {
-        toast('Este negócio está fora do seu escopo.');
-        return;
-      }
-      const decision = P.moveDecision(deal, stage);
-      if (decision.effect === 'approval') {
-        toast(`Mover para ${stage.name} requer aprovação de um gestor. Nada foi alterado.`);
-        return;
-      }
-      if (decision.effect !== 'allow') {
-        toast(`Não foi possível mover para ${stage.name}: ${P.reasonOf(decision, 'mover este negócio')}`);
-        return;
-      }
-      const card = () => el.querySelector(`[data-focus="card:${dealId}"]`);
-      const doMove = (reason) => {
-        const r = A.moveDeal(dealId, stageId, { reason }); // re-verifica no motor (a permissão pode ter mudado com o modal aberto)
-        if (!r.ok) {
-          toast(`Não foi possível mover para ${stage.name}: ${P.reasonOf(r.decision, 'mover este negócio')}`);
-          return;
-        }
-        toast(`Movido para ${stage.name}`);
-        // Menu/teclado: devolve o foco ao cartão que mudou de coluna. No arraste não, senão o anel de foco aparece sem ter sido pedido.
-        if (refocus) card()?.focus();
-      };
-      if (stage.kind === 'won' || stage.kind === 'lost') openConfirmMove({ deal, stage, onConfirm: doMove, restoreFocus: refocus ? card : undefined });
-      else doMove('');
-    }
-
     function newDeal() {
       const pipeline = store.pipeline(view.pipelineId);
       if (!pipeline) return;
@@ -288,139 +255,13 @@ export default {
       });
     }
 
-    function editDeal(deal) {
-      openEditDeal({
-        deal,
-        restoreFocus: () => el.querySelector('[data-focus="edit"]'),
-        onSave: (patch) => {
-          const r = A.editDeal(deal.id, patch);
-          if (r.ok) toast('Negócio atualizado');
-          else if (!r.error) toast(P.reasonOf(r.decision, 'editar este negócio'));
-          return r;
-        },
-      });
-    }
-
-    function addProduct(deal) {
-      const dec = P.editDecision(deal);
-      if (dec.effect === 'deny') {
-        toast(P.reasonOf(dec, 'editar a proposta'));
-        return;
-      }
-      openAddProduct({
-        deal,
-        onAdded: (p) => toast(`${p.name} adicionado à proposta`),
-        onProductCreated: (p) => {
-          toast(`${p.name} cadastrado no catálogo`);
-          addProduct(store.deal(deal.id) || deal); // reabre com o catálogo atualizado
-        },
-        onBlocked: (d) => toast(d.effect === 'approval' ? 'Esta alteração precisa da aprovação de um gestor (o fluxo de aprovação ainda não existe). Nada foi alterado.' : P.reasonOf(d, 'editar a proposta')),
-      });
-    }
-
-    function removeItem(deal, i) {
-      const r = A.removeItem(deal.id, i);
-      if (!r.ok) toast(r.decision.effect === 'approval' ? 'Esta alteração precisa da aprovação de um gestor (o fluxo de aprovação ainda não existe). Nada foi alterado.' : P.reasonOf(r.decision, 'editar a proposta'));
-    }
-
-    function send(deal) {
-      if (view.sending.has(deal.id) || !A.itemsOf(deal).length) return;
-      const dec = P.sendDecision(deal);
-      if (dec.effect !== 'allow') {
-        toast(P.reasonOf(dec, 'enviar a proposta'));
-        return;
-      }
-      const by = store.state.currentUserId;
-      view.sending.add(deal.id);
-      view.pendingFocus = 'send';
-      render();
-      const SENT_MSG = {
-        sent: 'Proposta enviada pelo WhatsApp',
-        'no-chat': 'Proposta registrada (este contato ainda não tem conversa no WhatsApp)',
-        'no-access': 'Proposta registrada, mas você não pode escrever na conversa deste contato',
-      };
-      if (live.enabled) {
-        // Modo operação: o servidor monta o texto, envia pelo WhatsApp e registra (erros aparecem como aviso).
-        live.sendProposal(deal.id).then((r) => {
-          view.sending.delete(deal.id);
-          liveRender?.();
-          if (r) toast(SENT_MSG[r.result] || 'Proposta registrada');
-        });
-        return;
-      }
-      // Envio simulado. Se o usuário sair da tela, o envio termina mesmo assim (só mexe no store);
-      // por isso este timer não é cancelado na limpeza.
-      setTimeout(() => {
-        view.sending.delete(deal.id);
-        // Trocou de usuário durante o envio: não envia em nome de outra pessoa.
-        if (store.state.currentUserId !== by) {
-          liveRender?.();
-          return;
-        }
-        const result = A.sendProposal(deal.id); // re-verifica no motor; store.update já re-renderiza quem estiver montado
-        liveRender?.();
-        // Itens ficam travados durante o envio (ver panel.js), então 'no-items' só ocorreria se outra tela os alterasse.
-        const msg = {
-          sent: 'Proposta enviada pelo WhatsApp',
-          'no-chat': 'Proposta registrada (este contato ainda não tem conversa no WhatsApp)',
-          'no-access': 'Proposta registrada, mas você não pode escrever na conversa deste contato',
-          'no-items': 'Nada enviado: a proposta ficou sem produtos',
-          denied: P.reasonOf(P.sendDecision(store.deal(deal.id) || deal), 'enviar a proposta'),
-        }[result];
-        toast(msg);
-      }, 1100);
-    }
-
-    function openChat(deal) {
-      const { conv, decision } = P.chatFor(deal);
-      if (!conv || decision.effect !== 'allow') {
-        toast(P.reasonOf(decision, 'ler a conversa deste contato'));
-        return;
-      }
-      if (A.pointInboxTo(conv.id)) navigate('inbox');
-    }
-
-    function confirmDelete(deal) {
-      const dec = P.deleteDecision(deal);
-      if (dec.effect !== 'allow') {
-        toast(P.reasonOf(dec, 'excluir negócios'));
-        return;
-      }
-      const back = () => el.querySelector('[data-focus="delete"]') || el.querySelector('.pipeline-card');
-      openConfirmDelete({
-        deal,
-        restoreFocus: back,
-        onConfirm: () => {
-          const r = A.deleteDeal(deal.id);
-          toast(r.ok ? 'Negócio excluído' : P.reasonOf(r.decision, 'excluir negócios'));
-        },
-      });
-    }
-
-    function share(deal, target) {
-      const r = A.shareDeal(deal.id, target);
-      if (!r.ok) {
-        toast(P.reasonOf(r.decision));
-        return;
-      }
-      toast('Negócio compartilhado');
-      el.querySelector('[data-focus="share-target"]')?.focus();
-    }
-
-    function unshare(deal, target) {
-      const r = A.unshareDeal(deal.id, target);
-      toast(r.ok ? 'Acesso removido' : P.reasonOf(r.decision));
-    }
-
     // ---- ciclo de vida ----
-    liveRender = render;
     const unsub = store.subscribe(render);
     document.addEventListener('dragend', clearDrag);
     render();
 
     return () => {
       alive = false;
-      if (liveRender === render) liveRender = null;
       unsub();
       document.removeEventListener('dragend', clearDrag);
       clearDrag();

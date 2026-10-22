@@ -149,7 +149,7 @@ export function createDeal({ title, contactId, newContact, value, ownerId, pipel
 }
 
 /** Edita título e/ou valor do negócio. Título exige `deal.update`; valor também exige o campo `value` editável. */
-export function editDeal(dealId, { title, value }) {
+export function editDeal(dealId, { title, value, expectedClose }) {
   const deal = store.deal(dealId);
   const decision = deal ? decide('deal', 'update', deal) : { effect: 'deny', reason: 'no_grant', matched: [] };
   if (decision.effect !== 'allow') return denied(decision);
@@ -161,6 +161,10 @@ export function editDeal(dealId, { title, value }) {
     if (P.fieldLevels().value !== 'write') return denied({ effect: 'deny', reason: 'field_readonly', matched: [] });
     if (!(Number(value) >= 0 && Number(value) <= MAX_DEAL_VALUE)) return { ok: false, error: 'Informe um valor válido.' };
     changes.value = Number(value);
+  }
+  if (expectedClose !== undefined && (expectedClose || null) !== (deal.expectedClose || null)) {
+    if (expectedClose && !/^\d{4}-\d{2}-\d{2}$/.test(expectedClose)) return { ok: false, error: 'Data inválida.' };
+    changes.expectedClose = expectedClose || null;
   }
   if (!Object.keys(changes).length) return allowed(decision);
   store.update((s) => Object.assign(s.deals.find((x) => x.id === dealId) || {}, changes));

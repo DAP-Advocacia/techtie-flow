@@ -25,11 +25,20 @@ const notFound = (m = 'Não encontrado.') => new HttpError(404, m);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const ms = (d) => (d ? new Date(d).getTime() : null);
+// coluna `date`: o pg devolve meia-noite LOCAL; lê pelos componentes locais para não deslocar o dia
+const dateStr = (d) => (d instanceof Date ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : d || null);
+const parseDay = (v) => {
+  if (v === null || v === '') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));
+  const d = m && new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (!d || d.getMonth() !== Number(m[2]) - 1 || d.getFullYear() < 2000 || d.getFullYear() > 2100) throw bad('Data inválida.');
+  return String(v);
+};
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 // --------------------------------------------------------------------- mapeamentos DB → API
 const apiContact = (r) => ({ id: r.id, name: r.name, company: r.company || '', phone: r.phone ? `+${r.phone}` : '', email: r.email || '', ownerId: r.owner_id, teamId: r.team_id, source: r.source || '', tags: [], status: r.status || null });
-const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], proposalSentAt: ms(r.proposal_sent_at), lastMessage: '' });
+const apiDeal = (r) => ({ id: r.id, title: r.title, contactId: r.contact_id, pipelineId: r.pipeline_id, stageId: r.stage_id, value: num(r.value) ?? 0, ownerId: r.owner_id, teamId: r.team_id, status: r.status, createdAt: ms(r.created_at), stageChangedAt: ms(r.stage_changed_at), items: Array.isArray(r.items) ? r.items : [], proposalSentAt: ms(r.proposal_sent_at), expectedClose: dateStr(r.expected_close), lastMessage: '' });
 const apiInstance = (r) => ({ id: r.id, name: r.name, channel: r.channel, status: r.status, phone: r.phone || '', attentionReason: r.attention_reason || null, ownerId: r.owner_id || null, teamId: r.team_id || null, ownerName: r.owner_name || '', aiActive: !!r.ai_active });
 const apiMessage = (r) => ({
   id: r.id,
@@ -445,7 +454,8 @@ function createApp({ pool, config, hub, channel, openai }) {
     }
   });
 
-  route('POST', '/api/deals', async ({ access, body }) => {
+  route('POST', '/api/deals', async ({ req, access, body }) => {
+    const expectedClose = body.expectedClose === undefined ? null : parseDay(body.expectedClose);
     const title = String(body.title || '').trim();
     if (!title || title.length > 200) throw bad('Informe o título (até 200 caracteres).');
     const pipelineId = uuidOr400(body.pipelineId, 'Funil');
@@ -462,7 +472,8 @@ function createApp({ pool, config, hub, channel, openai }) {
       if (!owner || owner.user.status !== 'active') throw bad('O responsável precisa ser um usuário ativo.');
       const row = { id: crypto.randomUUID(), tenantId: access.tenantId, ownerId, teamId: owner.teamIds[0] || null, pipelineId, stageId, status: st.kind, value };
       must(access, 'deal', 'create', row);
-      const r = await c.query('INSERT INTO deals (id, tenant_id, owner_id, team_id, title, pipeline_id, stage_id, status, value, contact_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *', [row.id, row.tenantId, row.ownerId, row.teamId, title, pipelineId, stageId, row.status, value, contactId]);
+      const r = await c.query('INSERT INTO deals (id, tenant_id, owner_id, team_id, title, pipeline_id, stage_id, status, value, contact_id, expected_close) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *', [row.id, row.tenantId, row.ownerId, row.teamId, title, pipelineId, stageId, row.status, value, contactId, expectedClose]);
+      await audit(c, access, req, 'deal.create', 'deal', row.id, { title, stageId });
       return { deal: apiDeal(r.rows[0]) };
     });
   });
@@ -492,6 +503,7 @@ function createApp({ pool, config, hub, channel, openai }) {
         patch.value = v;
         set('value', v);
       }
+      if (body.expectedClose !== undefined) set('expected_close', parseDay(body.expectedClose));
       if (body.items !== undefined) {
         if (!Array.isArray(body.items) || body.items.length > 50) throw bad('Itens da proposta inválidos.');
         const ids = body.items.map((i) => uuidOr400(i?.productId, 'Produto'));
@@ -541,6 +553,8 @@ function createApp({ pool, config, hub, channel, openai }) {
       // a etapa só muda se o motor também permitir `move` com o contexto real (negação do SDR p/ Ganho etc.)
       if (context) must(access, 'deal', 'move', before, context);
       const r = await c.query(`UPDATE deals SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, [id, ...vals]);
+      const edited = ['title', 'value', 'items', 'expectedClose'].filter((k) => body[k] !== undefined);
+      if (edited.length) await audit(c, access, req, 'deal.update', 'deal', id, { fields: edited });
       if (context || patch.ownerId) await audit(c, access, req, context ? 'deal.move' : 'deal.transfer', 'deal', id, context ? { from: context.fromStageId, to: context.toStageId } : { from: cur.owner_id, to: patch.ownerId });
       return { deal: apiDeal(r.rows[0]) };
     });

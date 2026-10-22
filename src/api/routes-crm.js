@@ -4,6 +4,8 @@
 // o MOTOR decide, o registro é lido do banco com o filtro do motor e o contexto nunca vem do corpo da requisição.
 // `H` traz os ajudantes do app.js (rotas, decisão, transação, serializadores).
 
+const ms = (d) => (d ? new Date(d).getTime() : null);
+
 module.exports = function registerCrmRoutes(H) {
   const { route, must, bad, forbidden, notFound, HttpError, uuidOr400, tx, listWhere, getAccess, audit, withShares, visibleDeal, convRow, apiContact, apiDeal, apiInstance, postOut, announce, EMAIL } = H;
 
@@ -148,7 +150,11 @@ module.exports = function registerCrmRoutes(H) {
       if (lv.value === 'hidden' || lv.items === 'hidden') throw forbidden('Seu perfil não vê os preços desta proposta.');
       const items = Array.isArray(cur.items) ? cur.items : [];
       if (!items.length) throw bad('Adicione produtos ao negócio antes de enviar a proposta.');
-      if (!cur.contact_id) return { result: 'no-chat' };
+      if (!cur.contact_id) {
+        await c.query('UPDATE deals SET proposal_sent_at = now() WHERE id = $1', [id]);
+        await audit(c, access, req, 'proposal.send', 'deal', id, { channel: 'none' });
+        return { result: 'no-chat' };
+      }
       const contact = (await c.query('SELECT name FROM contacts WHERE id = $1', [cur.contact_id])).rows[0];
       const w = listWhere(access, 'conversation', 'read');
       const convs = (await c.query(`SELECT t.* FROM conversations t WHERE t.contact_id = $${w.params.length + 1} AND ${w.sql} ORDER BY t.last_message_at DESC NULLS LAST`, [...w.params, cur.contact_id])).rows;
@@ -167,6 +173,70 @@ module.exports = function registerCrmRoutes(H) {
     if (out.posted) announce(access, out.posted);
     const deal = await tx(H.pool, access, (c) => visibleDeal(c, access, id), { readOnly: true });
     return { result: out.result, deal: apiDeal(deal), conversation: out.posted?.conversation || null, message: out.posted?.message || null };
+  });
+
+  // ===================================================================== ATIVIDADE DO NEGÓCIO
+  // Linha do tempo REAL do negócio: o que a auditoria registrou (criar, alterar, mover, passar para outra pessoa,
+  // compartilhar, enviar proposta) + tarefas ligadas a ele (criadas e concluídas). Quem lê o negócio lê o feed.
+  const FIELD_TEXT = { title: 'o título', value: 'o valor', items: 'a proposta', expectedClose: 'a previsão de fechamento' };
+  route('GET', '/api/deals/:id/activity', async ({ access, params }) => {
+    const id = uuidOr400(params.id, 'Negócio');
+    return tx(
+      H.pool,
+      access,
+      async (c) => {
+        await visibleDeal(c, access, id);
+        const logs = (await c.query("SELECT id, actor_id, action, diff, occurred_at FROM audit_log WHERE entity = 'deal' AND entity_id = $1 ORDER BY occurred_at DESC, seq DESC LIMIT 200", [id])).rows;
+        const tw = listWhere(access, 'task', 'read');
+        const tasks = (await c.query(`SELECT t.id, t.title, t.owner_id, t.created_by, t.created_at, t.completed_at, t.status FROM tasks t WHERE t.deal_id = $${tw.params.length + 1} AND (${tw.sql}) ORDER BY t.created_at DESC LIMIT 100`, [...tw.params, id])).rows;
+        const ids = (key) => [...new Set(logs.map((l) => l.diff?.[key]).filter(Boolean))];
+        const stageIds = [...ids('from'), ...ids('to')].filter((v) => /^[0-9a-f-]{36}$/i.test(v));
+        const userIds = [...new Set([...logs.map((l) => l.actor_id), ...logs.filter((l) => l.action === 'deal.transfer').map((l) => l.diff?.to), ...logs.filter((l) => l.diff?.type === 'user').map((l) => l.diff?.subjectId), ...tasks.flatMap((t) => [t.owner_id, t.created_by])].filter(Boolean))];
+        const teamIds = [...new Set(logs.filter((l) => l.diff?.type === 'team').map((l) => l.diff?.subjectId).filter(Boolean))];
+        const names = Object.fromEntries((userIds.length ? (await c.query('SELECT id, name FROM users WHERE id = ANY($1::uuid[])', [userIds])).rows : []).map((u) => [u.id, u.name]));
+        const stages = Object.fromEntries((stageIds.length ? (await c.query('SELECT id, name FROM pipeline_stages WHERE id = ANY($1::uuid[])', [stageIds])).rows : []).map((x) => [x.id, x.name]));
+        const teams = Object.fromEntries((teamIds.length ? (await c.query('SELECT id, name FROM teams WHERE id = ANY($1::uuid[])', [teamIds])).rows : []).map((x) => [x.id, x.name]));
+        const who = (uid) => names[uid] || 'Alguém';
+        const items = [];
+        for (const l of logs) {
+          const d = l.diff || {};
+          let text = null;
+          switch (l.action) {
+            case 'deal.create':
+              text = `${who(l.actor_id)} criou o negócio`;
+              break;
+            case 'deal.update':
+              text = `${who(l.actor_id)} alterou ${(d.fields || []).map((f) => FIELD_TEXT[f] || f).join(', ') || 'o negócio'}`;
+              break;
+            case 'deal.move':
+              text = `${who(l.actor_id)} moveu de ${stages[d.from] || 'uma etapa'} para ${stages[d.to] || 'outra etapa'}`;
+              break;
+            case 'deal.transfer':
+              text = `${who(l.actor_id)} passou o negócio para ${who(d.to)}`;
+              break;
+            case 'deal.share':
+              text = `${who(l.actor_id)} compartilhou com ${d.type === 'team' ? `a equipe ${teams[d.subjectId] || ''}`.trim() : who(d.subjectId)} (${d.level === 'edit' ? 'edição' : 'leitura'})`;
+              break;
+            case 'deal.unshare':
+              text = `${who(l.actor_id)} removeu o acesso de ${d.type === 'team' ? `a equipe ${teams[d.subjectId] || ''}`.trim() : who(d.subjectId)}`;
+              break;
+            case 'proposal.send':
+              text = d.channel === 'none' ? `${who(l.actor_id)} registrou o envio da proposta` : `${who(l.actor_id)} enviou a proposta por WhatsApp`;
+              break;
+            default:
+              break;
+          }
+          if (text) items.push({ id: `a:${l.id}`, kind: 'event', text, at: ms(l.occurred_at), actorId: l.actor_id });
+        }
+        for (const t of tasks) {
+          items.push({ id: `t:${t.id}:c`, kind: 'task', text: `${who(t.created_by || t.owner_id)} criou a tarefa “${t.title}”`, at: ms(t.created_at), actorId: t.created_by || t.owner_id });
+          if (t.completed_at) items.push({ id: `t:${t.id}:d`, kind: 'task', text: `${who(t.owner_id)} concluiu a tarefa “${t.title}”`, at: ms(t.completed_at), actorId: t.owner_id });
+        }
+        items.sort((a, b) => b.at - a.at);
+        return { activity: items.slice(0, 150) };
+      },
+      { readOnly: true }
+    );
   });
 
   // ===================================================================== PRODUTOS (catálogo das propostas)

@@ -35,6 +35,8 @@ const ROUTES = [
   { id: 'inbox', label: 'Inbox', shell: true, nav: true, require: ['conversation', 'read'] },
   { id: 'pipeline', label: 'Negócios', shell: true, nav: true, require: ['deal', 'read'] },
   { id: 'contacts', label: 'Contatos', shell: true, nav: true, require: ['contact', 'read'] },
+  // página de um negócio: não aparece no menu; o menu destaca Negócios e o caminho da página mostra Negócios › Negócio
+  { id: 'deal', label: 'Negócio', shell: true, nav: false, parent: 'pipeline', require: ['deal', 'read'] },
   { id: 'tasks', label: 'Tarefas', shell: true, nav: true, require: ['task', 'read'] },
   { id: 'agent', label: 'Agente de IA', shell: true, nav: true, require: ['ai_agent', 'read'] },
   // desktopOnly: no celular a tela é substituída por um aviso (são telas densas, feitas para o computador)

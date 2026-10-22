@@ -130,7 +130,7 @@ export default {
               ? h(
                   'ul',
                   { class: 'contacts-mini' },
-                  ...deals.map((d) => h('li', null, h('a', { class: 'contacts-mini__row', href: '#/pipeline' }, h('span', { class: 'contacts-mini__main truncate' }, d.title), h('span', { class: 'contacts-mini__sub' }, [store.stage(d.stageId)?.name, valueHidden ? null : fmtBRL(d.value)].filter(Boolean).join(' · ')))))
+                  ...deals.map((d) => h('li', null, h('a', { class: 'contacts-mini__row', href: `#/deal?id=${d.id}` }, h('span', { class: 'contacts-mini__main truncate' }, d.title), h('span', { class: 'contacts-mini__sub' }, [store.stage(d.stageId)?.name, valueHidden ? null : fmtBRL(d.value)].filter(Boolean).join(' · ')))))
                 )
               : h('p', { class: 'muted' }, 'Nenhum negócio visível para você.')
           ),
