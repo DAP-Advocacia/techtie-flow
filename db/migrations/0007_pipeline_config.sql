@@ -4,21 +4,9 @@
 BEGIN;
 SET LOCAL ROLE app_owner;
 
--- Probabilidade (0 a 100) de a etapa virar ganho. Preenchimento inicial: ganho 100, perdido 0 e as abertas
--- distribuídas ao longo do funil (3 abertas → 25, 50 e 75). Só roda na primeira vez (a coluna ainda não existe).
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pipeline_stages' AND column_name = 'probability') THEN
-    ALTER TABLE pipeline_stages ADD COLUMN probability smallint NOT NULL DEFAULT 0 CHECK (probability BETWEEN 0 AND 100);
-    UPDATE pipeline_stages SET probability = 100 WHERE kind = 'won';
-    UPDATE pipeline_stages s SET probability = r.p
-      FROM (
-        SELECT id, round(100.0 * row_number() OVER (PARTITION BY pipeline_id ORDER BY position, created_at) / (count(*) OVER (PARTITION BY pipeline_id) + 1))::int AS p
-        FROM pipeline_stages WHERE kind = 'open'
-      ) r
-      WHERE s.id = r.id;
-  END IF;
-END $$;
+-- Probabilidade (0 a 100) de a etapa virar ganho. O preenchimento dos funis que já existiam é da 0008: aqui a RLS
+-- (FORCE, sem tenant definido) esconderia todas as linhas e o UPDATE não alcançaria nenhuma.
+ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS probability smallint NOT NULL DEFAULT 0 CHECK (probability BETWEEN 0 AND 100);
 
 -- Motivo da perda escolhido ao mover o negócio para uma etapa "perdida" (some ao reabrir).
 ALTER TABLE deals ADD COLUMN IF NOT EXISTS lost_reason text CHECK (lost_reason IS NULL OR char_length(lost_reason) <= 200);

@@ -25,7 +25,7 @@ before(async () => {
   h = await startPostgres(env.pg, 'pilot');
   const c = await h.admin.connect();
   try {
-    await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0007_pipeline_config.sql'), 'utf8'));
+    await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0002_pilot.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0003_personal_instances.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0004_crm_ai.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0005_tasks.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0006_deal_expected_close.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0007_pipeline_config.sql'), 'utf8')); await c.query(fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0008_pipeline_probability_backfill.sql'), 'utf8'));
   } finally {
     c.release();
   }
@@ -112,4 +112,27 @@ test('mensagens: dedupe por id do WhatsApp, isolamento de tenant e sem DELETE pa
   await assert.rejects(() => withTenant(h.app, { tenantId: tenantA, readScopes: 'tenant' }, (c) => c.query("DELETE FROM messages WHERE wa_message_id = 'WA1'")), /permission denied/);
   void randomUUID;
   void APP_PW;
+});
+
+test('migração 0008: preenche a probabilidade dos funis antigos (RLS por empresa) sem sobrescrever o que já foi configurado', { skip }, async () => {
+  const sql = fs.readFileSync(path.join(repoRoot, 'db', 'migrations', '0008_pipeline_probability_backfill.sql'), 'utf8');
+  const tenantB = (await h.admin.query("SELECT id FROM tenants WHERE slug = 'escritorio-b'")).rows[0].id;
+  const probs = async (tenant) => {
+    const { rows } = await withTenant(h.app, { tenantId: tenant, readScopes: 'tenant', readOnly: true }, (c) => c.query('SELECT p.name AS funil, s.name, s.probability FROM pipeline_stages s JOIN pipelines p ON p.id = s.pipeline_id ORDER BY p.name, s.position'));
+    const out = {};
+    for (const r of rows) (out[r.funil] ||= {})[r.name] = r.probability;
+    return out;
+  };
+  // estado de produção logo depois da 0007: tudo em 0
+  await h.admin.query('UPDATE pipeline_stages SET probability = 0');
+  await h.admin.query(sql);
+  for (const tenant of [tenantA, tenantB]) {
+    assert.deepEqual(await probs(tenant), { Comercial: { Proposta: 33, Negociação: 67, Fechamento: 100, Perdido: 0 }, 'Vendas · SDR': { 'Novo lead': 25, Qualificação: 50, Reunião: 75, Ganho: 100 } }, 'as duas empresas foram preenchidas');
+  }
+  // quem já configurou um valor não é sobrescrito, e rodar de novo não muda nada
+  await h.admin.query("UPDATE pipeline_stages SET probability = 90 WHERE name = 'Proposta' AND tenant_id = $1", [tenantA]);
+  await h.admin.query("UPDATE pipeline_stages SET probability = 0 WHERE name = 'Negociação' AND tenant_id = $1", [tenantA]);
+  await h.admin.query(sql);
+  assert.deepEqual((await probs(tenantA)).Comercial, { Proposta: 90, Negociação: 0, Fechamento: 100, Perdido: 0 });
+  assert.deepEqual((await probs(tenantB)).Comercial, { Proposta: 33, Negociação: 67, Fechamento: 100, Perdido: 0 });
 });

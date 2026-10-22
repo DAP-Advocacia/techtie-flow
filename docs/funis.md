@@ -31,6 +31,8 @@ valor ponderado).
 
 ## Técnico
 - Migração `0007_pipeline_config.sql`: `pipeline_stages.probability`, `deals.lost_reason`, tabela `loss_reasons` (RLS por tenant).
+- Migração `0008_pipeline_probability_backfill.sql`: preenche a probabilidade dos funis que já existiam, empresa por empresa (a RLS é
+  FORCE: sem `app.tenant_id` o UPDATE não enxerga linha nenhuma — foi o que deixou tudo em 0% na 0007). Só mexe no que ninguém configurou.
 - API (`src/api/routes-pipelines.js`): `POST /api/pipelines`, `PATCH /api/pipelines/:id`, `PUT /api/pipelines/:id/stages`
   (lista inteira na ordem da tela), `DELETE /api/pipelines/:id`, `PUT /api/loss-reasons`. Tudo na auditoria (`pipeline.*`) e o
   tempo real avisa as outras pessoas (`pipelines`) para recarregar.
