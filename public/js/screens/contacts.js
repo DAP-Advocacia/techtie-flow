@@ -10,6 +10,8 @@ import { ensureScreenCss } from '../css.js';
 import { openContactForm, openDeleteContact, canCreateContact } from './contacts/form.js';
 import { contactColumns, contactCtx, contactViews } from './contacts/table.js';
 import { createTable } from '../lists/table.js';
+import { canImport, canExport, logExport } from './import/actions.js';
+import { openImport } from './import/wizard.js';
 import { tasksBlock } from './tasks/mini.js';
 import { tasksOfContact } from './tasks/actions.js';
 import { pointInboxTo } from './pipeline/actions.js';
@@ -97,7 +99,13 @@ export default {
       };
       return h('div', { class: 'pills lt-mode', role: 'group', 'aria-label': 'Forma de ver os contatos' }, pill('list', 'Lista'), pill('table', 'Tabela'));
     };
-    const head = (extra) => h('header', { class: 'contacts-head' }, h('div', { class: 'contacts-head__row' }, h('div', null, h('div', { class: 'eyebrow' }, 'RELACIONAMENTO'), h('h1', { class: 'page-title' }, 'CONTATOS')), h('div', { class: 'contacts-head__tools' }, modeToggle(), newBtn())), extra);
+    const importBtns = [];
+    const importBtn = () => {
+      const b = h('button', { class: 'btn btn--ghost contacts-import', type: 'button', title: 'Trazer contatos de uma planilha CSV', onclick: () => openImport({ entity: 'contact', onDone: () => draw() }) }, 'Importar CSV');
+      importBtns.push(b);
+      return b;
+    };
+    const head = (extra) => h('header', { class: 'contacts-head' }, h('div', { class: 'contacts-head__row' }, h('div', null, h('div', { class: 'eyebrow' }, 'RELACIONAMENTO'), h('h1', { class: 'page-title' }, 'CONTATOS')), h('div', { class: 'contacts-head__tools' }, modeToggle(), importBtn(), newBtn())), extra);
 
     const search = h('input', { class: 'input contacts-search__input', type: 'search', placeholder: 'Buscar por nome, telefone, e-mail ou empresa', autocomplete: 'off', 'aria-label': 'Buscar contatos' });
     const count = h('span', { class: 'contacts-count muted', role: 'status' });
@@ -129,6 +137,7 @@ export default {
       getRows: () => visibleMasked(),
       builtins: contactViews(store.state.currentUserId),
       noun: ['contato', 'contatos'],
+      exportable: { base: 'contatos', allowed: (n) => canExport('contact', n), log: (n) => logExport('contact', n) },
       emptyText: 'Nenhum contato visível para você.',
       searchPlaceholder: 'Buscar por nome, empresa, telefone ou e-mail',
       onOpen: (c) => {
@@ -400,6 +409,7 @@ export default {
     }
 
     for (const b of newBtns) b.hidden = !canCreateContact();
+    for (const b of importBtns) b.hidden = !canImport('contact');
     const wanted = hashParam('c');
     if (wanted && visible('contact', store.state.contacts).some((c) => c.id === wanted)) {
       selectedId = wanted;

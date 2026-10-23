@@ -385,6 +385,11 @@ function onChatEvent(ev) {
   if (!mine && chatViewing === m.roomId) markChatRead(m.roomId);
 }
 
+// ---- CSV: importar e registrar a exportação ----
+export const logExport = (entity, count) => request('/api/exports', { method: 'POST', body: { entity, count } });
+export const importContacts = (rows) => request('/api/import/contacts', { method: 'POST', body: { rows } }).then(async (r) => (await hydrate({ keepMessages: true }).catch(() => {}), r));
+export const importDeals = (pipelineId, rows) => request('/api/import/deals', { method: 'POST', body: { pipelineId, rows } }).then(async (r) => (await hydrate({ keepMessages: true }).catch(() => {}), r));
+
 // ---- perfil (o próprio) ----
 export const saveProfile = (body) => request('/api/me', { method: 'PATCH', body }).then((r) => (store.update((s) => Object.assign(s.users.find((u) => u.id === r.me.id) || {}, r.me)), r.me));
 

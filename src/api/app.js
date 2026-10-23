@@ -650,6 +650,7 @@ function createApp({ pool, config, hub, channel, openai }) {
   require('./routes-tasks')(taskH);
   const aiH = { pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, openai };
   require('./ai-routes')(aiH);
+  require('./routes-import')({ pool, route, must, bad, HttpError, uuidOr400, tx, listWhere, getAccess, audit, primaryTeam });
   require('./routes-chat')({ pool, route, bad, notFound, HttpError, uuidOr400, tx, audit, hub });
   require('./routes-pipelines')({ pool, route, must, bad, notFound, HttpError, uuidOr400, tx, audit, hub });
   require('./routes-crm')({ pool, route, must, bad, forbidden, notFound, HttpError, uuidOr400, tx, listWhere, getAccess, audit, withShares, visibleDeal, convRow, dealRow, apiContact, apiDeal, apiInstance, postOut, announce, EMAIL });

@@ -1073,3 +1073,90 @@ test('perfil: cada pessoa edita o PRÓPRIO nome, cargo, telefone e sobre; valida
   assert.equal(cleared.me.bio, '');
   assert.equal((await call('/api/me', { method: 'PATCH', body: { name: 'x' } })).status, 401, 'sem login não edita');
 });
+
+test('CSV: importar contatos e negócios (prévia = servidor), pular o que já existe, respeitar permissões; exportar fica na auditoria', { skip }, async () => {
+  const admin = await login('admin@a.com.br');
+  const ana = await login('ana@a.com.br');
+  const adminB = await login('admin@b.com.br');
+  const post = (path, token, body) => call(path, { method: 'POST', token, body });
+  const contactsOf = async (token) => (await call('/api/bootstrap', { token })).contacts;
+
+  // Atendente não importa nem exporta (o motor não deu essas ações a ela)
+  assert.equal((await post('/api/import/contacts', ana, { rows: [{ name: 'X' }] })).status, 403);
+  assert.equal((await post('/api/import/deals', ana, { pipelineId: '00000000-0000-4000-8000-000000000000', rows: [{ title: 'X' }] })).status, 403);
+  assert.equal((await post('/api/exports', ana, { entity: 'contact', count: 3 })).status, 403);
+  assert.equal((await post('/api/import/contacts', admin, { rows: [] })).status, 400, 'sem linhas');
+  assert.equal((await post('/api/import/contacts', admin, { rows: Array.from({ length: 2001 }, () => ({ name: 'x' })) })).status, 400, 'passou do limite');
+
+  // contatos: entram os válidos; fora: sem nome, telefone/e-mail ruins, repetidos no arquivo
+  const rows = [
+    { line: 2, name: 'Importada Um', company: 'Acme CSV', phone: '(11) 98888-1111', email: 'UM@csv.com' },
+    { line: 3, name: 'Importado Dois', phone: '+55 21 97777-2222' },
+    { line: 4, name: '', phone: '11 91111-0000' },
+    { line: 5, name: 'Telefone ruim', phone: '12' },
+    { line: 6, name: 'Repete tel', phone: '11988881111' },
+    { line: 7, name: 'Sem telefone nem e-mail' },
+    { line: 8, name: 'E-mail ruim', email: 'x' },
+  ];
+  const r1 = await post('/api/import/contacts', admin, { rows });
+  assert.equal(r1.status, 200, JSON.stringify(r1));
+  assert.equal(r1.created, 3);
+  assert.deepEqual(r1.skipped.map((x) => [x.line, x.reason]), [[4, 'Sem nome'], [5, 'Telefone inválido'], [6, 'Telefone repetido no arquivo'], [8, 'E-mail inválido']]);
+  const imported = (await contactsOf(admin)).filter((c) => /^Importad|Sem telefone nem/.test(c.name));
+  assert.equal(imported.length, 3);
+  const um = imported.find((c) => c.name === 'Importada Um');
+  assert.equal(um.phone, '+5511988881111');
+  assert.equal(um.email, 'um@csv.com');
+  assert.equal(um.company, 'Acme CSV');
+  assert.equal(um.source, 'import');
+  // rodar de novo: tudo que tinha telefone/e-mail já existe e é pulado (sem criar de novo)
+  const r2 = await post('/api/import/contacts', admin, { rows: rows.slice(0, 2) });
+  assert.equal(r2.created, 0);
+  assert.deepEqual(r2.skipped.map((x) => x.reason), ['Já existe um contato com este telefone', 'Já existe um contato com este telefone']);
+  // outra empresa tem o mesmo telefone livre e não vê nada da primeira
+  assert.equal((await post('/api/import/contacts', adminB, { rows: [rows[0]] })).created, 1, 'cada empresa tem a sua base');
+  assert.equal((await contactsOf(adminB)).some((c) => c.name === 'Importado Dois'), false);
+
+  // negócios: etapa por nome, contato casado por telefone, contato novo criado, responsável por e-mail, fora quem não bate
+  const boot = await call('/api/bootstrap', { token: admin });
+  const funil = boot.pipelines.find((p) => p.name === 'Comercial');
+  const [proposta, negociacao, fechamento] = funil.stages;
+  const d = await post('/api/import/deals', admin, {
+    pipelineId: funil.id,
+    rows: [
+      { line: 2, title: 'CSV Negócio A', value: 'R$ 1.500,50', stage: negociacao.name.toUpperCase(), expectedClose: '31/12/2030', contactPhone: '(11) 98888-1111' },
+      { line: 3, title: 'CSV Negócio B', contactName: 'Contato Novo Do CSV', contactEmail: 'novo@csv.com', owner: 'ana@a.com.br' },
+      { line: 4, title: '', value: '10' },
+      { line: 5, title: 'CSV Etapa errada', stage: 'Não existe' },
+      { line: 6, title: 'CSV Valor ruim', value: 'abc' },
+      { line: 7, title: 'CSV Responsável ruim', owner: 'ninguem@a.com.br' },
+      { line: 8, title: 'CSV Ganho direto', stage: fechamento.name },
+    ],
+  });
+  assert.equal(d.status, 200, JSON.stringify(d));
+  assert.equal(d.created, 3, JSON.stringify(d));
+  assert.equal(d.contactsCreated, 1);
+  assert.deepEqual(d.skipped.map((x) => x.line), [4, 5, 6, 7]);
+  const deals = (await call('/api/bootstrap', { token: admin })).deals.filter((x) => x.title.startsWith('CSV '));
+  const a = deals.find((x) => x.title === 'CSV Negócio A');
+  assert.equal(a.value, 1500.5);
+  assert.equal(a.stageId, negociacao.id);
+  assert.equal(a.expectedClose, '2030-12-31');
+  assert.equal(a.contactId, um.id, 'casou pelo telefone do contato importado');
+  const b = deals.find((x) => x.title === 'CSV Negócio B');
+  assert.equal(b.stageId, proposta.id, 'sem etapa: a primeira em andamento');
+  assert.ok(b.contactId && b.contactId !== um.id, 'contato novo criado');
+  assert.equal(b.ownerId, boot.users.find((u) => u.email === 'ana@a.com.br').id, 'responsável por e-mail');
+  assert.equal(deals.find((x) => x.title === 'CSV Ganho direto').status, 'won');
+  assert.equal((await post('/api/import/deals', admin, { pipelineId: funil.id.replace(/.$/, funil.id.endsWith('0') ? '1' : '0'), rows: [{ title: 'X' }] })).status, 400, 'funil que não existe');
+  // a Ana (dona do negócio B) enxerga o dela; o resto do arquivo não é dela
+  assert.deepEqual((await call('/api/bootstrap', { token: ana })).deals.filter((x) => x.title.startsWith('CSV ')).map((x) => x.title), ['CSV Negócio B']);
+
+  // exportar: o motor confere (Admin pode) e a auditoria guarda quem exportou e quantas linhas
+  assert.equal((await post('/api/exports', admin, { entity: 'contact', count: 12 })).ok, true);
+  assert.equal((await post('/api/exports', admin, { entity: 'task', count: 1 })).status, 400, 'só contatos e negócios');
+  assert.equal((await post('/api/exports', admin, { entity: 'deal', count: -1 })).status, 400);
+  const audited = (await h.admin.query("SELECT action, diff FROM audit_log WHERE tenant_id = $1 AND (action LIKE '%.import' OR action LIKE '%.export') ORDER BY occurred_at", [tenantA])).rows;
+  assert.deepEqual(audited.map((x) => x.action), ['contact.import', 'contact.import', 'deal.import', 'contact.export']);
+  assert.equal(audited.at(-1).diff.rows, 12);
+});

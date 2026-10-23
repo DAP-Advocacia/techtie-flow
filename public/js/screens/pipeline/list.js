@@ -51,6 +51,7 @@ export function dealColumns(pipeline) {
         const st = stages.find((x) => x.id === d.stageId);
         return h('span', { class: `lt-pill${st?.kind === 'won' ? ' lt-pill--won' : st?.kind === 'lost' ? ' lt-pill--lost' : ''}` }, st?.name || '—');
       },
+      exportText: (d) => stages.find((x) => x.id === d.stageId)?.name || '',
       visible: true,
     },
     valueOk && { id: 'value', label: 'Valor', type: 'money', get: (d) => (Number.isFinite(Number(d.value)) ? Number(d.value) : null), align: 'right', visible: true },
@@ -62,6 +63,7 @@ export function dealColumns(pipeline) {
       sortValue: (d, ctx) => ctx.userName(d.ownerId),
       options: (ctx) => ctx.users.map((u) => ({ value: u.id, label: u.name })),
       cell: (d, ctx) => ctx.userName(d.ownerId) || 'Sem responsável',
+      exportText: (d, ctx) => ctx.userName(d.ownerId),
       visible: true,
     },
     { id: 'expectedClose', label: 'Previsão de fechamento', type: 'date', get: (d) => (d.expectedClose ? parseDay(d.expectedClose) : null), cell: (d) => (d.expectedClose && !Number.isNaN(parseDay(d.expectedClose)) ? lateDate(parseDay(d.expectedClose), statusOf(d) === 'open') : '—'), visible: true },

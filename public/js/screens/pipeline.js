@@ -10,6 +10,8 @@ import { mask, fieldLevel } from '../access.js';
 import { createTable } from '../lists/table.js';
 import { dealColumns, dealCtx, dealViews } from './pipeline/list.js';
 import { dealBulk } from './pipeline/bulk.js';
+import { canImport, canExport, logExport } from './import/actions.js';
+import { openImport } from './import/wizard.js';
 import { weightedValue } from './funnels/model.js';
 import { renderBoard, clearDrag, autoScroll } from './pipeline/board.js';
 import { renderPanel, renderPanelEmpty } from './pipeline/panel.js';
@@ -81,6 +83,7 @@ export default {
     const modeToggle = h('div', { class: 'pills lt-mode', role: 'group', 'aria-label': 'Forma de ver os negócios' }, ...modeBtns);
     const listHost = h('div', { class: 'pipeline-list', 'aria-label': 'Negócios em lista' });
     const newBtn = h('button', { class: 'btn btn--primary', type: 'button', onclick: () => newDeal() }, '+ Novo negócio');
+    const importBtn = h('button', { class: 'btn btn--ghost pipeline-import', type: 'button', title: 'Trazer negócios de uma planilha CSV para este funil', onclick: () => openImport({ entity: 'deal', pipeline: store.pipeline(view.pipelineId), onDone: () => render() }) }, 'Importar CSV');
     const newHint = h('span', { class: 'pipeline-header__hint', role: 'note' });
     const board = h('div', { class: 'pipeline-board', id: 'pipeline-board', role: 'tabpanel', 'aria-label': 'Quadro do pipeline', onscroll: () => closeMoveMenu({ restoreFocus: false }), ondragover: (e) => autoScroll(e, board) });
     const panel = h('aside', { class: 'pipeline-panel', 'aria-label': 'Proposta do negócio selecionado' });
@@ -93,7 +96,7 @@ export default {
     const setMView = (v) => (pipelineEl.dataset.mview = v);
 
     pipelineEl.append(
-        h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), picker.el, modeToggle, h('div', { class: 'pipeline-header__new' }, newBtn, newHint)),
+        h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), picker.el, modeToggle, h('div', { class: 'pipeline-header__new' }, importBtn, newBtn, newHint)),
         stagebar,
         listHost,
         h('div', { class: 'pipeline-body' }, mback, board, panel)
@@ -176,6 +179,7 @@ export default {
             builtins: dealViews(store.state.currentUserId),
             bulk: dealBulk(pipeline.id),
             noun: ['negócio', 'negócios'],
+            exportable: { base: 'negocios', allowed: (n) => canExport('deal', n), log: (n) => logExport('deal', n) },
             emptyText: 'Nenhum negócio visível neste funil.',
             searchPlaceholder: 'Buscar por negócio, contato ou empresa',
             rowHref: (d) => linkTo('deal', { id: d.id }),
@@ -215,6 +219,7 @@ export default {
       const create = pipeline ? P.createOwners(pipeline) : null;
       const canCreate = !!create && create.allowed.length > 0;
       newBtn.disabled = !canCreate;
+      importBtn.hidden = !pipeline || !canImport('deal');
       const newWhy = !pipeline ? 'Sem pipeline disponível para o seu perfil.' : canCreate ? '' : P.reasonOf(create.probe, 'criar negócios neste pipeline');
       newBtn.title = newWhy;
       newHint.textContent = newWhy;

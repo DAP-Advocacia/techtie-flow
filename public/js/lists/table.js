@@ -2,7 +2,8 @@
 // visões salvas (neste navegador), seleção com ações em massa e "Mostrar mais". A tela só descreve as colunas
 // (ver lists/model.js) e entrega as linhas JÁ filtradas pelo motor de permissões: a tabela nunca amplia o acesso.
 // Colunas de campo oculto NÃO entram em `columns` (senão ordenar/filtrar vazaria o valor escondido).
-import { h, icon, replaceChildren, fmtBRL, fmtInt } from '../ui.js';
+import { h, icon, replaceChildren, fmtBRL, fmtInt, toast } from '../ui.js';
+import { toCsv, downloadCsv, csvName } from './csv.js';
 import { runList, normalizeState, opsOf, opDef, describeFilter, makeViewsStore, parseNumber } from './model.js';
 
 const PAGE = 50;
@@ -32,6 +33,25 @@ function defaultCell(col, row, ctx) {
   }
 }
 
+/** Texto puro de uma célula para o CSV (sem HTML): dinheiro com vírgula, data dd/mm/aaaa, sim/não e o nome da opção. */
+export function plainCell(col, row, ctx) {
+  if (col.exportText) return col.exportText(row, ctx);
+  const v = col.get(row, ctx);
+  if (blank(v) || (typeof v === 'number' && Number.isNaN(v))) return '';
+  switch (col.type) {
+    case 'money':
+      return (Math.round(Number(v) * 100) / 100).toFixed(2).replace('.', ',');
+    case 'date':
+      return fmtDate(v);
+    case 'bool':
+      return v ? 'Sim' : 'Não';
+    case 'enum':
+      return col.options?.(ctx)?.find((o) => String(o.value) === String(v))?.label ?? String(v);
+    default:
+      return String(v);
+  }
+}
+
 /**
  * @param {object} o
  * @param {string} o.id               chave da lista (visões salvas ficam em ttf:views:<id>)
@@ -46,6 +66,7 @@ function defaultCell(col, row, ctx) {
  * @param {Function} [o.summary]      (linhas filtradas, ctx) => texto extra do rodapé (ex.: soma dos valores)
  * @param {Function} [o.rowClass]     (row) => classe extra da linha
  * @param {string} [o.scope]          separa o estado lembrado entre usuários (use o id do usuário atual)
+ * @param {object} [o.exportable]     { base: 'contatos', allowed(count) → bool, log(count) → Promise<{ok, error?}> } — botão "Exportar CSV"
  */
 export function createTable(o) {
   const { id, builtins = [], onOpen, rowHref, bulk = [], noun = ['item', 'itens'], emptyText = 'Nada por aqui.', summary, rowClass, storage = globalThis.localStorage } = o;
@@ -75,6 +96,7 @@ export function createTable(o) {
   const btnFilters = h('button', { class: 'btn btn--quiet btn--sm lt-btn', type: 'button', 'aria-expanded': 'false', onclick: () => togglePanel('filters') });
   const btnCols = h('button', { class: 'btn btn--quiet btn--sm lt-btn', type: 'button', 'aria-expanded': 'false', onclick: () => togglePanel('columns') }, 'Colunas');
   const btnSave = h('button', { class: 'btn btn--quiet btn--sm lt-btn', type: 'button', 'aria-expanded': 'false', onclick: () => togglePanel('save') }, 'Salvar visão');
+  const btnExport = h('button', { class: 'btn btn--quiet btn--sm lt-btn lt-export', type: 'button', title: 'Baixar a lista (com os filtros e as colunas que você está vendo) em CSV', onclick: () => exportCsv() }, 'Exportar CSV');
   const btnDelete = h('button', { class: 'btn btn--quiet btn--sm lt-btn', type: 'button', onclick: () => deleteView() }, 'Apagar visão');
   const chips = h('div', { class: 'lt-chips' });
   const panelEl = h('div', { class: 'lt-panel' });
@@ -85,7 +107,7 @@ export function createTable(o) {
   const el = h(
     'section',
     { class: 'lt', 'aria-label': 'Lista em tabela' },
-    h('div', { class: 'lt-toolbar' }, h('div', { class: 'lt-search-wrap' }, icon('M21 21l-4.3-4.3M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z', 17), search), viewSel, modified, h('span', { class: 'lt-spacer' }), btnFilters, btnCols, btnSave, btnDelete),
+    h('div', { class: 'lt-toolbar' }, h('div', { class: 'lt-search-wrap' }, icon('M21 21l-4.3-4.3M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z', 17), search), viewSel, modified, h('span', { class: 'lt-spacer' }), btnFilters, btnCols, btnSave, btnDelete, btnExport),
     chips,
     panelEl,
     bulkEl,
@@ -102,6 +124,25 @@ export function createTable(o) {
     }, 150);
   });
   viewSel.addEventListener('change', () => pickView(viewSel.value));
+
+  // ---------------------------------------------------------------- exportar
+  /** Baixa o que está na tela: linhas filtradas/ordenadas e só as colunas visíveis (campo oculto nunca é coluna). */
+  async function exportCsv() {
+    const ex = o.exportable;
+    if (!ex || !shown.length) return;
+    const count = shown.length;
+    btnExport.disabled = true;
+    const r = await ex.log(count);
+    btnExport.disabled = false;
+    if (!r?.ok) {
+      toast(r?.error || 'Não foi possível exportar.');
+      return;
+    }
+    const ctx = getCtx();
+    const visibleCols = state.columns.map((cid) => cols.find((c) => c.id === cid)).filter(Boolean);
+    downloadCsv(csvName(ex.base), toCsv(visibleCols.map((c) => c.label), shown.map((row) => visibleCols.map((c) => plainCell(c, row, ctx)))));
+    toast(`${fmtInt(count)} ${count === 1 ? 'linha exportada' : 'linhas exportadas'}`);
+  }
 
   // ---------------------------------------------------------------- visões
   function pickView(vid) {
@@ -413,6 +454,7 @@ export function createTable(o) {
     viewSel.value = viewId ?? '';
     modified.hidden = !current || same(state, normalizeState(current.state, cols));
     btnDelete.hidden = !current || !!current.builtin;
+    btnExport.hidden = !o.exportable || !shown.length || !o.exportable.allowed(shown.length);
     if (search.value !== state.q) search.value = state.q;
 
     // botões e painel

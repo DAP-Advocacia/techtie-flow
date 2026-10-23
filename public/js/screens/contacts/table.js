@@ -44,6 +44,7 @@ export function contactColumns() {
       sortValue: (c, ctx) => ctx.userName(c.ownerId),
       options: (ctx) => ctx.users.map((u) => ({ value: u.id, label: u.name })),
       cell: (c, ctx) => ctx.userName(c.ownerId) || 'Sem responsável',
+      exportText: (c, ctx) => ctx.userName(c.ownerId),
       visible: true,
     },
     { id: 'source', label: 'Origem', type: 'text', get: (c) => c.source },

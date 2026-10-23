@@ -1059,3 +1059,7 @@
     padding: 14px 12px;
   }
 }
+
+.pipeline-import[hidden] {
+  display: none;
+}

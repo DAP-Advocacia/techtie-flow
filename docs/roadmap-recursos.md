@@ -13,6 +13,21 @@ e modelos), lá está o **em que ordem** (backend, canais, produto).
 
 ---
 
+## Andamento (atualizado em 23/10/2026)
+
+Sequência combinada com o usuário depois do redesenho visual:
+
+| # | Objetivo | Situação |
+|---|---|---|
+| 1 | Funis configuráveis (etapas, probabilidade, motivos de perda, previsão ponderada) | **feito** (docs/funis.md) |
+| 2 | Importar e exportar CSV (contatos e negócios) | **feito** (docs/csv.md); Excel .xlsx ainda não (salvar como CSV) |
+| 3 | Automações de verdade (motor no servidor; robôs por etapa primeiro) | pendente |
+| 4 | Campos personalizados (negócio e contato) | pendente |
+| 5 | **Mascote de IA** dentro do produto (seção 10) | **novo objetivo** — a desenhar |
+| — | Também feitos: chat interno e perfil (docs/chat-e-perfil.md), visual Salesforce e brilhos (docs/visual-salesforce.md), tarefas, metas, lista em tabela |
+
+---
+
 ## 0. Pesquisas pendentes (decidem escopo — fazer antes de planejar o resto)
 
 ### 0.1 Baileys e ligações de WhatsApp — **PESQUISAR**
@@ -348,3 +363,28 @@ desenhado dentro dos **Passos 4 e 5** (banco e autenticação), e não como pass
 isolado no fim; telefonia vira um passo novo ("`VoiceChannel` + softphone") depois
 do Passo 7; a **pesquisa 0.1** deve rodar já, em paralelo ao Passo 3, porque muda o
 escopo do `CloudApiChannel` (Passo 8).
+
+---
+
+## 10. Mascote de IA (assistente dentro do produto)
+
+**Pedido do usuário (23/10/2026):** uma IA no CRM "tipo um mascote" — um personagem que dê personalidade e ajuda à ferramenta, no
+mesmo espírito das estrelinhas e animações (magia sem exagero, dourado da marca). Entra nos objetivos; ainda **não foi desenhado nem
+construído**. O Agente de IA que já existe (src/ai, atende clientes no WhatsApp) é outra coisa: o mascote fala com **a equipe**.
+
+**Proposta de fases (a validar):**
+1. **Presença e guia** — um personagem simples (a estrela dourada da marca com olhos/expressões, animado em CSS/SVG) num botão no canto;
+   dicas contextuais por tela, estados vazios com ele ("ainda não há negócios, que tal importar um CSV?"), comemoração junto das
+   estrelinhas, indicador de "pensando" nas respostas da IA. Sem custo de IA (só interface).
+2. **Perguntar e mandar em português** — caixa "Pergunte ao …": "quais negócios fecham esta semana?", "cria tarefa ligar para a Carla
+   amanhã 10h", "abre o contato do Grupo Aurora". A IA só lê o que **o usuário já pode ver** (os mesmos dados filtrados pelo motor de
+   permissões) e qualquer ação passa pelo motor e pede confirmação antes de gravar.
+3. **Resumos e próximos passos** — resumir uma conversa ou negócio, sugerir a próxima ação, rascunhar resposta ao cliente, apontar
+   negócio parado e tarefa atrasada (nudges proativos, com opção de desligar).
+4. **Por empresa** — ligar/desligar por tenant, nome e tom do mascote configuráveis (white-label), limite de uso e custo por plano.
+
+**Regras de ouro:** respeita permissões (nunca mostra dado que a pessoa não vê, campo oculto continua oculto); toda ação é auditada
+("feito pelo assistente a pedido de X"); LGPD (o que vai para a OpenAI é minimizado e registrado); sem prometer o que não faz.
+**Perguntas em aberto:** nome e personalidade do mascote; onde mora (botão flutuante, barra superior, painel lateral); começar pela
+fase 1 (visual, barata) ou pela 2 (utilidade, usa a OpenAI que já está configurada).
+
