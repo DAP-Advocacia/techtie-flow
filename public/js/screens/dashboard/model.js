@@ -53,12 +53,14 @@ export function parseSecs(str) {
   return Number(m[1] || 0) * 60 + Number(m[2] || 0);
 }
 
-/** 130 -> '2m 10s', 182 -> '3m 02s', 8 -> '8s' */
+/** 130 -> '2m 10s', 182 -> '3m 02s', 8 -> '8s', 7500 -> '2h 05min', 90000 -> '1d 1h' (acima de 1 h some o segundo, que não importa) */
 export function fmtSecs(s) {
   if (s == null) return '—';
   const n = Math.round(s);
   if (n < 60) return `${n}s`;
-  return `${Math.floor(n / 60)}m ${String(n % 60).padStart(2, '0')}s`;
+  if (n < 3600) return `${Math.floor(n / 60)}m ${String(n % 60).padStart(2, '0')}s`;
+  if (n < 86400) return `${Math.floor(n / 3600)}h ${String(Math.floor((n % 3600) / 60)).padStart(2, '0')}min`;
+  return `${Math.floor(n / 86400)}d ${Math.floor((n % 86400) / 3600)}h`;
 }
 
 const pad2 = (n) => String(n).padStart(2, '0');

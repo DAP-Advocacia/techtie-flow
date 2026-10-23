@@ -27,6 +27,17 @@ import * as P from './pipeline/perm.js';
 // Estado só de UI. Fica no módulo (não no store), mas é REINICIADO a cada mount: ao trocar de usuário
 // ("Ver como") a tela remonta e nenhuma seleção/pipeline do usuário anterior vaza.
 const MODE_KEY = 'ttf:pipeline:mode';
+const PANEL_KEY = 'ttf:pipeline:panel';
+/** Painel da proposta: o que a pessoa escolheu; sem escolha, recolhido em tela de notebook (< 1360 px) e aberto em monitor grande. */
+function initialPanel() {
+  try {
+    const v = localStorage.getItem(PANEL_KEY);
+    if (v === 'open' || v === 'closed') return v;
+  } catch {
+    /* sem armazenamento */
+  }
+  return (globalThis.innerWidth || 1440) < 1360 ? 'closed' : 'open';
+}
 function savedMode() {
   try {
     return localStorage.getItem(MODE_KEY) === 'list' ? 'list' : 'board';
@@ -86,20 +97,37 @@ export default {
     const importBtn = h('button', { class: 'btn btn--ghost pipeline-import', type: 'button', title: 'Trazer negócios de uma planilha CSV para este funil', onclick: () => openImport({ entity: 'deal', pipeline: store.pipeline(view.pipelineId), onDone: () => render() }) }, 'Importar CSV');
     const newHint = h('span', { class: 'pipeline-header__hint', role: 'note' });
     const board = h('div', { class: 'pipeline-board', id: 'pipeline-board', role: 'tabpanel', 'aria-label': 'Quadro do pipeline', onscroll: () => closeMoveMenu({ restoreFocus: false }), ondragover: (e) => autoScroll(e, board) });
-    const panel = h('aside', { class: 'pipeline-panel', 'aria-label': 'Proposta do negócio selecionado' });
+    const panel = h('aside', { class: 'pipeline-panel', id: 'pipeline-panel', 'aria-label': 'Proposta do negócio selecionado' });
 
     // Celular: em vez do quadro Kanban (colunas lado a lado), abas por etapa + lista vertical dos negócios da etapa;
     // tocar num negócio abre a proposta em tela cheia. Mover de etapa continua pelo menu "Mover para…" do cartão.
     const stagebar = h('div', { class: 'pipeline-stagebar', role: 'tablist', 'aria-label': 'Etapas' });
     const mback = h('button', { class: 'pipeline-mback', type: 'button', onclick: () => setMView('board') }, icon('M15 5l-7 7 7 7', 22), h('span', null, 'Negócios'));
-    const pipelineEl = h('div', { class: 'pipeline', 'data-mview': 'board', 'data-mode': 'board' });
+    const pipelineEl = h('div', { class: 'pipeline', 'data-mview': 'board', 'data-mode': 'board', 'data-panel': initialPanel() });
     const setMView = (v) => (pipelineEl.dataset.mview = v);
+    // Painel da proposta recolhível: em notebook ele come um terço do quadro e esconde etapas. A escolha fica lembrada.
+    const panelToggle = h('button', { class: 'pipeline-paneltoggle', type: 'button', 'aria-controls': 'pipeline-panel', onclick: () => setPanel(pipelineEl.dataset.panel === 'closed' ? 'open' : 'closed') });
+    function setPanel(v, { remember = true } = {}) {
+      pipelineEl.dataset.panel = v;
+      const open = v !== 'closed';
+      panelToggle.setAttribute('aria-expanded', String(open));
+      panelToggle.title = open ? 'Recolher a proposta e ganhar espaço no quadro' : 'Mostrar a proposta do negócio selecionado';
+      replaceChildren(panelToggle, icon(open ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6', 16), h('span', null, 'Proposta'));
+      if (remember) {
+        try {
+          localStorage.setItem(PANEL_KEY, v);
+        } catch {
+          /* sem armazenamento: vale só nesta visita */
+        }
+      }
+    }
+    setPanel(pipelineEl.dataset.panel, { remember: false });
 
     pipelineEl.append(
         h('header', { class: 'pipeline-header' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, 'NEGÓCIOS'), h('h1', { class: 'page-title' }, 'PIPELINES')), picker.el, modeToggle, h('div', { class: 'pipeline-header__new' }, importBtn, newBtn, newHint)),
         stagebar,
         listHost,
-        h('div', { class: 'pipeline-body' }, mback, board, panel)
+        h('div', { class: 'pipeline-body' }, mback, board, panelToggle, panel)
     );
     el.append(pipelineEl);
 
@@ -256,6 +284,7 @@ export default {
           levels,
           onSelect: (id) => {
             view.selectedByPipeline[pipeline.id] = id;
+            if (!isMobile() && pipelineEl.dataset.panel === 'closed') setPanel('open'); // escolheu um negócio: mostra a proposta
             if (isMobile()) setMView('deal'); // celular: abre a proposta do negócio em tela cheia
             render();
           },

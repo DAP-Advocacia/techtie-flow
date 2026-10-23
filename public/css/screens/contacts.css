@@ -3,7 +3,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+  grid-template-columns: clamp(340px, 30vw, 440px) minmax(0, 1fr);
 }
 .contacts-col {
   min-height: 0;
@@ -21,14 +21,18 @@
 }
 .contacts-head__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 10px;
 }
+/* os botões quebram de linha em vez de sair da coluna (antes o "+ Novo contato" ficava cortado) */
 .contacts-head__tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
+  min-width: 0;
 }
 .contacts-new {
   padding: 9px 18px;

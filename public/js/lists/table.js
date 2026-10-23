@@ -4,6 +4,7 @@
 // Colunas de campo oculto NÃO entram em `columns` (senão ordenar/filtrar vazaria o valor escondido).
 import { h, icon, replaceChildren, fmtBRL, fmtInt, toast } from '../ui.js';
 import { toCsv, downloadCsv, csvName } from './csv.js';
+import { dateField } from '../fields/index.js';
 import { runList, normalizeState, opsOf, opDef, describeFilter, makeViewsStore, parseNumber } from './model.js';
 
 const PAGE = 50;
@@ -224,7 +225,11 @@ export function createTable(o) {
         const opts = col.options?.(ctx) || [];
         return bind(h('select', { class: 'select', 'aria-label': label, 'data-focus': 'f-val' }, h('option', { value: '' }, 'Escolha…'), ...opts.map((x) => h('option', { value: String(x.value), selected: String(x.value) === String(draft[key]) }, x.label))));
       }
-      if (op.date) return bind(h('input', { class: 'input', type: 'date', 'aria-label': label, value: draft[key], 'data-focus': 'f-val' }));
+      if (op.date) {
+        const df = dateField({ label, value: draft[key] });
+        df.setAttribute('data-focus', 'f-val');
+        return bind(df);
+      }
       const numeric = col.type === 'number' || col.type === 'money';
       return bind(h('input', { class: 'input', type: 'text', inputmode: numeric ? 'decimal' : 'text', placeholder: numeric ? '0' : 'Valor', 'aria-label': label, value: draft[key], 'data-focus': 'f-val' }));
     };

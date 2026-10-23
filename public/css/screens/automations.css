@@ -530,3 +530,15 @@
   color: var(--green);
   font-weight: 600;
 }
+
+.automations-engine {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--acc) 40%, var(--line));
+  border-radius: var(--radius-input);
+  background: color-mix(in srgb, var(--acc) 8%, transparent);
+  font-size: 13px;
+}
+.automations-engine strong {
+  color: var(--acc);
+}

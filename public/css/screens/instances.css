@@ -807,3 +807,41 @@
 .instances-menu__item.is-danger[aria-disabled='true']:focus-visible {
   color: var(--red);
 }
+
+.instances-card__link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--acc);
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.instances-explain {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+.instances-explain__title {
+  font-weight: 600;
+}
+.instances-explain__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  font-size: 13px;
+}
+.instances-explain__cols ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--mute);
+}
+@media (max-width: 560px) {
+  .instances-explain__cols {
+    grid-template-columns: 1fr;
+  }
+}

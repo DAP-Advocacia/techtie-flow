@@ -17,6 +17,7 @@ export function applyBootstrap(s, d, { keepMessages = false } = {}) {
   s.tasks = d.tasks || [];
   // Agente de IA: configuração salva no servidor (o que é só da tela — instância escolhida, chat de teste — fica)
   if (d.agent) s.agent = { ...(s.agent || {}), ...d.agent };
+  if (!keepMessages) dropDemoData(s);
   s.conversations = d.conversations;
   s.instances = d.instances.map((i) => ({ ownerName: '', conversations: 0, messagesToday: 0, aiActive: false, ...i }));
   if (!keepMessages) {
@@ -27,6 +28,18 @@ export function applyBootstrap(s, d, { keepMessages = false } = {}) {
   s.session = { ...(s.session || {}), loggedIn: true };
   s.permissions = d.permissions;
   return s;
+}
+
+/**
+ * O estado nasce com os dados de demonstração (mock). Em operação real eles NÃO podem aparecer como se fossem da empresa:
+ * domínio "verificado" que ninguém verificou, conversa de teste citando um documento que não existe, fluxos "com 1,2 mil
+ * execuções", eventos de auditoria inventados. O que o servidor ainda não guarda (marca, fluxos) começa vazio e honesto.
+ */
+export function dropDemoData(s) {
+  s.tenant.brand = { productName: 'TechTie Flow', domain: '', domainStatus: 'idle', accent: 'gold', logo: null };
+  if (s.agent) s.agent.testChat = [];
+  s.automations = [];
+  s.auditLog = [];
 }
 
 /** Mescla uma conversa vinda do servidor (mantém o que o servidor não manda, ex.: dealId). */

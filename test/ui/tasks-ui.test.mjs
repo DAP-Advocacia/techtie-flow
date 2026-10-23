@@ -251,7 +251,7 @@ test('Contatos: a ficha mostra as tarefas do contato e o botão de criar uma nov
   assert.ok(block, 'bloco de tarefas na ficha');
   assert.match(text(block), /Retornar para o contato/);
   $$(block, 'button').find((b) => /\+ Tarefa/.test(b.textContent)).click();
-  assert.equal($(panelEl(), 'select[aria-label="Contato vinculado"]').value, contact.id, 'o contato já vem preenchido');
+  assert.equal($(panelEl(), '.combo__input[aria-label="Contato vinculado"]').closest('.combo').value, contact.id, 'o contato já vem preenchido');
   closePanel();
   cleanup();
 });

@@ -136,7 +136,7 @@ test('tarefa criada na aba Relacionados já nasce ligada ao negócio e ao contat
   add.click();
   const panel = $(document, '.tasks-panel');
   assert.equal($(panel, 'select[aria-label="Negócio vinculado"]').value, deal.id);
-  assert.equal($(panel, 'select[aria-label="Contato vinculado"]').value, deal.contactId);
+  assert.equal($(panel, '.combo__input[aria-label="Contato vinculado"]').closest('.combo').value, deal.contactId);
   const title = $(panel, '.tasks-title');
   title.value = 'Combinar assinatura';
   $$(panel, 'button').find((b) => /Criar tarefa/.test(b.textContent)).click();
@@ -152,7 +152,7 @@ test('editar: título, valor e previsão de fechamento; a página mostra o novo'
   const { host, cleanup } = await mountDeal(deal.id);
   $(host, '.deal-head__actions button[data-focus="edit"]').click();
   const modal = await waitFor(() => $(document, '.pipeline-modal'));
-  const date = $(modal, 'input[type="date"]');
+  const date = $(modal, '.datefield');
   assert.equal(date.value, '2026-12-31');
   const title = $(modal, 'input[type="text"]');
   title.value = `${title0} (editado)`;
@@ -165,7 +165,7 @@ test('editar: título, valor e previsão de fechamento; a página mostra o novo'
   // limpar a previsão
   $(host, '.deal-head__actions button[data-focus="edit"]').click();
   const modal2 = await waitFor(() => $(document, '.pipeline-modal'));
-  $(modal2, 'input[type="date"]').value = '';
+  $(modal2, '.datefield').value = '';
   fire($(modal2, 'form'), 'submit');
   await tick(40);
   assert.equal(store.deal(deal.id).expectedClose, null);

@@ -763,3 +763,138 @@ p {
 .login > .fx-sparkles {
   z-index: -1;
 }
+
+/* Campos pt-BR: data dd/mm/aaaa, hora de 24 h e busca de contato (public/js/fields) */
+.datefield {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.datefield__text {
+  padding-right: 42px;
+}
+.datefield__btn {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--mute);
+}
+.datefield__btn:hover:not(:disabled) {
+  color: var(--acc);
+}
+.datefield__native {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.datefield__text[aria-invalid],
+.timefield[aria-invalid] {
+  border-color: var(--red);
+}
+.combo {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.combo__input {
+  padding-right: 38px;
+  text-overflow: ellipsis;
+}
+.combo__clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--mute);
+}
+.combo__clear:hover {
+  color: var(--acc);
+}
+.combo__list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: min(280px, 38vh);
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--acc);
+  border-radius: var(--radius-input);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  animation: ov-fade 0.12s ease-out;
+}
+.combo__list[hidden] {
+  display: none;
+}
+.combo__opt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}
+.combo__opt.is-active,
+.combo__opt:hover {
+  background: color-mix(in srgb, var(--acc) 14%, transparent);
+}
+.combo__opt.is-selected .combo__name {
+  color: var(--acc);
+}
+.combo__name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.combo__name--action {
+  color: var(--acc);
+}
+.combo__name--none {
+  color: var(--mute);
+  font-weight: 400;
+}
+.combo__sub {
+  color: var(--mute);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combo__empty,
+.combo__more {
+  padding: 8px 10px;
+  color: var(--mute);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .combo__list {
+    animation: none;
+  }
+}

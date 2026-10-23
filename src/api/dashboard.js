@@ -143,7 +143,7 @@ module.exports = function registerDashboard({ route, must, tx, pool, listWhere, 
                            FROM messages m JOIN fi ON fi.conversation_id = m.conversation_id AND m.created_at > fi.fi
                           WHERE m.direction = 'out' AND m.kind = 'text' AND (m.author_id IS NOT NULL OR m.by_ai)
                           ORDER BY m.conversation_id, m.created_at)
-             SELECT fo.author_id, fo.by_ai, count(*)::int n, avg(extract(epoch FROM (fo.fo - fi.fi)))::float secs
+             SELECT fo.author_id, fo.by_ai, count(*)::int n, percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (fo.fo - fi.fi)))::float secs
                FROM fi JOIN fo USING (conversation_id) JOIN conversations t ON t.id = fi.conversation_id
               WHERE fi.fi >= $C1 AND fi.fi < $C2 AND ({CONV}) GROUP BY 1, 2`,
             [iso(from), iso(to)]

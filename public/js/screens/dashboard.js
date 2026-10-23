@@ -12,6 +12,14 @@ const LOAD_MS = 300; // loading simulado ao trocar o período
 
 const skel = (cls) => h('span', { class: `dashboard-skel ${cls}`, 'aria-hidden': 'true' });
 
+// O que cada número significa (bate com as consultas de src/api/dashboard.js)
+const KPI_DEFS = {
+  'NOVOS LEADS': 'Conversas em que o cliente mandou a 1ª mensagem dentro do período.',
+  'CONVERSAS ATIVAS': 'Conversas ainda não resolvidas, neste momento (não depende do período).',
+  'TAXA DE CONVERSÃO': 'Ganhos ÷ (ganhos + perdidos) dos negócios encerrados no período.',
+  'RECEITA GANHA': 'Soma do valor dos negócios marcados como Ganho no período.',
+};
+
 function kpiCard(k, compare) {
   // noDelta: valor oculto pelo perfil — a variação também revelaria o número, então some junto
   const d = k.value != null && !k.noDelta ? describeDelta(k.delta, k.unit, compare) : null;
@@ -21,7 +29,8 @@ function kpiCard(k, compare) {
     h(
       'div',
       { class: 'kpi__body dashboard-kpi' },
-      h('span', { class: 'dashboard-kpi__label' }, k.label),
+      h('span', { class: 'dashboard-kpi__label', title: KPI_DEFS[k.label] || null }, k.label),
+      KPI_DEFS[k.label] ? h('span', { class: 'dashboard-kpi__def' }, KPI_DEFS[k.label]) : null,
       k.value == null ? skel('dashboard-skel--value') : h('span', { class: 'dashboard-kpi__value num', title: k.title || null }, k.value),
       k.noDelta
         ? h('span', { class: 'dashboard-kpi__delta' }, h('span', { class: 'dashboard-kpi__cmp' }, 'oculto pelo seu perfil'))

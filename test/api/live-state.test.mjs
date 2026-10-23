@@ -16,11 +16,13 @@ const data = () => ({
 test('applyBootstrap troca os dados reais, preserva o que o servidor não manda e completa a instância', () => {
   const s = { tenant: { brand: { productName: 'TechTie Flow' } }, messages: { x: [1] }, timeline: { y: [] }, agent: { enabled: true } };
   applyBootstrap(s, data());
-  assert.equal(s.tenant.brand.productName, 'TechTie Flow', 'marca do protótipo preservada');
+  assert.equal(s.tenant.brand.productName, 'TechTie Flow');
+  assert.equal(s.tenant.brand.domain, '', 'o domínio de demonstração não vaza para a operação real');
   assert.equal(s.tenant.name, 'Empresa');
   assert.equal(s.currentUserId, 'u1');
   assert.deepEqual(s.messages, {}, 'mensagens recarregadas por conversa');
-  assert.deepEqual(s.agent, { enabled: true }, 'módulos ainda em demonstração ficam como estão');
+  assert.deepEqual(s.agent, { enabled: true, testChat: [] }, 'a conversa de teste de demonstração some');
+  assert.deepEqual([s.automations, s.auditLog], [[], []], 'fluxos e auditoria inventados não aparecem');
   assert.equal(s.instances[0].aiActive, false);
   assert.equal(s.session.loggedIn, true);
   const s2 = { tenant: {}, messages: { x: [1] }, timeline: {} };

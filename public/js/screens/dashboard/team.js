@@ -45,7 +45,7 @@ export function renderTeam(rows, sort, onSort, { revenueHidden = false, emptyTex
       return h(
         'th',
         { scope: 'col', 'aria-sort': ariaSort },
-        h('button', { class: 'dashboard-sort' + (active ? ' is-active' : ''), type: 'button', dataset: { key: c.key }, disabled: locked, onclick: () => !locked && onSort(c.key), title: locked ? 'Seu perfil não permite ver os valores dos negócios.' : `Ordenar por ${c.label.toLowerCase()}` }, c.label, h('span', { class: 'dashboard-sort__arrow', 'aria-hidden': 'true' }, active ? (sort.dir === 'asc' ? '▲' : '▼') : '⇅'))
+        h('button', { class: 'dashboard-sort' + (active ? ' is-active' : ''), type: 'button', dataset: { key: c.key }, disabled: locked, onclick: () => !locked && onSort(c.key), title: locked ? 'Seu perfil não permite ver os valores dos negócios.' : `Ordenar por ${c.label.toLowerCase()}${c.key === 'firstResponse' ? ' (mediana do tempo até a 1ª resposta)' : ''}` }, c.label, h('span', { class: 'dashboard-sort__arrow', 'aria-hidden': 'true' }, active ? (sort.dir === 'asc' ? '▲' : '▼') : '⇅'))
       );
     })
   );

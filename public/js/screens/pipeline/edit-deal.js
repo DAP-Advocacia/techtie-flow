@@ -4,6 +4,7 @@ import { h } from '../../ui.js';
 import { openModal } from './modal.js';
 import { fieldLevels } from './perm.js';
 import { itemsOf, parseMoney } from './actions.js';
+import { dateField } from '../../fields/index.js';
 
 export function openEditDeal({ deal, onSave, restoreFocus }) {
   const lv = fieldLevels();
@@ -11,7 +12,7 @@ export function openEditDeal({ deal, onSave, restoreFocus }) {
   const valueLocked = lv.value !== 'write' || hasItems;
   const title = h('input', { class: 'input', type: 'text', maxlength: '200', value: deal.title, 'data-autofocus': true, autocomplete: 'off' });
   const value = h('input', { class: 'input num', type: 'text', inputmode: 'decimal', value: String(deal.value ?? 0).replace('.', ','), disabled: valueLocked });
-  const close = h('input', { class: 'input', type: 'date', value: deal.expectedClose || '', 'aria-label': 'Previsão de fechamento' });
+  const close = dateField({ value: deal.expectedClose || '', label: 'Previsão de fechamento' });
   const error = h('span', { class: 'field-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn--primary', type: 'submit' }, 'Salvar');
   const cancelBtn = h('button', { class: 'btn btn--quiet', type: 'button' }, 'Cancelar');

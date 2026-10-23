@@ -125,7 +125,7 @@ test('Contatos (ficha): copiar telefone/e-mail, e-mail, etiquetas, cadastrado em
   click(add);
   const modal = document.querySelector('.pipeline-modal');
   assert.ok(modal, 'abriu o novo negócio');
-  assert.equal($(modal, 'select').value, 'c_carlos', 'o contato já vem escolhido');
+  assert.equal($(modal, '.combo').value, 'c_carlos', 'o contato já vem escolhido');
   [...modal.querySelectorAll('button')].find((b) => /Cancelar/.test(text(b)))?.click();
   cleanup();
 });

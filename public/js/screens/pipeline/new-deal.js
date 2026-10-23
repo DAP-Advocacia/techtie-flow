@@ -6,6 +6,7 @@ import { visible, canAccess } from '../../access.js';
 import { openModal } from './modal.js';
 import { createDeal, parseMoney, MAX_DEAL_VALUE } from './actions.js';
 import { createOwners, createStageDecision, fieldLevels, reasonOf } from './perm.js';
+import { contactField } from '../../fields/index.js';
 
 const NEW_CONTACT = '__new__';
 
@@ -27,13 +28,7 @@ export function openNewDeal({ pipeline, onCreated, contactId = null }) {
   const errors = { title: err('title'), contact: err('contact'), cname: err('cname'), cphone: err('cphone'), value: err('value'), owner: err('owner'), stage: err('stage') };
 
   const title = h('input', { class: 'input', type: 'text', maxlength: '80', autocomplete: 'off', placeholder: 'Ex.: Implantação CRM + WhatsApp', 'data-autofocus': true });
-  const contact = h(
-    'select',
-    { class: 'select' },
-    h('option', { value: '' }, 'Selecione um contato'),
-    ...contacts.map((c) => h('option', { value: c.id }, c.company ? `${c.name} — ${c.company}` : c.name)),
-    mayCreateContact ? h('option', { value: NEW_CONTACT }, '+ Novo contato…') : null
-  );
+  const contact = contactField({ contacts, label: 'Contato', extra: mayCreateContact ? [{ value: NEW_CONTACT, label: '+ Novo contato…' }] : [] });
   if (contactId && contacts.some((c) => c.id === contactId)) contact.value = contactId; // vindo da ficha do contato
   const cname = h('input', { class: 'input', type: 'text', maxlength: '80', autocomplete: 'off', placeholder: 'Nome do contato' });
   const ccompany = h('input', { class: 'input', type: 'text', maxlength: '80', autocomplete: 'off', placeholder: 'Empresa (opcional)' });

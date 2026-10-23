@@ -2,6 +2,7 @@
 // aparecem depois que o campo foi tocado (ou após uma tentativa de publicar/testar),
 // para não gritar em formulário recém-aberto.
 import { h, icon } from '../../ui.js';
+import { timeField } from '../../fields/index.js';
 import { KIND_META, typesOf, nodeIssues, DAY_OPTIONS, AI_GOALS, FIELD_OPTIONS, OPERATOR_OPTIONS, instanceOptions, pipelineOptions, stageOptions, templateOptions, ownerOptions } from './catalog.js';
 
 export const PATHS = {
@@ -60,9 +61,9 @@ export function renderEditor(ctx) {
   };
 
   const input = (key, label, { type = 'text', min, max, placeholder, wide, maxlength } = {}) => {
-    const el = h('input', {
-      class: 'input input--inset', type, min, max, placeholder, maxlength,
-      value: p[key] ?? '',
+    // hora: campo de 24 h (o <input type="time"> segue o idioma do navegador e mostra AM/PM)
+    const el = type === 'time' ? timeField({ label, value: p[key] ?? '', className: 'input input--inset' }) : h('input', { class: 'input input--inset', type, min, max, placeholder, maxlength, value: p[key] ?? '' });
+    const handlers = {
       oninput: (e) => {
         ctx.touch(node.id, key);
         // Início/fim são validados em conjunto (o erro mora em "Até"): tocar um revela o outro.
@@ -72,7 +73,9 @@ export function renderEditor(ctx) {
         refreshErrors();
       },
       onblur: () => { ctx.touch(node.id, key); refreshErrors(); },
-    });
+    };
+    el.addEventListener('input', handlers.oninput);
+    el.addEventListener('blur', handlers.onblur);
     return wrap(key, label, el, { wide });
   };
 

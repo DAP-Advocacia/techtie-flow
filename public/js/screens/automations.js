@@ -6,6 +6,7 @@ import { KIND_META, TYPES, typesOf, createNode, refresh, emptyTrigger, flowIssue
 import { renderEditor, PATHS } from './automations/editor.js';
 import { audit } from '../access.js';
 import { check, blocked, createHints, banner, anyOk } from './_ops/perm.js';
+import * as live from '../live.js';
 
 const PLUS = 'M12 5v14M5 12h14';
 const PLAY = 'M7 4l13 8-13 8z';
@@ -98,7 +99,9 @@ export default {
     const flowHost = h('div', { class: 'automations-flow', role: 'list', 'aria-label': 'Etapas do fluxo' });
     const panelHost = h('div', { class: 'automations-panelhost' });
     const logHost = h('div');
-    const canvas = h('section', { class: 'automations-canvas', 'aria-label': 'Editor do fluxo' }, bannerEl, headHost, alertHost, flowHost, panelHost, logHost, hints.host);
+    // Em operação real o motor que EXECUTA os fluxos no servidor ainda não existe: a tela é o editor, e diz isso sem rodeio.
+    const engineNote = live.enabled ? h('div', { class: 'automations-note automations-engine', role: 'note' }, h('strong', null, 'Editor em pré-visualização. '), 'Os fluxos ainda não rodam sozinhos: o motor de execução no servidor é a próxima etapa. Você já pode desenhar e testar o passo a passo.') : null;
+    const canvas = h('section', { class: 'automations-canvas', 'aria-label': 'Editor do fluxo' }, bannerEl, engineNote, headHost, alertHost, flowHost, panelHost, logHost, hints.host);
     el.append(h('div', { class: 'automations' }, listHost, canvas));
 
     /** Reconstrói um contêiner devolvendo o foco ao mesmo controle (via data-fk). */

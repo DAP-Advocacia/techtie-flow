@@ -5,6 +5,7 @@ import { h, icon, replaceChildren, toast, avatar } from '../../ui.js';
 import { store } from '../../store.js';
 import { visible } from '../../access.js';
 import { ensureTasksCss } from './css.js';
+import { dateField, timeField, contactField } from '../../fields/index.js';
 import * as A from './actions.js';
 import { STATUSES, PRIORITIES, dueFrom, startOfDay, dueLabel, checklistProgress } from './model.js';
 
@@ -76,8 +77,8 @@ export function openTaskPanel({ taskId = null, defaults = {}, onClose } = {}) {
     }
   }
 
-  const dateInput = h('input', { class: 'input', type: 'date', 'aria-label': 'Data do prazo', value: dateValue(val('dueAt')) });
-  const timeInput = h('input', { class: 'input', type: 'time', 'aria-label': 'Hora do prazo', value: timeValue({ dueAt: val('dueAt'), dueHasTime: val('dueHasTime') }) });
+  const dateInput = dateField({ label: 'Data do prazo', value: dateValue(val('dueAt')) });
+  const timeInput = timeField({ label: 'Hora do prazo', value: timeValue({ dueAt: val('dueAt'), dueHasTime: val('dueHasTime') }) });
   function commitDue() {
     let day = dateInput.value;
     const time = timeInput.value;
@@ -123,16 +124,16 @@ export function openTaskPanel({ taskId = null, defaults = {}, onClose } = {}) {
   });
 
   const dealSel = h('select', { class: 'select', 'aria-label': 'Negócio vinculado' });
-  const contactSel = h('select', { class: 'select', 'aria-label': 'Contato vinculado' });
+  const contactSel = contactField({ label: 'Contato vinculado', none: '— Nenhum —' });
   function fillLinks() {
     const deals = visible('deal', store.state.deals).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 300);
-    const contacts = visible('contact', store.state.contacts).sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR')).slice(0, 500);
+    const contacts = visible('contact', store.state.contacts).sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR'));
     const dCur = val('dealId');
     const cCur = val('contactId');
     if (dCur && !deals.some((d) => d.id === dCur)) deals.unshift(store.deal(dCur) || { id: dCur, title: 'Negócio (sem acesso)' });
     if (cCur && !contacts.some((c) => c.id === cCur)) contacts.unshift(store.contact(cCur) || { id: cCur, name: 'Contato (sem acesso)' });
     replaceChildren(dealSel, h('option', { value: '' }, '— Nenhum —'), ...deals.map((d) => h('option', { value: d.id }, d.title)));
-    replaceChildren(contactSel, h('option', { value: '' }, '— Nenhum —'), ...contacts.map((c) => h('option', { value: c.id }, c.company ? `${c.name} · ${c.company}` : c.name)));
+    contactSel.setContacts(contacts);
     dealSel.value = dCur || '';
     contactSel.value = cCur || '';
   }

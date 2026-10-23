@@ -180,7 +180,15 @@ export function openManage(inst, { returnFocus, onRename, onAssign, onDisconnect
       row('Msgs hoje', fmtInt(inst.messagesToday))
     ),
     h('div', { class: 'instances-ai' }, h('div', null, h('div', { class: 'instances-ai__title' }, 'Agente de IA nesta instância'), h('div', { class: 'muted instances-hint' }, 'Quando ativo, a IA responde primeiro e transfere conforme as regras de transbordo.')), aiSwitch),
-    h('p', { class: 'muted instances-hint' }, channelNote),
+    h(
+      'section',
+      { class: 'instances-explain', 'aria-label': 'Como funciona esta conexão' },
+      h('div', { class: 'instances-explain__title' }, 'Como funciona esta conexão'),
+      h('p', { class: 'muted instances-hint' }, ch.help),
+      h('div', { class: 'instances-explain__cols' }, h('div', null, h('strong', null, 'O que você ganha'), h('ul', null, ch.pros.map((t) => h('li', null, t)))), h('div', null, h('strong', null, 'Limitações'), h('ul', null, ch.cons.map((t) => h('li', null, t))))),
+      ch.risk ? h('div', { class: 'instances-note instances-note--warn', role: 'note' }, h('span', null, ch.risk)) : null,
+      h('p', { class: 'muted instances-hint' }, channelNote)
+    ),
     hints.host
   );
   replaceChildren(

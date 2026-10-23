@@ -183,7 +183,7 @@ export default {
         : inst.status === 'disconnected'
           ? h('div', { class: 'instances-card__hint muted' }, inst.channel === 'baileys' ? 'Sessão encerrada. Leia um novo QR Code para voltar a atender.' : 'Autorização da Meta pendente. Entre de novo para reativar.')
           : inst.status === 'connected'
-            ? h('div', { class: 'instances-card__hint muted' }, inst.channel === 'baileys' ? 'Sessão por QR ativa. Só conversas recentes foram importadas.' : 'API oficial ativa. Cobrança por mensagem entregue, direto pela Meta.')
+            ? h('div', { class: 'instances-card__hint muted' }, inst.channel === 'baileys' ? 'Sessão por QR ativa. Só conversas recentes foram importadas.' : 'API oficial ativa. Cobrança por mensagem entregue, direto pela Meta.', ' ', h('button', { class: 'instances-card__link', type: 'button', onclick: () => manage(inst) }, 'Entenda este tipo de conexão'))
             : null;
 
       const primary = h(
