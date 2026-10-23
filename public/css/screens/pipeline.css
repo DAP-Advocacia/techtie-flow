@@ -405,6 +405,7 @@
 .pipeline-modal {
   --pad-x: 24px;
   --pad-b: 24px;
+  width: min(var(--modal-w, 480px), calc(100vw - 32px));
   max-height: calc(var(--vvh, 100dvh) - 32px);
   overflow: auto;
   overscroll-behavior: contain;
@@ -869,6 +870,7 @@
   .pipeline-modal {
     --pad-x: 16px;
     --pad-b: calc(env(safe-area-inset-bottom) + 20px);
+    width: 100%;
     max-height: calc(var(--vvh, 100dvh) * 0.94);
     border-radius: 18px 18px 0 0;
     padding: 20px var(--pad-x) var(--pad-b);

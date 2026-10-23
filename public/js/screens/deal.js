@@ -141,6 +141,13 @@ export default {
       else body = relatedTab(deal, contact, mc);
 
       replaceChildren(root, highlights, path, tabs, h('div', { class: 'deal-body', role: 'tabpanel' }, body));
+      // celular: as etapas rolam para o lado; a atual vem para o meio em vez de ficar escondida à direita
+      const here = path.querySelector('[aria-current]');
+      if (here && path.scrollWidth > path.clientWidth) {
+        const a = here.getBoundingClientRect();
+        const b = path.getBoundingClientRect();
+        path.scrollLeft += a.left - b.left - (path.clientWidth - a.width) / 2;
+      }
     }
 
     // ---------------- Detalhes ----------------

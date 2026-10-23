@@ -97,6 +97,10 @@
 .deal-path {
   padding: 14px 16px;
   overflow-x: auto;
+  flex: none; /* o cartão não encolhe (antes as etapas apareciam cortadas na altura) */
+}
+.deal > * {
+  flex-shrink: 0;
 }
 .path {
   list-style: none;
@@ -381,5 +385,23 @@
   }
   .path__item {
     min-width: 108px;
+  }
+  .deal-path {
+    padding: 12px;
+    scroll-snap-type: x proximity;
+  }
+  .path__item {
+    scroll-snap-align: center;
+  }
+  /* botões de baixo: grade 2×2 de largura inteira, em vez de pílulas soltas à esquerda */
+  .deal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .deal-actions .btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
   }
 }

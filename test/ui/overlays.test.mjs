@@ -108,3 +108,15 @@ test('viewport: --vvh/--vvt acompanham a área visível (teclado aberto encolhe)
   await new Promise((r) => setTimeout(r, 360));
   assert.equal(touched, false);
 });
+
+test('modal de Negócios: a largura NÃO é inline (no celular a folha de baixo ocupa 100%, antes ficava com vão à direita)', async () => {
+  const { openModal } = await import('../../public/js/screens/pipeline/modal.js');
+  const m = openModal({ title: 'Teste', content: 'x', width: 520 });
+  const dialog = document.querySelector('.pipeline-modal');
+  assert.ok(!/(^|;)\s*width\s*:/.test(dialog.getAttribute('style') || ''), 'sem width inline');
+  assert.match(dialog.getAttribute('style'), /--modal-w:\s*520px/);
+  m.close();
+  const src = css('screens/pipeline.css');
+  assert.match(rule(src, '.pipeline-modal'), /width: min\(var\(--modal-w, 480px\)/);
+  assert.match(src, /@media \(max-width: 820px\) \{[\s\S]*?\.pipeline-modal \{[^}]*width: 100%/);
+});

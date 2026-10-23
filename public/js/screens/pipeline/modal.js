@@ -40,7 +40,7 @@ export function openModal({ eyebrow, title, content, footer, width = 480, onClos
   const titleId = `pipeline-modal-title-${++seq}`;
   const dialog = h(
     'div',
-    { class: 'pipeline-modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, style: { width: `min(${width}px, calc(100vw - 32px))` } },
+    { class: 'pipeline-modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, style: `--modal-w: ${width}px` }, // largura por variável: no celular o CSS a troca por 100% (um width inline não deixava)
     h('div', { class: 'pipeline-modal__head' }, eyebrow ? h('div', { class: 'label' }, eyebrow) : null, h('h2', { class: 'pipeline-modal__title', id: titleId }, title)),
     h('div', { class: 'pipeline-modal__body' }, content),
     footer ? h('div', { class: 'pipeline-modal__foot' }, footer) : null
