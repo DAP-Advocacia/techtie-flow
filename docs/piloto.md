@@ -16,9 +16,16 @@ servidor), **exceto** a conexão com um WhatsApp de verdade e as telas no navega
 - Conversa nova do cliente cai na **fila**; responder a atribui a quem respondeu; transferir e
   resolver gravam no servidor; tudo com trilha de auditoria.
 
-**Ainda é demonstração (dados fictícios), mesmo em operação:** Agente de IA, Automações, Dashboard,
-Produtos/propostas, edição de **perfis** e **equipes** (a tela existe, mas não salva no servidor),
-editar/remover usuário e redefinir MFA. Convidar e suspender/reativar usuário **são** reais.
+Também é real (desde 16/10): **CRM** (contatos, negócios, produtos e propostas), **funis configuráveis**, **tarefas**, **chat interno**,
+**perfil**, **importar/exportar CSV**, **Dashboard** com números do banco e **Agente de IA** com a OpenAI (precisa de `OPENAI_API_KEY`).
+Visão completa do que existe: [README](../README.md#status-24102026) e [arquitetura.md](arquitetura.md).
+
+**Ainda é demonstração ou ainda não existe, mesmo em operação:**
+- **Automações:** o editor existe, mas o **motor de execução no servidor não** (em operação a tela abre vazia e avisa).
+- **Marca e domínio personalizado** (Configurações): só na tela; a verificação de CNAME é simulada.
+- Criar/editar **equipes** pela tela e editar dados de outro usuário/redefinir MFA não gravam no servidor. Perfis de acesso, convidar,
+  suspender/reativar usuário e atribuir equipes a um usuário **são** reais.
+- Cloud API oficial, envio de mídia pelo Inbox, ligações, campos personalizados, `.xlsx`.
 
 ## 2. Pré-requisitos
 
@@ -70,17 +77,17 @@ subdomínios do mesmo domínio, trocar por cookie `httpOnly` (pendência de segu
 - **Conexão real com o WhatsApp** (pareamento, recebimento e envio com um número de verdade): o
   código do gateway é o herdado do DapZap, que roda em produção, e a integração com o banco foi
   testada com um canal falso. O primeiro pareamento real é o teste que falta.
-- **Telas no navegador no modo operação**: a lógica de dados é testada (`test/api/live-state.test.mjs`),
-  a fiação das telas foi conferida só por sintaxe. Se alguma tela quebrar, mande a mensagem do console.
-- **Mídia** (imagem/áudio recebidos) é gravada em disco local (`MEDIA_FOLDER`); o envio de mídia
-  pelo Inbox ainda não existe (só texto).
+- **Telas no navegador:** a lógica de dados e as telas num DOM simulado são testadas (`test/api/live-state.test.mjs`, `test/ui/`), mas o
+  **layout** (principalmente no celular) só se confere olhando no navegador após cada Redeploy. Se algo quebrar, mande a mensagem do console.
+- **Mídia** (imagem/áudio recebidos) vai para o Supabase Storage quando há `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`, senão para disco local
+  (`MEDIA_FOLDER`); o envio de mídia pelo Inbox ainda não existe (só texto).
 
 ## 7. Antes de ir além do piloto
 
 - Cookie `httpOnly` em vez de token na `sessionStorage`; MFA; recuperação de senha (hoje só o admin convida de novo).
 - Credenciais do Baileys no banco e workers por número (docs/arquitetura-hospedagem.md); backup do `AUTH_FOLDER`.
-- Backlog de segurança do motor (docs/permissoes.md §11) e persistência real de perfis e equipes.
-- Cloud API oficial da Meta; envio de mídia; automações e agente de IA com dados reais.
+- Backlog de segurança do motor (docs/permissoes.md §11) e persistência real de equipes.
+- Cloud API oficial da Meta; envio de mídia; motor de automações no servidor.
 
 ## Números individuais (pessoais) e números da empresa
 

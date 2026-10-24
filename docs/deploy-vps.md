@@ -45,6 +45,10 @@ Painel: botão **Gerenciar painel** na visão geral da VPS (Hostinger → VPS �
    | `TRUST_PROXY` | `true` (há proxy na frente; sem isso o limite de tentativas de login enxerga o IP errado) |
    | `AUTH_FOLDER` | `/app/auth_session` |
    | `MAX_CONCURRENT_PAIRINGS` | `4` |
+   | `OPENAI_API_KEY` | chave da OpenAI (marque como *secret*) — liga o Agente de IA; sem ela a IA não responde |
+   | `OPENAI_MODEL`, `AI_DAILY_TOKEN_CAP` | opcionais (padrão `gpt-4o-mini` e 300000 tokens/dia por empresa) |
+
+   Lista completa com padrões: [configuracao.md](configuracao.md).
 
    Não defina `CORS_ORIGIN`: o site e a API estão na mesma origem.
    **Não** coloque `APP_USER_PASSWORD` nem `DIRECT_URL`: servem só para migrar o banco e isso já está feito.
@@ -67,6 +71,9 @@ Painel: botão **Gerenciar painel** na visão geral da VPS (Hostinger → VPS �
 ## Operação
 
 - **Atualizar:** `git push` na `main` e clicar em *Redeploy* (ou ligar *Auto Deploy* por webhook).
+  **Push não publica sozinho:** a produção só muda depois do *Redeploy*. Se o commit trouxe **migração nova** (`db/migrations/`),
+  aplique-a **antes**, do seu computador: `node db/migrate.mjs` (precisa de `DIRECT_URL` e é idempotente). Migrações aplicadas até hoje: 0001–0009.
+  Mantenha `APP_URL=https://crm.techtie.digital` (um valor velho quebraria os links de convite).
   Cada redeploy reinicia o servidor e religa os números em fila (alguns minutos até voltarem todos).
 - **Logs:** aba *Logs* do Coolify. O servidor já esconde chaves e ruído de criptografia do WhatsApp.
 - **Backup:** o banco é do Supabase (backups do próprio plano). O que a VPS guarda de insubstituível é o volume

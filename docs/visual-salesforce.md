@@ -76,3 +76,10 @@ Contatos (**Lista | Tabela**) e Negócios (**Quadro | Lista**). No celular só e
   girando**; mensagens do chat carregando mostram **esqueleto** com brilho passando; criar contato ou negócio solta um brilho
   pequeno (ganhar negócio, concluir tarefa e bater a meta continuam com o maior); o login ganha **estrelinhas** piscando ao fundo.
   Tudo some com "reduzir movimento".
+
+## Ajustes de 23/10 (auditoria de UX e celular)
+- Campos de **data dd/mm/aaaa**, **hora de 24 h** e **busca de contato** (`public/js/fields/`) no lugar dos nativos do navegador.
+- **Kanban:** painel da proposta recolhível (lembra a escolha; recolhido por padrão abaixo de 1360 px) e largura proporcional à tela.
+- **Dashboard:** definição de cada indicador; tempo de 1ª resposta em mediana e formato legível.
+- **Celular:** modal de Negócios com largura total (variável `--modal-w`), etapas do negócio sem corte e rolando até a atual, botões em grade 2×2.
+- Detalhes e pendências: [auditoria-ux-23-10.md](auditoria-ux-23-10.md).

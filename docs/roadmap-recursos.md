@@ -13,7 +13,7 @@ e modelos), lá está o **em que ordem** (backend, canais, produto).
 
 ---
 
-## Andamento (atualizado em 23/10/2026)
+## Andamento (atualizado em 24/10/2026)
 
 Sequência combinada com o usuário depois do redesenho visual:
 
@@ -24,6 +24,7 @@ Sequência combinada com o usuário depois do redesenho visual:
 | 3 | Automações de verdade (motor no servidor; robôs por etapa primeiro) | pendente |
 | 4 | Campos personalizados (negócio e contato) | pendente |
 | 5 | **Mascote de IA** dentro do produto (seção 10) | **novo objetivo** — a desenhar |
+| — | **Auditoria de UX** (23/10): pontos reais corrigidos; sobram marca/domínio no servidor, Dashboard com filtros e clique, "Mais detalhes" no negócio, checklist da IA, contraste, formulário público de captação e revisão do celular (docs/auditoria-ux-23-10.md) | parcial |
 | — | Também feitos: chat interno e perfil (docs/chat-e-perfil.md), visual Salesforce e brilhos (docs/visual-salesforce.md), tarefas, metas, lista em tabela |
 
 ---
