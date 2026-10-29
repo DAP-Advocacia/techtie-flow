@@ -318,15 +318,10 @@
   position: relative;
 }
 .onboarding-qr--code {
-  background: var(--text);
-  color: var(--ink);
+  /* polaridade de QR real: módulos escuros sobre fundo claro (legível a scanners) */
+  background: #ffffff;
+  color: #15171a;
   padding: 18px;
-}
-/* Polaridade de QR real nos dois temas (módulos escuros sobre fundo claro): no claro
-   --text/--ink se invertem e o código ficaria claro sobre escuro, ilegível a scanners. */
-:root[data-theme='light'] .onboarding-qr--code {
-  background: var(--ink);
-  color: var(--text);
 }
 .onboarding-qr--code svg {
   width: 100%;

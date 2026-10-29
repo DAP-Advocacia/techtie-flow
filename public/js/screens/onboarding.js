@@ -3,7 +3,7 @@
 // produto (store) quando o usuário avança: tenant no passo 1, instância ao
 // sair do passo 2, pipeline ao concluir.
 import { h, icon, replaceChildren } from '../ui.js';
-import { AUTH_ICONS, authBrand, ensureAuthCss, spinner, themeToggle } from './auth/common.js';
+import { AUTH_ICONS, authBrand, ensureAuthCss, spinner } from './auth/common.js';
 import { createPairing, QR_TTL_S } from './auth/pairing.js';
 import { buildQrSvg } from './auth/qr.js';
 
@@ -563,7 +563,7 @@ export default {
         h(
           'div',
           { class: 'onboarding__inner' },
-          h('header', { class: 'onboarding-top' }, authBrand(), h('div', { class: 'onboarding-top__right' }, h('a', { class: 'auth-link', href: '#/login' }, 'Já tenho conta'), themeToggle())),
+          h('header', { class: 'onboarding-top' }, authBrand(), h('div', { class: 'onboarding-top__right' }, h('a', { class: 'auth-link', href: '#/login' }, 'Já tenho conta'))),
           progressHost,
           cardHost
         )

@@ -133,7 +133,6 @@ function renderSidebar(active) {
     ...admin,
     h('div', { class: 'sidebar__spacer' }),
     pwa.shouldOffer() ? h('button', { class: 'sidebar__btn sidebar__install', type: 'button', onclick: () => pwa.install() }, 'Instalar app no celular') : null,
-    h('button', { class: 'sidebar__btn', type: 'button', onclick: () => store.setTheme(s.theme === 'dark' ? 'light' : 'dark') }, s.theme === 'dark' ? 'Modo claro' : 'Modo escuro'),
     live.enabled
       ? h('button', { class: 'sidebar__btn sidebar__btn--dashed', type: 'button', onclick: () => live.logout() }, 'Sair')
       : h('button', { class: 'sidebar__btn sidebar__btn--dashed', type: 'button', onclick: () => navigate('login') }, 'Ver login / onboarding'),

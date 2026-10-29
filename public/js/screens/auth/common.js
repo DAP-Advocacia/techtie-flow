@@ -40,21 +40,5 @@ export function authBrand({ large = false } = {}) {
   );
 }
 
-/** Alternância de tema discreta — nestas telas não há sidebar para isso. */
-export function themeToggle() {
-  const btn = h('button', { class: 'auth-theme', type: 'button' });
-  const paint = () => {
-    const dark = store.state.theme === 'dark';
-    btn.replaceChildren(icon(dark ? AUTH_ICONS.sun : AUTH_ICONS.moon, 16), h('span', null, dark ? 'Modo claro' : 'Modo escuro'));
-    btn.setAttribute('aria-label', dark ? 'Alternar para o modo claro' : 'Alternar para o modo escuro');
-  };
-  btn.addEventListener('click', () => {
-    store.setTheme(store.state.theme === 'dark' ? 'light' : 'dark');
-    paint();
-  });
-  paint();
-  return btn;
-}
-
 /** Spinner que herda a cor do texto (currentColor). */
 export const spinner = () => h('span', { class: 'auth-spinner', 'aria-hidden': 'true' });

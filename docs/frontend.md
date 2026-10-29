@@ -67,7 +67,7 @@ Telas densas marcadas `desktopOnly` (Automações, Funis, Usuários, Configuraç
 
 ## CSS
 
-- `css/tokens.css`: tokens (tema escuro padrão, claro por `data-theme="light"`): `--bg --card --side --line --text --mute --dim
+- `css/tokens.css`: tokens (tema único, claro, sem modo escuro): `--bg --card --side --line --text --mute --dim
   --acc --acc2 --red --green --radius-*`. `css/base.css`: componentes comuns (`.btn`, `.input`, `.select`, `.field`, `.card`,
   campos pt-BR, esqueleto, toast, overlays). `css/shell.css`: casca. `css/screens/<tela>.css`: o que é específico.
 - **Celular:** ponto de corte único **820 px** (`@media (max-width: 820px)`), idêntico a `MOBILE_QUERY`. Modais viram **folha de baixo**
@@ -75,7 +75,8 @@ Telas densas marcadas `desktopOnly` (Automações, Funis, Usuários, Configuraç
   (botões nunca ficam atrás do teclado). Largura de modal vai por variável (`--modal-w`), **nunca `width` inline**, senão vence o CSS do celular.
 - Animações: `@keyframes ov-fade/ov-pop/ov-sheet/ov-drawer` (modais, gavetas), `.fx-in` (entrada escalonada de tela por ~900 ms),
   esqueleto com brilho, anel de carregamento, toast com estrela. **Tudo some com `prefers-reduced-motion`.**
-- Visual: preto e dourado da marca, sóbrio; evitar "cara de IA genérica". Notas de design em [visual-salesforce.md](visual-salesforce.md).
+- Visual: claro, na linha da paleta do Bitrix24 (ciano `#2FC7F7`, azul `#409EEF`, azul escuro `#0066A1` sobre cinza-azulado
+  `#EEF2F4`); o dourado fica só no logotipo e como opção de cor de destaque. Sóbrio; evitar "cara de IA genérica". Notas de design em [visual-salesforce.md](visual-salesforce.md).
 
 ## Efeitos (`fx.js`)
 
