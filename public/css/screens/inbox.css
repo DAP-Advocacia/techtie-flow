@@ -162,6 +162,10 @@
 .inbox-item__stage {
   font-size: 11px;
   letter-spacing: 0.08em;
+  color: var(--dim);
+}
+/* o dim do handoff foi pensado para o escuro; no claro fica ~2:1 sobre a lista */
+:root[data-theme='light'] .inbox-item__stage {
   color: var(--mute);
 }
 .inbox-list__empty {

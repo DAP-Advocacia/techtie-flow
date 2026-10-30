@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#141619">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
@@ -20,6 +20,10 @@
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/shell.css">
   <script src="/config.js"></script>
+  <script>
+    // Aplica o tema salvo antes do primeiro paint (evita flash escuro->claro).
+    try { document.documentElement.dataset.theme = localStorage.getItem('ttf:theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+  </script>
 </head>
 <body>
   <div id="app"></div>

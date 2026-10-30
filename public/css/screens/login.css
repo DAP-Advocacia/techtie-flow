@@ -115,7 +115,7 @@
   line-height: 0;
 }
 .login {
-  --login-bg: var(--bg);
+  --login-bg: #0b0c0e;
   flex: 1;
   min-height: 0;
   position: relative;
@@ -124,6 +124,9 @@
   place-items: center;
   padding: 56px 32px 48px;
   background: var(--login-bg);
+}
+:root[data-theme='light'] .login {
+  --login-bg: var(--bg);
 }
 .login__top {
   position: absolute;

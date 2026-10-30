@@ -1,10 +1,13 @@
 /* Tela Instâncias. Tudo prefixado com .instances-; só variáveis dos tokens. */
 :root {
-  /* Véu atrás dos modais. */
-  --instances-scrim: rgba(31, 45, 54, 0.4);
-  /* QR sempre escuro sobre claro (precisa de contraste para ser lido). */
+  /* Véu atrás dos modais: escurece nos dois temas, mais leve no claro. */
+  --instances-scrim: rgba(8, 9, 11, 0.62);
+  /* QR sempre escuro sobre claro (precisa de contraste para ser lido em qualquer tema). */
   --instances-qr-bg: #ffffff;
   --instances-qr-fg: #15171a;
+}
+:root[data-theme='light'] {
+  --instances-scrim: rgba(37, 39, 43, 0.38);
 }
 
 /* ---------- página e grade ---------- */

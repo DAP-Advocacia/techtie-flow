@@ -9,33 +9,32 @@ import { store } from '../../store.js';
 
 export const ACCENT_KEY = 'ttf:accent';
 
-// Há um tema só (claro). O id 'gold' é o padrão (por herança de nome; hoje é o ciano do Bitrix
-// e espelha tokens.css, usado só na amostra, já que o padrão é aplicado removendo overrides).
-// Os demais são opções white-label, com variantes de ênfase, discreta e de barra.
+// Valores por tema. Os de "gold" espelham tokens.css (usados só nas amostras
+// de cor, já que gold é aplicado removendo overrides); os demais partem de
+// --green / --ins / --red de cada tema, com variantes de ênfase, discreta e de barra.
 export const ACCENTS = [
   {
     id: 'gold',
-    name: 'Ciano',
-    light: { acc: '#0066a1', acc2: '#004f80', dim: '#7fb7d6', bar: '#2fc7f7' },
-  },
-  {
-    id: 'blue',
-    name: 'Azul',
-    light: { acc: '#2d6fc0', acc2: '#1f5599', dim: '#8fb3d6', bar: '#409eef' },
+    name: 'Champagne',
+    dark: { acc: '#d6c093', acc2: '#ead9b0', dim: '#8b7a55', bar: '#6f6850' },
+    light: { acc: '#8a6d2f', acc2: '#6f5622', dim: '#b9a572', bar: '#c4ad74' },
   },
   {
     id: 'green',
     name: 'Verde',
+    dark: { acc: '#6fbf8b', acc2: '#9bd8b0', dim: '#4f8a65', bar: '#3f6b50' },
     light: { acc: '#2f8f58', acc2: '#23724a', dim: '#7fb896', bar: '#8fc9a6' },
   },
   {
-    id: 'champagne',
-    name: 'Dourado',
-    light: { acc: '#8a6d2f', acc2: '#6f5622', dim: '#b9a572', bar: '#c4ad74' },
+    id: 'blue',
+    name: 'Azul',
+    dark: { acc: '#8bb4dd', acc2: '#b3d0ee', dim: '#5f83a8', bar: '#46627f' },
+    light: { acc: '#3f78b0', acc2: '#2f6090', dim: '#8fb3d6', bar: '#9dbfe0' },
   },
   {
     id: 'red',
     name: 'Vermelho',
+    dark: { acc: '#e08a82', acc2: '#f0aaa3', dim: '#a85f59', bar: '#7a4743' },
     light: { acc: '#c0504a', acc2: '#9e3c37', dim: '#d89a96', bar: '#deaaa6' },
   },
 ];
@@ -45,9 +44,25 @@ const isValid = (id) => ACCENTS.some((a) => a.id === id);
 
 // Accent atualmente aplicado no <html> (pode ser uma prévia ainda não salva).
 let current = 'gold';
+let subscribed = false;
+
+/** Reaplica o accent atual quando o tema muda: as variantes mudam por tema. */
+function ensureThemeSubscription() {
+  if (subscribed) return;
+  subscribed = true;
+  let lastTheme = store.state.theme;
+  // Assinatura permanente de propósito: o accent precisa acompanhar o tema em
+  // qualquer tela depois de aplicado (inline style vence o [data-theme='light']).
+  store.subscribe((s) => {
+    if (s.theme === lastTheme) return;
+    lastTheme = s.theme;
+    applyAccent(current, s.theme);
+  });
+}
 
 /** Aplica (ou, para 'gold', limpa) as variáveis de destaque no <html>. */
-export function applyAccent(id) {
+export function applyAccent(id, theme = store.state.theme) {
+  ensureThemeSubscription();
   const accent = ACCENTS.find((a) => a.id === id) || ACCENTS[0];
   current = accent.id;
   const style = document.documentElement.style;
@@ -55,7 +70,7 @@ export function applyAccent(id) {
     for (const v of VARS) style.removeProperty(`--${v}`);
     return accent.id;
   }
-  const set = accent.light;
+  const set = theme === 'light' ? accent.light : accent.dark;
   for (const v of VARS) style.setProperty(`--${v}`, set[v]);
   return accent.id;
 }

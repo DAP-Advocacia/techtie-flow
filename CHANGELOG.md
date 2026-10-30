@@ -3,12 +3,6 @@
 Formato: por data, do mais novo ao mais antigo; o hash é o commit na `main`. Contexto e decisões por trás de cada fase em
 [docs/historico.md](docs/historico.md). Migrações de banco aparecem com o número (aplicadas em `db/migrations/`).
 
-## 2026-10-28
-
-- **Paleta Bitrix e fim do modo escuro:** tema único claro (cinza-azulado `#EEF2F4`, cartões brancos, ciano `#2FC7F7`, azul escuro
-  `#0066A1`); removidos o seletor de modo (barra lateral, login e cadastro) e os blocos `data-theme`. Cores de destaque: Ciano (padrão),
-  Azul, Verde, Dourado, Vermelho. O id `gold` segue como padrão por compatibilidade.
-
 ## 2026-10-23
 
 - `496a03f` **Celular:** modal de Negócios com largura total (a largura inline vencia o CSS e deixava vão à direita; agora `--modal-w`);

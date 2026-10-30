@@ -417,6 +417,9 @@
   flex-direction: column;
   gap: 16px;
   max-width: 760px;
+  color-scheme: dark;
+}
+:root[data-theme='light'] .automations-panel {
   color-scheme: light;
 }
 .automations-panel__head {

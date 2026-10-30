@@ -4,10 +4,22 @@
 // houver backend, só este módulo troca de implementação.
 import { createMockData } from './mock/data.js';
 
+const THEME_KEY = 'ttf:theme';
+
+function readTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    if (t === 'light' || t === 'dark') return t;
+  } catch {
+    /* localStorage indisponível (modo privado/bloqueado): segue com o padrão */
+  }
+  return 'dark';
+}
+
 const listeners = new Set();
 
 export const store = {
-  state: { ...createMockData(), theme: 'light',session: { loggedIn: false } },
+  state: { ...createMockData(), theme: readTheme(), session: { loggedIn: false } },
 
   /** Muta o estado dentro de fn(state) e avisa os assinantes. */
   update(fn) {
@@ -47,9 +59,21 @@ export const store = {
   deal(id) {
     return this.state.deals.find((d) => d.id === id);
   },
+
+  // ---- tema ----
+  setTheme(theme) {
+    this.update((s) => {
+      s.theme = theme;
+    });
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      /* sem persistência: vale só nesta sessão */
+    }
+  },
 };
 
-/** Tema único (claro). Mantido para as telas que ainda leem data-theme; não há mais alternância. */
-export function applyTheme() {
-  document.documentElement.dataset.theme = 'light';
+/** Aplica o tema atual no <html> (CSS lê data-theme). */
+export function applyTheme(theme = store.state.theme) {
+  document.documentElement.dataset.theme = theme;
 }

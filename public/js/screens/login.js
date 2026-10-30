@@ -3,7 +3,7 @@
 // inválidas" depois do loading; qualquer outra senha entra.
 import { h, icon, toast } from '../ui.js';
 import { sparkles } from '../fx.js';
-import { AUTH_ICONS, EMAIL_RE, ensureAuthCss, spinner } from './auth/common.js';
+import { AUTH_ICONS, EMAIL_RE, ensureAuthCss, spinner, themeToggle } from './auth/common.js';
 import { techtieMark } from './auth/logo.js';
 import * as live from '../live.js';
 
@@ -156,6 +156,7 @@ export default {
         'div',
         { class: 'login' },
         sparkles(),
+        h('div', { class: 'login__top' }, themeToggle()),
         h(
           'main',
           { class: 'login-stage' },
