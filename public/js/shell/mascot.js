@@ -1,8 +1,10 @@
-// Mascote "Flow": bichinho roxo, felpudo e brilhante em SVG (gradientes, reflexos e borda de pelo dão o ar 3D), com orelhas pontudas.
+// Mascote "Flow": bichinho roxo, felpudo e brilhante, com orelhas pontudas. Em 3D de verdade (Three.js, ver mascot3d.js) quando o navegador
+// tem WebGL; senão, o desenho SVG abaixo (gradientes e reflexos imitam o volume).
 // Cantinho fixo; ao clicar ele vem para o meio da tela com um chat ao lado e reage à conversa (sem IA, por palavras-chave).
 // Os olhos e a cabeça seguem o cursor. Exceção consciente ao visual sóbrio do CRM: ele é o único toque "fofo".
 import { h, replaceChildren } from '../ui.js';
 import { MASCOT_NAME, greeting, idleMood, lookVector, nextTip, reply } from './mascot-model.js';
+import { loadMascot3D, onMascot3DLost } from './mascot3d.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_KEY = 'ttf:mascot';
@@ -20,6 +22,28 @@ const reduced = () => {
     return false;
   }
 };
+
+// ---------- 3D compartilhado: um só canvas, que muda de lugar (cantinho, palco) ----------
+let shared = null; // { canvas, mood, setMood, pulse, setLook, start } quando o 3D está pronto
+let loading = false;
+
+function notifyAll() {
+  for (const root of [...live]) root.dispatchEvent(new globalThis.Event('mascot-3d'));
+}
+
+function ensure3d() {
+  if (loading) return;
+  loading = true;
+  onMascot3DLost(() => {
+    shared = null;
+    loading = false;
+    notifyAll();
+  });
+  loadMascot3D().then((inst) => {
+    shared = inst;
+    if (inst) notifyAll();
+  });
+}
 
 // ---------- olhar que segue o cursor (um único ouvinte para todos os mascotes montados) ----------
 const live = new Set();
@@ -43,6 +67,7 @@ function applyLook() {
     root.style.setProperty('--ly', v.y.toFixed(3));
     root.style.setProperty('--ax', Math.abs(v.x).toFixed(3));
     root.style.setProperty('--ay', Math.abs(v.y).toFixed(3));
+    if (shared && root.contains(shared.canvas)) shared.setLook(v.x, v.y);
   }
 }
 
@@ -138,7 +163,7 @@ export function mascotSvg(mood = 'happy', size = 64) {
     // orelhas pontudas (atrás do corpo, num grupo que se move ao contrário do rosto = profundidade), com miolo, fio de luz e tufinhos
     s(
       'g',
-      { class: 'mascot__back' },
+      {},
       s('g', { class: 'mascot__ear' }, s('path', { d: 'M19 46C13 31 15 16 22 3C32 9 41 18 45 28Z', fill: `url(#${id}-ear)` }), s('path', { d: 'M24 40C21 29 22 19 25 11C31 16 37 22 40 29Z', fill: `url(#${id}-inner)` }), s('path', { d: 'M24 40C21 29 22 19 25 11C31 16 37 22 40 29Z', fill: '#4a1d8f', opacity: 0.22, transform: 'translate(2.4 3)' }), s('path', { d: 'M21 8C17 18 17 30 21 40', ...stroke, 'stroke-width': 1.5, stroke: '#e9dcff', opacity: 0.55 }), s('path', { d: 'M22 6l-1 6M26 9l-1 6', ...stroke, 'stroke-width': 1.6, stroke: '#f3e8ff' })),
       s('g', { class: 'mascot__ear mascot__ear--r' }, s('path', { d: 'M81 46C87 31 85 16 78 3C68 9 59 18 55 28Z', fill: `url(#${id}-ear)` }), s('path', { d: 'M76 40C79 29 78 19 75 11C69 16 63 22 60 29Z', fill: `url(#${id}-inner)` }), s('path', { d: 'M76 40C79 29 78 19 75 11C69 16 63 22 60 29Z', fill: '#4a1d8f', opacity: 0.3, transform: 'translate(-2 3)' }), s('path', { d: 'M82 12C85 22 84 32 80 40', ...stroke, 'stroke-width': 1.5, stroke: '#ffb6f0', opacity: 0.5 }), s('path', { d: 'M78 6l1 6M74 9l1 6', ...stroke, 'stroke-width': 1.6, stroke: '#f3e8ff' }))
     ),
@@ -157,7 +182,7 @@ export function mascotSvg(mood = 'happy', size = 64) {
     s('circle', { cx: 50, cy: 53, r: 38, fill: `url(#${id}-shade)` }),
     s('circle', { cx: 50, cy: 53, r: 38, fill: `url(#${id}-bounce)` }),
     // sombra das orelhas na cabeça
-    s('g', { class: 'mascot__back' }, s('ellipse', { cx: 28, cy: 27, rx: 13, ry: 5, fill: '#1e0b52', opacity: 0.22, transform: 'rotate(-35 28 27)' }), s('ellipse', { cx: 72, cy: 27, rx: 13, ry: 5, fill: '#1e0b52', opacity: 0.22, transform: 'rotate(35 72 27)' })),
+    s('g', {}, s('ellipse', { cx: 28, cy: 27, rx: 13, ry: 5, fill: '#1e0b52', opacity: 0.22, transform: 'rotate(-35 28 27)' }), s('ellipse', { cx: 72, cy: 27, rx: 13, ry: 5, fill: '#1e0b52', opacity: 0.22, transform: 'rotate(35 72 27)' })),
     // luz de contorno rosada à direita + reflexos (um macio e um brilho duro, de plástico)
     s('path', { d: 'M73 26C83 35 88 47 86 60C83 76 70 88 52 90C67 83 77 71 79 57C80 45 78 35 73 26Z', fill: `url(#${id}-rim)` }),
     s('ellipse', { cx: 33, cy: 31, rx: 13, ry: 7, fill: '#fff', opacity: 0.45, transform: 'rotate(-30 33 31)' }),
@@ -187,18 +212,29 @@ export function createMascot({ routeId, firstName, now = () => new Date(), delay
   let input = null;
   let busy = false;
   let closing = false;
+  let heroMood = 'happy';
   let timer = 0;
 
   const root = h('div', { class: 'mascot' });
   track(root);
   const hour = () => now().getHours();
-  /** `.mascot__tilt` inclina o desenho conforme o olhar (variáveis --lx/--ly na raiz). */
-  const art = (mood, size) => h('span', { class: 'mascot__tilt' }, mascotSvg(mood, size));
+  ensure3d();
+  /** O bichinho: o canvas 3D (se pronto e `flat` não for pedido) ou o SVG. `.mascot__tilt` inclina o SVG conforme o olhar (--lx/--ly). */
+  const art = (mood, size, { flat = false } = {}) => {
+    const use3d = !!shared && !flat;
+    root.classList.toggle('mascot--3d', use3d);
+    if (!use3d) return h('span', { class: 'mascot__tilt' }, mascotSvg(mood, size));
+    const host = h('span', { class: 'mascot__tilt' }, shared.canvas);
+    if (shared.mood !== mood) shared.setMood(mood);
+    shared.start();
+    return host;
+  };
+  root.addEventListener('mascot-3d', () => (stage ? setMood(heroMood) : drawClosed()));
 
   function drawClosed() {
     root.classList.toggle('is-min', minimized);
     if (minimized) {
-      replaceChildren(root, h('button', { class: 'mascot__peek', type: 'button', 'aria-label': `Mostrar ${MASCOT_NAME}`, title: `Mostrar ${MASCOT_NAME}`, onclick: () => setMinimized(false) }, art('happy', 30)));
+      replaceChildren(root, h('button', { class: 'mascot__peek', type: 'button', 'aria-label': `Mostrar ${MASCOT_NAME}`, title: `Mostrar ${MASCOT_NAME}`, onclick: () => setMinimized(false) }, art('happy', 30, { flat: true })));
       return;
     }
     replaceChildren(
@@ -220,7 +256,14 @@ export function createMascot({ routeId, firstName, now = () => new Date(), delay
 
   /** Troca a expressão do mascote grande; o desenho novo entra com um "pulinho". */
   function setMood(mood) {
-    if (hero) replaceChildren(hero, h('span', { class: 'mascot__react' }, art(mood, 200)));
+    heroMood = mood;
+    if (!hero) return;
+    // 3D: o canvas já está no palco, só troca a expressão (com o pulinho); SVG: redesenha
+    if (shared && hero.contains(shared.canvas)) {
+      shared.setMood(mood);
+      return;
+    }
+    replaceChildren(hero, h('span', { class: 'mascot__react' }, art(mood, 200)));
   }
 
   function addMessage(from, text, { remember = true } = {}) {
@@ -355,16 +398,17 @@ export function createMascot({ routeId, firstName, now = () => new Date(), delay
     if (redraw && from && home && from.width && hero.animate && !reduced()) {
       closing = true;
       stage.classList.add('is-closing');
-      // o botão do cantinho tem 64px e fica colado no canto de `root`
-      const dx = home.right - 32 - (from.left + from.width / 2);
-      const dy = home.bottom - 32 - (from.top + from.height / 2);
+      // o botão do cantinho fica colado no canto de `root` (64px no SVG, 76px no 3D)
+      const corner = shared && hero.contains(shared.canvas) ? 76 : 64;
+      const dx = home.right - corner / 2 - (from.left + from.width / 2);
+      const dy = home.bottom - corner / 2 - (from.top + from.height / 2);
       let done = false;
       const end = () => {
         if (done) return;
         done = true;
         finish();
       };
-      const anim = hero.animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${64 / from.width})` }], { duration: 420, easing: 'cubic-bezier(.5,0,.75,.4)', fill: 'forwards' });
+      const anim = hero.animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${corner / from.width})` }], { duration: 420, easing: 'cubic-bezier(.5,0,.75,.4)', fill: 'forwards' });
       anim.onfinish = end;
       setTimeout(end, 560);
       return;

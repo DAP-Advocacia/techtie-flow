@@ -11,6 +11,11 @@ Formato: por data, do mais novo ao mais antigo; o hash é o commit na `main`. Co
   **sem IA**: dicas da tela, piadas e bate-papo; o que não entende ele admite. Esc ou fora fecha; "–" minimiza (lembrado no navegador).
   Nome provisório. Arquivos: `public/js/shell/mascot.js`, `mascot-model.js`, `public/css/mascot.css`; teste `test/ui/mascot.test.mjs`.
   Fase 2 (entender pedidos e executar comandos em português, respeitando permissões) segue pendente.
+- **Mascote em 3D de verdade (Three.js):** o corpo é uma esfera com iluminação real (luzes paradas, o brilho escorrega pela bola quando ela vira);
+  orelhas, pés, pelinhos, olhos, bochechas e boca são filhos do corpo, e só o corpo gira em direção ao cursor. As 8 expressões foram refeitas no
+  modelo e cada reação dá um pulinho. Sem WebGL (ou se o contexto for perdido), cai no desenho SVG. A biblioteca vai no repositório
+  (`public/vendor/three.min.js`, ~560 KB, ~145 KB comprimida, só as classes usadas) com a licença MIT; carrega sob demanda, sem CDN.
+  Arquivos: `public/js/shell/mascot3d.js`, `scripts/three-entry.js`, `public/vendor/`.
 
 ## 2026-10-23
 

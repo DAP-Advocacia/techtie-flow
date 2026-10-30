@@ -99,3 +99,6 @@ Ondinha dourada no `pointerdown` de `.btn, .pill, .contacts-chip, .stage-chip, .
   folha de baixo no celular, Esc/fora fecha, foco preso). Respostas e humores por palavra-chave em `mascot-model.js` (`reply`); o olhar segue o
   cursor por `--lx/--ly` (um único ouvinte `pointermove`, desligado com `prefers-reduced-motion`). Minimizar: `localStorage['ttf:mascot']`;
   a conversa vive só na sessão do navegador.
+- **Mascote 3D** (`shell/mascot3d.js`): Three.js local em `public/vendor/three.min.js` (pacote só com as classes usadas; como regerar em
+  `public/vendor/README.md`). `buildModel(T)` monta a cena sem WebGL (testada em Node); `loadMascot3D()` cria um único canvas que muda de lugar
+  (cantinho, palco) e devolve `null` sem WebGL, quando o mascote usa o SVG. Regra: tudo que compõe o bichinho é filho de `body`; só `body` gira.

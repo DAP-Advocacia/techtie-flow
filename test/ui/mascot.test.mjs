@@ -173,11 +173,76 @@ test('fechar: o bichinho voa de volta ao cantinho e só então o palco some', as
   }
 });
 
-test('CSS: orelhas acompanham a cabeça (deslocam e afinam o lado que vira)', () => {
+test('CSS: o corpo gira inteiro; orelhas e rosto não se movem soltos', () => {
   const css = fs.readFileSync(path.resolve(import.meta.dirname, '../../public/css/mascot.css'), 'utf8');
-  // olhando para baixo as orelhas sobem, nunca descem para trás do corpo
-  assert.match(css, /\.mascot__back \{[^}]*transform: translate\(calc\(var\(--lx\) \* 9px\), calc\(var\(--ly\) \* -5px\)\)/);
-  assert.match(css, /\.mascot__ear \{\s*scale: calc\(1 \+ var\(--lx\)/);
-  assert.match(css, /\.mascot__ear--r \{\s*scale: calc\(1 - var\(--lx\)/);
+  assert.match(css, /\.mascot__tilt \{[^}]*rotateY\(calc\(var\(--lx\) \* 22deg\)\)/);
+  assert.ok(!/\.mascot__back/.test(css));
+  assert.ok(!/\.mascot__ear \{[^}]*(scale|translate):/.test(css));
   assert.match(css, /\.mascot-stage\.is-closing/);
+});
+
+// ---------- 3D (Three.js): o modelo monta em Node, sem WebGL ----------
+const T = await import('../../public/vendor/three.min.js');
+const { buildModel, canWebGL, loadMascot3D } = await import('../../public/js/shell/mascot3d.js');
+
+test('3D: sem WebGL (DOM simulado) o mascote usa o SVG', async () => {
+  assert.equal(canWebGL(), false);
+  assert.equal(await loadMascot3D(), null);
+  const el = createMascot({ routeId: 'home', delay: 0 });
+  assert.ok(el.querySelector('.mascot__btn svg'));
+  assert.ok(!el.querySelector('canvas'));
+  assert.ok(!el.classList.contains('mascot--3d'));
+});
+
+test('3D: tudo é filho do corpo (rígido); só o corpo gira; luzes e sombra ficam no mundo', () => {
+  const m = buildModel(T);
+  const parentOf = (o) => {
+    for (let p = o.parent; p; p = p.parent) if (p === m.body) return 'body';
+    return 'world';
+  };
+  const meshes = [];
+  m.root.traverse((o) => o.isMesh && meshes.push(o));
+  const world = meshes.filter((o) => parentOf(o) === 'world');
+  assert.equal(world.length, 1, 'só a sombra do chão fica fora do corpo'); // orelhas, pés, olhos, boca, bochechas: todos no corpo
+  const before = m.face.position.toArray();
+  m.update({ dt: 0.016, lx: 1, ly: -1 });
+  for (let i = 0; i < 40; i++) m.update({ dt: 0.016, lx: 1, ly: -1 });
+  assert.deepEqual(m.face.position.toArray(), before, 'o rosto não se desloca por conta própria');
+  assert.ok(m.body.rotation.y > 0.6 && m.body.rotation.x < -0.35, 'o corpo vira em direção ao cursor');
+  // as orelhas têm pivô preso ao corpo e sobem acima da esfera (pontas à vista, não atrás dela)
+  const tips = [];
+  m.body.updateMatrixWorld(true);
+  m.body.traverse((o) => o.geometry?.type === 'ConeGeometry' && o.geometry.parameters.height > 0.9 && tips.push(new T.Vector3(0, o.geometry.parameters.height / 2, 0).applyMatrix4(o.matrixWorld)));
+  assert.equal(tips.length, 2);
+  for (const tip of tips) assert.ok(tip.length() > 1.2, 'a ponta da orelha fica fora da esfera');
+});
+
+test('3D: cada humor tem um rosto próprio e reage com um pulinho', () => {
+  const m = buildModel(T);
+  const sig = (mood) => {
+    m.setMood(mood);
+    assert.equal(m.mood, mood);
+    return m.face.children.map((c) => c.children.map((k) => k.geometry?.type).join(',')).join('|');
+  };
+  const sigs = ['happy', 'think', 'wow', 'confused', 'sleep', 'love', 'laugh', 'sad'].map(sig);
+  assert.equal(new Set(sigs).size, sigs.length, 'nenhum humor repete o desenho de outro');
+  // reação: ao trocar de humor o corpo estica e volta
+  m.setMood('wow');
+  m.update({ dt: 0.05 });
+  assert.notEqual(m.body.scale.y, 1);
+  for (let i = 0; i < 30; i++) m.update({ dt: 0.05 });
+  assert.equal(m.body.scale.y, 1);
+  // movimento reduzido: sem balanço nem tremor
+  m.update({ dt: 0.5, still: true });
+  assert.equal(m.body.position.y, 0);
+  assert.equal(m.body.rotation.z, 0);
+});
+
+test('3D: biblioteca local incluída com a licença, e o pacote traz só o necessário', () => {
+  const dir = path.resolve(import.meta.dirname, '../../public/vendor');
+  assert.ok(fs.existsSync(path.join(dir, 'three.min.js')));
+  assert.match(fs.readFileSync(path.join(dir, 'three.LICENSE.txt'), 'utf8'), /MIT License/);
+  assert.ok(fs.statSync(path.join(dir, 'three.min.js')).size < 700 * 1024);
+  const src = fs.readFileSync(path.resolve(import.meta.dirname, '../../public/js/shell/mascot3d.js'), 'utf8');
+  assert.ok(!/https?:\/\//.test(src.replace(/\/\/.*$/gm, '')), 'nada de CDN: a biblioteca vem de /vendor');
 });

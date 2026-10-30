@@ -47,7 +47,8 @@
 /* ---- desenho: a cabeça inclina e os olhos seguem o cursor (--lx/--ly vão de -1 a 1, definidos em JS) ---- */
 .mascot__tilt {
   display: inline-block;
-  transform: perspective(300px) rotateY(calc(var(--lx) * 7deg)) rotateX(calc(var(--ly) * -6deg));
+  /* o bichinho inteiro gira como uma peça só: orelhas, pés e rosto ficam presos ao corpo */
+  transform: perspective(320px) rotateY(calc(var(--lx) * 22deg)) rotateX(calc(var(--ly) * -16deg));
   transition: transform 0.12s linear;
 }
 .mascot-art {
@@ -56,11 +57,6 @@
 }
 .mascot-art--sleep {
   animation-duration: 5s;
-}
-.mascot__back {
-  /* para baixo as orelhas sobem (ficam à vista); descer as esconderia atrás do corpo */
-  transform: translate(calc(var(--lx) * 9px), calc(var(--ly) * -5px));
-  transition: transform 0.12s linear;
 }
 .mascot__look {
   transform: translate(calc(var(--lx) * 3.2px), calc(var(--ly) * 2.4px));
@@ -74,7 +70,7 @@
 .mascot__wrap {
   transform-box: view-box;
   transform-origin: 50px 53px;
-  transform: translate(calc(var(--lx) * 15px), calc(var(--ly) * 11px)) scale(calc(1 - var(--ax) * 0.2), calc(1 - var(--ay) * 0.14)) rotate(calc(var(--lx) * 3deg));
+  transform: translate(calc(var(--lx) * 6px), calc(var(--ly) * 4px)) scale(calc(1 - var(--ax) * 0.1), calc(1 - var(--ay) * 0.07));
   transition: transform 0.1s linear;
 }
 .mascot__eyes {
@@ -89,15 +85,6 @@
 }
 .mascot__ear--r {
   animation-delay: 0.35s;
-}
-/* a cabeça vira: a orelha do lado para onde ela vira passa a ficar de frente (alarga) e a do lado oposto encolhe, de perfil */
-.mascot__ear {
-  scale: calc(1 + var(--lx) * 0.32) calc(1 + var(--ly) * 0.08);
-  rotate: calc(var(--lx) * 4deg);
-  transition: scale 0.12s linear, rotate 0.12s linear;
-}
-.mascot__ear--r {
-  scale: calc(1 - var(--lx) * 0.32) calc(1 + var(--ly) * 0.08);
 }
 .mascot__react {
   display: inline-block;
@@ -292,6 +279,38 @@
   }
 }
 
+/* ---- 3D (canvas do Three.js): a rotação é feita no modelo, então o CSS não inclina nada ---- */
+.mascot-3d {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.mascot__btn .mascot-3d {
+  width: 76px;
+  height: 76px;
+}
+.mascot__hero .mascot-3d {
+  width: var(--hero-size);
+  height: var(--hero-size);
+}
+.mascot--3d .mascot__tilt {
+  transform: none;
+  transition: none;
+}
+.mascot--3d .mascot__btn,
+.mascot--3d .mascot__hero {
+  filter: none;
+}
+.mascot--3d .mascot__hero {
+  --hero-size: 250px;
+}
+@media (max-width: 820px) {
+  .mascot--3d .mascot__hero {
+    --hero-size: 140px;
+  }
+}
+
 /* fechar: o fundo some e o chat recolhe enquanto o bichinho volta ao cantinho */
 .mascot-stage.is-closing {
   background: transparent;
@@ -349,7 +368,6 @@
   }
   .mascot__tilt,
   .mascot__wrap,
-  .mascot__back,
   .mascot__look,
   .mascot__face,
   .mascot__btn {
