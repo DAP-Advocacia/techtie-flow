@@ -3,6 +3,15 @@
 Formato: por data, do mais novo ao mais antigo; o hash é o commit na `main`. Contexto e decisões por trás de cada fase em
 [docs/historico.md](docs/historico.md). Migrações de banco aparecem com o número (aplicadas em `db/migrations/`).
 
+## 2026-10-30
+
+- **Mascote "Flow" (fase 1):** bichinho roxo, felpudo e brilhante em SVG (volume 3D com gradientes, luz de contorno e borda de pelo), com
+  orelhas pontudas. Cantinho fixo nas telas com menu lateral; a cabeça e os olhos seguem o cursor. Ao clicar, ele vem para o meio da tela com
+  um chat ao lado e reage à conversa (feliz, pensando, rindo, apaixonado, triste, confuso, surpreso). As respostas são por palavras-chave,
+  **sem IA**: dicas da tela, piadas e bate-papo; o que não entende ele admite. Esc ou fora fecha; "–" minimiza (lembrado no navegador).
+  Nome provisório. Arquivos: `public/js/shell/mascot.js`, `mascot-model.js`, `public/css/mascot.css`; teste `test/ui/mascot.test.mjs`.
+  Fase 2 (entender pedidos e executar comandos em português, respeitando permissões) segue pendente.
+
 ## 2026-10-23
 
 - `496a03f` **Celular:** modal de Negócios com largura total (a largura inline vencia o CSS e deixava vão à direita; agora `--modal-w`);

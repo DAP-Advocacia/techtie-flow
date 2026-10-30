@@ -1,0 +1,359 @@
+/* Mascote "Flow" (public/js/shell/mascot.js). Exceção consciente ao visual sóbrio: único toque colorido e "fofo". */
+.mascot {
+  --lx: 0;
+  --ly: 0;
+  --ax: 0;
+  --ay: 0;
+  position: fixed;
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  z-index: 900;
+  pointer-events: none;
+}
+.mascot > * {
+  pointer-events: auto;
+}
+.mascot__btn,
+.mascot__peek,
+.mascot__hero {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  line-height: 0;
+  filter: drop-shadow(0 6px 10px rgba(76, 42, 154, 0.35));
+}
+.mascot__btn {
+  transition: transform 0.18s ease;
+}
+.mascot__btn:hover {
+  transform: translateY(-3px) scale(1.06);
+}
+.mascot__btn:focus-visible,
+.mascot__peek:focus-visible,
+.mascot__hero:focus-visible,
+.mascot__x:focus-visible,
+.mascot__chip:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+}
+.mascot__peek {
+  opacity: 0.75;
+}
+.mascot__peek:hover {
+  opacity: 1;
+}
+
+/* ---- desenho: a cabeça inclina e os olhos seguem o cursor (--lx/--ly vão de -1 a 1, definidos em JS) ---- */
+.mascot__tilt {
+  display: inline-block;
+  transform: perspective(300px) rotateY(calc(var(--lx) * 7deg)) rotateX(calc(var(--ly) * -6deg));
+  transition: transform 0.12s linear;
+}
+.mascot-art {
+  animation: mascot-float 3.4s ease-in-out infinite;
+  overflow: visible;
+}
+.mascot-art--sleep {
+  animation-duration: 5s;
+}
+.mascot__back {
+  /* para baixo as orelhas sobem (ficam à vista); descer as esconderia atrás do corpo */
+  transform: translate(calc(var(--lx) * 9px), calc(var(--ly) * -5px));
+  transition: transform 0.12s linear;
+}
+.mascot__look {
+  transform: translate(calc(var(--lx) * 3.2px), calc(var(--ly) * 2.4px));
+  transition: transform 0.1s linear;
+}
+.mascot__face {
+  transform-box: view-box;
+  transform-origin: 50px 53px;
+}
+/* o rosto "contorna" a esfera: anda na direção do olhar e encolhe de lado perto da borda (como em uma bola de verdade) */
+.mascot__wrap {
+  transform-box: view-box;
+  transform-origin: 50px 53px;
+  transform: translate(calc(var(--lx) * 15px), calc(var(--ly) * 11px)) scale(calc(1 - var(--ax) * 0.2), calc(1 - var(--ay) * 0.14)) rotate(calc(var(--lx) * 3deg));
+  transition: transform 0.1s linear;
+}
+.mascot__eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mascot-blink 5s infinite;
+}
+.mascot__ear {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: mascot-ear 7s ease-in-out infinite;
+}
+.mascot__ear--r {
+  animation-delay: 0.35s;
+}
+/* a cabeça vira: a orelha do lado para onde ela vira passa a ficar de frente (alarga) e a do lado oposto encolhe, de perfil */
+.mascot__ear {
+  scale: calc(1 + var(--lx) * 0.32) calc(1 + var(--ly) * 0.08);
+  rotate: calc(var(--lx) * 4deg);
+  transition: scale 0.12s linear, rotate 0.12s linear;
+}
+.mascot__ear--r {
+  scale: calc(1 - var(--lx) * 0.32) calc(1 + var(--ly) * 0.08);
+}
+.mascot__react {
+  display: inline-block;
+  line-height: 0;
+  animation: mascot-react 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+/* ---- palco: o mascote no meio e o chat ao lado ---- */
+.mascot-stage {
+  --modal-w: 380px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--vvt, 0px);
+  height: var(--vvh, 100dvh);
+  z-index: 980;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(3px);
+  animation: ov-fade 0.16s ease-out;
+}
+.mascot-stage__box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  width: 100%;
+  max-width: 760px;
+}
+.mascot__hero {
+  --hero-size: 200px;
+  flex: none;
+  filter: drop-shadow(0 14px 18px rgba(76, 42, 154, 0.4));
+}
+.mascot__hero .mascot-art {
+  width: var(--hero-size);
+  height: var(--hero-size);
+}
+.mascot__chat {
+  width: var(--modal-w);
+  max-width: 100%;
+  max-height: calc(var(--vvh, 100dvh) - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  padding: 12px 14px 14px;
+  animation: mascot-pop 0.22s 0.18s ease-out backwards;
+}
+.mascot__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.mascot__sub {
+  font-size: 12px;
+  color: var(--mute);
+}
+.mascot__head-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+.mascot__x {
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.mascot__x:hover {
+  color: var(--text);
+  background: var(--card2);
+}
+.mascot__log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 150px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.mascot__msg {
+  max-width: 86%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  animation: mascot-pop 0.18s ease-out;
+}
+.mascot__msg--bot {
+  align-self: flex-start;
+  background: var(--bub);
+  border-bottom-left-radius: 4px;
+}
+.mascot__msg--me {
+  align-self: flex-end;
+  background: var(--fill);
+  color: var(--ink);
+  border-bottom-right-radius: 4px;
+}
+.mascot__msg.is-typing {
+  color: var(--mute);
+  letter-spacing: 0.2em;
+}
+.mascot__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mascot__chip {
+  border: 1px solid var(--line);
+  background: var(--card2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.mascot__chip:hover {
+  border-color: var(--acc);
+  color: var(--acc);
+}
+.mascot__form {
+  display: flex;
+  gap: 8px;
+}
+.mascot__input {
+  flex: 1;
+  min-width: 0;
+}
+
+@keyframes mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes mascot-blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes mascot-ear {
+  0%,
+  90%,
+  100% {
+    transform: rotate(0);
+  }
+  94% {
+    transform: rotate(-7deg);
+  }
+  97% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes mascot-react {
+  0% {
+    transform: scale(0.88, 1.1);
+  }
+  55% {
+    transform: scale(1.08, 0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes mascot-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+
+/* fechar: o fundo some e o chat recolhe enquanto o bichinho volta ao cantinho */
+.mascot-stage.is-closing {
+  background: transparent;
+  backdrop-filter: none;
+  pointer-events: none;
+  transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+}
+.mascot-stage.is-closing .mascot__chat {
+  animation: mascot-chat-out 0.24s ease-in forwards;
+}
+@keyframes mascot-chat-out {
+  to {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+}
+
+/* celular: mascote menor em cima e o chat embaixo, como folha */
+@media (max-width: 820px) {
+  .mascot {
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom) + 76px);
+  }
+  .mascot-stage {
+    padding: 8px;
+    place-items: end center;
+  }
+  .mascot-stage__box {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .mascot__hero {
+    --hero-size: 110px;
+  }
+  .mascot__chat {
+    width: 100%;
+    max-height: calc(var(--vvh, 100dvh) - 150px);
+  }
+  .mascot__log {
+    min-height: 90px;
+    max-height: none;
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot-art,
+  .mascot__eyes,
+  .mascot__ear,
+  .mascot__react,
+  .mascot__chat,
+  .mascot-stage.is-closing .mascot__chat,
+  .mascot__msg,
+  .mascot-stage {
+    animation: none;
+  }
+  .mascot__tilt,
+  .mascot__wrap,
+  .mascot__back,
+  .mascot__look,
+  .mascot__face,
+  .mascot__btn {
+    transition: none;
+    transform: none;
+  }
+}

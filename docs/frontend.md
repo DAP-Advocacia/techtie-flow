@@ -93,3 +93,9 @@ Ondinha dourada no `pointerdown` de `.btn, .pill, .contacts-chip, .stage-chip, .
 6. Mobile: teste a 820 px; modais e painéis seguem o padrão de folha de baixo; use `--vvh`.
 7. Campo de data/hora/contato: use `fields/`, não o nativo.
 8. Testes de tela rodam num DOM simulado (ver [testes.md](testes.md)); eles **não medem layout** — olhe no navegador.
+
+- **Mascote "Flow"** (`shell/mascot.js`, `mascot-model.js`, `css/mascot.css`): único toque colorido/"fofo" do CRM, exceção consciente à regra de visual
+  sóbrio. Fase 1, sem IA: cantinho fixo; o clique leva o bichinho ao meio da tela com um chat (palco `.mascot-stage`, largura por `--modal-w`,
+  folha de baixo no celular, Esc/fora fecha, foco preso). Respostas e humores por palavra-chave em `mascot-model.js` (`reply`); o olhar segue o
+  cursor por `--lx/--ly` (um único ouvinte `pointermove`, desligado com `prefers-reduced-motion`). Minimizar: `localStorage['ttf:mascot']`;
+  a conversa vive só na sessão do navegador.

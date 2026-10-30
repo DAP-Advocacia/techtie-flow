@@ -21,6 +21,7 @@ import { renderTopbar } from './shell/topbar.js';
 import { openPalette } from './search/palette.js';
 import { openMenu } from './shell/menu.js';
 import { newActions } from './shell/new.js';
+import { createMascot } from './shell/mascot.js';
 import { trackViewport } from './viewport.js';
 import { initFx } from './fx.js';
 import { totalUnread as chatUnread } from './screens/inbox/chat/actions.js';
@@ -242,7 +243,7 @@ async function render() {
     const backdrop = h('div', { class: 'nav-backdrop', onclick: () => setNav(false) });
     sidebarHost.addEventListener('click', (e) => e.target.closest('.nav-item') && setNav(false));
     app.addEventListener('keydown', (e) => e.key === 'Escape' && setNav(false));
-    app.append(mobilebar, backdrop, sidebarHost, h('main', { class: 'app__main' }, topHost, screenEl), tabHost);
+    app.append(mobilebar, backdrop, sidebarHost, h('main', { class: 'app__main' }, topHost, screenEl), tabHost, createMascot({ routeId: route.id, firstName: (store.user()?.name || '').split(' ')[0] }));
     replaceChildren(root, app);
   } else {
     replaceChildren(root, h('div', { class: 'app' }, h('main', { class: 'app__main' }, screenEl)));

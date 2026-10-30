@@ -34,7 +34,7 @@ npm run build:static           # dist/ para site estático (Vercel)
 6. **Campos de data, hora e contato:** use `public/js/fields/` (os nativos seguem o idioma do navegador e não escalam com milhares de contatos).
 7. **Modais:** largura por `--modal-w` (nunca `width` inline), folha de baixo no celular, medidas por `--vvh/--vvt` (nunca `100vh`).
    Ponto de corte do celular: 820 px. Animações respeitam `prefers-reduced-motion`.
-8. Visual **sóbrio, preto e dourado da marca**; nada de "cara de IA genérica".
+8. Visual **sóbrio, preto e dourado da marca**; nada de "cara de IA genérica". **Exceção:** o mascote "Flow" (roxo, brilhante) é de propósito.
 
 ## Fluxo de trabalho
 
